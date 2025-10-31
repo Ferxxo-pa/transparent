@@ -30,7 +30,7 @@ export const HomePage: React.FC = () => {
         onClick={() => navigate('/login')}
         className="absolute top-10 right-10 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans'] z-20"
       >
-        Login
+        waa.sol
       </button>
 
       {/* Frame wrapper pinned to Figma width + TOP PADDING to clear Login */}
