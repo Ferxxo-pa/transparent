@@ -36,7 +36,7 @@ export const HomePage: React.FC = () => {
       {/* Frame wrapper pinned to Figma width + TOP PADDING to clear Login */}
       <div className="w-full max-w-[1440px] mx-auto pt-[80px]">
         {/* Cropped logo; exact 69px visual gap below it */}
-        <TransparentLogo className="mb-[20px]" />
+        <TransparentLogo className="mb-[200px]" />
 
         <div className="w-full relative z-10">
           {/* Gap between buttons from your design; adjust if needed */}
