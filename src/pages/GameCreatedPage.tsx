@@ -113,7 +113,7 @@ export const GameCreatedPage: React.FC = () => {
             className="text-[#BFFB4F] text-3xl font-bold"
             style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
           >
-            {gameState.players.length} / 4
+            {gameState.players.length} / 10
           </p>
         </div>
 
