@@ -13,7 +13,7 @@ export const CreateGamePage: React.FC = () => {
   const [roomName, setRoomName] = useState('');
 
   const handleCreate = () => {
-    const buyInAmount = parseFloat(buyIn) || 0.1;
+    const buyInAmount = parseFloat(buyIn) || 1;
     createGame(buyInAmount, roomName);
     navigate('/created');
   };
