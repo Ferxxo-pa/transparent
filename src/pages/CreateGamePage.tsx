@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import logoSvg from '../assets/logo.svg';
+import transparentLogo from '../assets/transparent logo copy copy.png';
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
@@ -41,9 +41,9 @@ export const CreateGamePage: React.FC = () => {
       {/* Centered logo */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2">
         <img
-          src={logoSvg}
+          src={transparentLogo}
           alt="Transparent"
-          style={{ height: '80px', width: 'auto' }}
+          style={{ height: '100px', width: 'auto' }}
         />
       </div>
 
