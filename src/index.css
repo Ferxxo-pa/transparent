@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;700&family=Pixelify+Sans:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .text-pixel {
+    font-family: 'Pixelify Sans', cursive;
+  }
+
+  .text-gradient {
+    background: linear-gradient(90deg, #BFFB4F 0%, #70AC00 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(32px);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(217, 217, 217, 0.03) 100%);
+    box-shadow: -87px 214px 94px rgba(145, 145, 145, 0.01),
+                -48px 120px 77px rgba(145, 145, 145, 0.03),
+                -22px 55px 58px rgba(145, 145, 145, 0.04),
+                -6px 12px 32px rgba(145, 145, 145, 0.05),
+                inset 0px -16px 12px rgba(255, 255, 255, 0.25),
+                inset 0px 12px 12px rgba(255, 255, 255, 0.25);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px rgba(191, 251, 79, 0.5),
+                0 0 40px rgba(191, 251, 79, 0.3);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(166, 123, 236, 0.5),
+                0 0 40px rgba(166, 123, 236, 0.3);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
