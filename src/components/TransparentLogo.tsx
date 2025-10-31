@@ -1,13 +1,18 @@
 import React from 'react';
-import transparentLogo from '../assets/transparent logo copy copy.png';
+import transparentLogo from '../assets/trans 3.svg';
 
 export const TransparentLogo: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
-    <div className={`leading-none ${className}`}>
+    <div className={`relative -mb-[150px] z-10 ${className}`}>
       <img
         src={transparentLogo}
         alt="Transparent"
-        className="block w-full h-auto select-none pointer-events-none align-bottom"
+        className="w-full h-auto pointer-events-none select-none"
+        style={{
+          maxWidth: '1440px',
+          margin: '0 auto',
+          display: 'block',
+        }}
       />
     </div>
   );
