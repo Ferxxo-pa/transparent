@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import transparentLogo from '../assets/transparent logo copy copy.png';
+import transparentLogo from '../assets/trans 3.svg';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();

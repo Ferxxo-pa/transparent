@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import transparentLogo from '../assets/transparent logo copy copy copy.png';
+import transparentLogo from '../assets/trans 3.svg';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();

@@ -4,10 +4,10 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import groupIcon from '../assets/Group icon.png';
-import moneyBagIcon from '../assets/money bag icon.png';
-import moneyIcon from '../assets/money icon.png';
-import transparentLogo from '../assets/transparent logo copy copy.png';
+import groupIcon from '../assets/Group.svg';
+import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
+import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
+import transparentLogo from '../assets/trans 3.svg';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();

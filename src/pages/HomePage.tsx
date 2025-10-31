@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { TransparentLogo } from '../components/TransparentLogo';
 import { GlassCard } from '../components/GlassCard';
 import addIcon from '../assets/Add.svg';
-import starIcon from '../assets/Star.png';
-import groupIcon from '../assets/Group icon.png';
-import moneyIcon from '../assets/money icon.png';
-import handIcon from '../assets/hand icon.png';
-import fireIcon from '../assets/fire icon.png';
-import messageIcon from '../assets/message icon.png';
-import moneyBagIcon from '../assets/money bag icon.png';
+import starIcon from '../assets/Star.svg';
+import groupIcon from '../assets/Group.svg';
+import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
+import handIcon from '../assets/Group copy.svg';
+import fireIcon from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
+import messageIcon from '../assets/email-mail-chat--Streamline-Pixel.svg';
+import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();

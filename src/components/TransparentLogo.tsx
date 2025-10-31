@@ -1,5 +1,5 @@
 import React from 'react';
-import transparentLogo from '../assets/trans 3.png';
+import transparentLogo from '../assets/trans 3.svg';
 
 export const TransparentLogo: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
