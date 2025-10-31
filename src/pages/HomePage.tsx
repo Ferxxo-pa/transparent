@@ -2,25 +2,18 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TransparentLogo } from '../components/TransparentLogo';
 import { GlassCard } from '../components/GlassCard';
-import addIcon from '../assets/Add.svg';
-import starIcon from '../assets/Star.png';
-import groupIcon from '../assets/Group icon.png';
-import moneyIcon from '../assets/money icon.png';
-import handIcon from '../assets/hand icon.png';
-import fireIcon from '../assets/fire icon.png';
-import messageIcon from '../assets/message icon.png';
-import moneyBagIcon from '../assets/money bag icon.png';
+import { Plus, Star, Users, Coins, Hand, Flame, MessageSquare, Wallet } from 'lucide-react';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
 
   const howToPlaySteps = [
-    { number: 1, iconSrc: groupIcon, title: 'Host or Join' },
-    { number: 2, iconSrc: moneyIcon, title: 'Buy-In' },
-    { number: 3, iconSrc: fireIcon, title: 'Hot Seat' },
-    { number: 4, iconSrc: messageIcon, title: 'Vote' },
-    { number: 5, iconSrc: handIcon, title: 'Hold or Fold' },
-    { number: 6, iconSrc: moneyBagIcon, title: 'Winner Takes All' },
+    { number: 1, Icon: Users, title: 'Host or Join' },
+    { number: 2, Icon: Coins, title: 'Buy-In' },
+    { number: 3, Icon: Flame, title: 'Hot Seat' },
+    { number: 4, Icon: MessageSquare, title: 'Vote' },
+    { number: 5, Icon: Hand, title: 'Hold or Fold' },
+    { number: 6, Icon: Wallet, title: 'Winner Takes All' },
   ];
 
   return (
@@ -48,7 +41,7 @@ export const HomePage: React.FC = () => {
             >
               <GlassCard className="h-full">
                 <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-                  <img src={addIcon} alt="Add" className="w-28 h-28" />
+                  <Plus className="w-28 h-28 text-[#BFFB4F]" strokeWidth={1.5} />
                   <h2 className="text-white text-4xl font-bold">Join Game</h2>
                 </div>
               </GlassCard>
@@ -61,7 +54,7 @@ export const HomePage: React.FC = () => {
             >
               <GlassCard className="h-full">
                 <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-                  <img src={starIcon} alt="Star" className="w-28 h-28" />
+                  <Star className="w-28 h-28 text-[#BFFB4F] fill-[#BFFB4F]" strokeWidth={1.5} />
                   <h2 className="text-white text-4xl font-bold">Create Game</h2>
                 </div>
               </GlassCard>
@@ -88,10 +81,9 @@ export const HomePage: React.FC = () => {
                   >
                     {step.number}.
                   </div>
-                  <img
-                    src={step.iconSrc}
-                    alt={step.title}
-                    className="w-full h-full object-contain"
+                  <step.Icon
+                    className="w-full h-full text-[#BFFB4F]"
+                    strokeWidth={1.5}
                   />
                 </div>
                 <p

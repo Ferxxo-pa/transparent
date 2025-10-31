@@ -4,7 +4,7 @@ import { Trash2 } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import transparentLogo from '../assets/transparent logo copy copy copy.png';
+import logoSvg from '../assets/logo.svg';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -52,9 +52,9 @@ export const GamePlayPage: React.FC = () => {
       {/* Centered logo — identical placement */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2">
         <img
-          src={transparentLogo}
+          src={logoSvg}
           alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
+          style={{ height: '80px', width: 'auto' }}
         />
       </div>
 

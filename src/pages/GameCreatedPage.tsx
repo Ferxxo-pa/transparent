@@ -1,13 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users, Coins, Wallet } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
-import groupIcon from '../assets/Group icon.png';
-import moneyBagIcon from '../assets/money bag icon.png';
-import moneyIcon from '../assets/money icon.png';
-import transparentLogo from '../assets/transparent logo copy copy.png';
+import logoSvg from '../assets/logo.svg';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -45,9 +42,9 @@ export const GameCreatedPage: React.FC = () => {
       {/* Centered logo */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2">
         <img
-          src={transparentLogo}
+          src={logoSvg}
           alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
+          style={{ height: '80px', width: 'auto' }}
         />
       </div>
 
@@ -86,7 +83,7 @@ export const GameCreatedPage: React.FC = () => {
 
       <div className="grid grid-cols-3 gap-12 mb-12">
         <div className="flex flex-col items-center gap-4">
-          <img src={moneyIcon} alt="Buy-In" className="w-20 h-20" />
+          <Coins className="w-20 h-20 text-[#BFFB4F]" strokeWidth={1.5} />
           <p
             className="text-white font-bold text-xl"
             style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
@@ -102,7 +99,7 @@ export const GameCreatedPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          <img src={groupIcon} alt="Players" className="w-20 h-20" />
+          <Users className="w-20 h-20 text-[#BFFB4F]" strokeWidth={1.5} />
           <p
             className="text-white font-bold text-xl"
             style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
@@ -118,7 +115,7 @@ export const GameCreatedPage: React.FC = () => {
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          <img src={moneyBagIcon} alt="Total Pot" className="w-20 h-20" />
+          <Wallet className="w-20 h-20 text-[#BFFB4F]" strokeWidth={1.5} />
           <p
             className="text-white font-bold text-xl"
             style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
