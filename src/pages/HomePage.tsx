@@ -2,14 +2,14 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TransparentLogo } from '../components/TransparentLogo';
 import { GlassCard } from '../components/GlassCard';
+import { GlowButton } from '../components/GlowButton';
 import addIcon from '../assets/Add.svg';
-import starIcon from '../assets/Star.svg';
-import groupIcon from '../assets/Group.svg';
-import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
-import handIcon from '../assets/Group copy.svg';
-import fireIcon from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
-import messageIcon from '../assets/email-mail-chat--Streamline-Pixel.svg';
-import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
+import starIcon from '../assets/Star.png';
+import groupIcon from '../assets/Group icon.png';
+import moneyIcon from '../assets/money icon.png';
+import handIcon from '../assets/hand icon.png';
+import messageIcon from '../assets/message icon.png';
+import moneyBagIcon from '../assets/money bag icon.png';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export const HomePage: React.FC = () => {
   const howToPlaySteps = [
     { number: 1, iconSrc: groupIcon, title: 'Host or Join' },
     { number: 2, iconSrc: moneyIcon, title: 'Buy-In' },
-    { number: 3, iconSrc: fireIcon, title: 'Hot Seat' },
+    { number: 3, iconSrc: handIcon, title: 'Hot Seat' },
     { number: 4, iconSrc: messageIcon, title: 'Vote' },
     { number: 5, iconSrc: handIcon, title: 'Hold or Fold' },
     { number: 6, iconSrc: moneyBagIcon, title: 'Winner Takes All' },
@@ -25,22 +25,24 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-6">
-      {/* Login pill */}
+      {/* Login Button */}
       <button
         onClick={() => navigate('/login')}
-        className="absolute top-10 right-10 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans'] z-20"
+        className="absolute top-10 right-10 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans']"
       >
         Login
       </button>
 
-      {/* Frame wrapper pinned to Figma width + TOP PADDING to clear Login */}
-      <div className="w-full max-w-[1440px] mx-auto pt-[80px]">
-        {/* Cropped logo; exact 69px visual gap below it */}
-        <TransparentLogo className="mb-[10px]" />
+      {/* LOGO — bounding box fix */}
+      <div className="relative flex flex-col items-center w-full">
+        {/* Removes that hidden empty space below the PNG */}
+        <div className="-mb-[113px] leading-none">
+          <TransparentLogo className="block" />
+        </div>
 
-        <div className="w-full relative z-10">
-          {/* Gap between buttons from your design; adjust if needed */}
-          <div className="flex gap-[80px] justify-center">
+        {/* Buttons below logo */}
+        <div className="w-full max-w-4xl relative z-10">
+          <div className="flex gap-8 justify-center">
             <button
               onClick={() => navigate('/join')}
               className="hover:scale-105 transition-all duration-300"
@@ -68,41 +70,41 @@ export const HomePage: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
 
-        {/* 69px from buttons to HOW TO PLAY */}
-        <div className="w-full mt-[69px] max-w-[1200px] mx-auto">
-          <h2
-            className="text-white/70 text-4xl font-bold text-center mb-8"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-          >
-            HOW TO PLAY
-          </h2>
+      {/* HOW TO PLAY section */}
+      <div className="w-full max-w-5xl mt-[69px]">
+        <h2
+          className="text-white/70 text-3xl text-center mb-6"
+          style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+        >
+          HOW TO PLAY
+        </h2>
 
-          <div className="grid grid-cols-6 gap-8">
-            {howToPlaySteps.map((step) => (
-              <div key={step.number} className="flex flex-col items-center gap-3">
-                <div className="w-20 h-20 flex items-center justify-center relative">
-                  <div
-                    className="absolute top-0 -left-6 text-white text-lg font-bold"
-                    style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                  >
-                    {step.number}.
-                  </div>
-                  <img
-                    src={step.iconSrc}
-                    alt={step.title}
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <p
-                  className="text-white text-center font-bold text-sm"
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                >
-                  {step.title}
-                </p>
+        <div className="grid grid-cols-6 gap-6">
+          {howToPlaySteps.map((step) => (
+            <div key={step.number} className="flex flex-col items-center gap-2">
+              <div
+                className="text-white text-xs font-bold"
+                style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+              >
+                {step.number}.
               </div>
-            ))}
-          </div>
+              <div className="w-14 h-14 flex items-center justify-center">
+                <img
+                  src={step.iconSrc}
+                  alt={step.title}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <p
+                className="text-white text-center font-bold text-sm"
+                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+              >
+                {step.title}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
