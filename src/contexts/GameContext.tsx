@@ -21,12 +21,13 @@ const generateRoomCode = (): string => {
 };
 
 const generateFakePlayers = (count: number, buyIn: number): Player[] => {
+  const customBalances = [1.73, 0.85, 0.24, 1.18];
   const players: Player[] = [];
   for (let i = 0; i < count; i++) {
     players.push({
       id: `player-${i + 1}`,
       name: FAKE_PLAYER_NAMES[i % FAKE_PLAYER_NAMES.length],
-      balance: buyIn,
+      balance: customBalances[i] || buyIn,
       isHost: i === 0,
     });
   }
