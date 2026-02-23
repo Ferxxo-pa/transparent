@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TransparentLogo } from '../components/TransparentLogo';
 import { GlassCard } from '../components/GlassCard';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import addIcon from '../assets/Add.svg';
 import starIcon from '../assets/Star.svg';
 import groupIcon from '../assets/Group.svg';
@@ -13,6 +14,7 @@ import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixe
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { connected, login, logout, displayName } = usePrivyWallet();
 
   const howToPlaySteps = [
     { number: 1, iconSrc: groupIcon, title: 'Host or Join' },
@@ -23,14 +25,22 @@ export const HomePage: React.FC = () => {
     { number: 6, iconSrc: moneyBagIcon, title: 'Winner Takes All' },
   ];
 
+  const handleLoginClick = () => {
+    if (connected) {
+      logout();
+    } else {
+      login();
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-8 py-6">
       {/* Login pill */}
       <button
-        onClick={() => navigate('/login')}
+        onClick={handleLoginClick}
         className="absolute top-10 right-10 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans'] z-20"
       >
-        waa.sol
+        {connected ? displayName : 'Login'}
       </button>
 
       {/* Frame wrapper pinned to Figma width + TOP PADDING to clear Login */}

@@ -4,11 +4,13 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import transparentLogo from '../assets/trans 3.svg';
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, startGame } = useGame();
+  const { connected, displayName } = usePrivyWallet();
 
   useEffect(() => {
     if (gameState?.gameStatus === 'playing') {
@@ -40,7 +42,7 @@ export const WaitingRoomPage: React.FC = () => {
 
       <div className="absolute top-10 right-10">
         <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          waa.sol
+          {connected ? displayName : 'Not Connected'}
         </div>
       </div>
 
@@ -85,7 +87,7 @@ export const WaitingRoomPage: React.FC = () => {
         </GlassCard>
       </div>
 
-      {/* 2) Players section - moved up & horizontal line */}
+      {/* 2) Players section — real players from Supabase real-time subscription */}
       <div className="text-center -mt-20">
         <h3
           className="text-white text-4xl font-bold mb-6"
@@ -101,7 +103,7 @@ export const WaitingRoomPage: React.FC = () => {
               className="text-2xl font-bold text-white"
               style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
             >
-              {player.name}: {player.balance.toFixed(2)} SOL
+              {player.name}: {gameState.buyInAmount.toFixed(2)} SOL
             </p>
           ))}
         </div>

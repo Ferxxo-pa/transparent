@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
+import { WalletBridge } from './components/WalletBridge';
 import { Background } from './components/Background';
 import { HomePage } from './pages/HomePage';
 import { JoinGamePage } from './pages/JoinGamePage';
@@ -11,21 +13,24 @@ import { GameOverPage } from './pages/GameOverPage';
 
 function App() {
   return (
-    <GameProvider>
-      <Router>
-        <Background />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/join" element={<JoinGamePage />} />
-          <Route path="/create" element={<CreateGamePage />} />
-          <Route path="/created" element={<GameCreatedPage />} />
-          <Route path="/waiting" element={<WaitingRoomPage />} />
-          <Route path="/game" element={<GamePlayPage />} />
-          <Route path="/gameover" element={<GameOverPage />} />
-          <Route path="/login" element={<HomePage />} />
-        </Routes>
-      </Router>
-    </GameProvider>
+    <PrivyWalletProvider>
+      <GameProvider>
+        <WalletBridge />
+        <Router>
+          <Background />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/join" element={<JoinGamePage />} />
+            <Route path="/create" element={<CreateGamePage />} />
+            <Route path="/created" element={<GameCreatedPage />} />
+            <Route path="/waiting" element={<WaitingRoomPage />} />
+            <Route path="/game" element={<GamePlayPage />} />
+            <Route path="/gameover" element={<GameOverPage />} />
+            <Route path="/login" element={<HomePage />} />
+          </Routes>
+        </Router>
+      </GameProvider>
+    </PrivyWalletProvider>
   );
 }
 

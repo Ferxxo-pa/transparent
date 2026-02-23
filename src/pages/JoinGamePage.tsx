@@ -4,12 +4,15 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import transparentLogo from '../assets/trans 3.svg';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
-  const { joinGame } = useGame();
+  const { joinGame, loading, error } = useGame();
+  const { connected, login, displayName } = usePrivyWallet();
   const [roomCode, setRoomCode] = useState('');
+  const [nickname, setNickname] = useState('');
 
   const handleRoomCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/[^0-9]/g, '');
@@ -19,9 +22,13 @@ export const JoinGamePage: React.FC = () => {
     setRoomCode(value);
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
+    if (!connected) {
+      login();
+      return;
+    }
     if (roomCode.length === 7) {
-      joinGame(roomCode);
+      await joinGame(roomCode, nickname.trim() || undefined);
       navigate('/waiting');
     }
   };
@@ -40,7 +47,7 @@ export const JoinGamePage: React.FC = () => {
 
       <div className="absolute top-10 right-10">
         <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          waa.sol
+          {connected ? displayName : 'Not Connected'}
         </div>
       </div>
 
@@ -57,6 +64,25 @@ export const JoinGamePage: React.FC = () => {
           <h2 className="text-white text-4xl font-bold">Join Game</h2>
 
           <div className="w-full">
+            {/* Nickname input */}
+            <p
+              className="text-white/90 text-2xl text-center mb-3 font-bold"
+              style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+            >
+              Your Name
+            </p>
+            <div className="backdrop-blur-md bg-black/80 rounded-full p-4 mb-6">
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="Enter nickname..."
+                maxLength={20}
+                className="w-full bg-transparent text-[#BFFB4F] text-2xl text-center font-bold outline-none placeholder-[#BFFB4F]/40"
+                style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+              />
+            </div>
+
             <p
               className="text-white/90 text-3xl text-center mb-6"
               style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
@@ -76,9 +102,14 @@ export const JoinGamePage: React.FC = () => {
               />
             </div>
 
+            {/* Error display */}
+            {error && (
+              <p className="text-red-400 text-sm text-center mb-4">{error}</p>
+            )}
+
             <div className="flex justify-center">
               <GlowButton onClick={handleJoin} variant="purple">
-                ACCESS GAME
+                {loading ? 'Joining...' : connected ? 'ACCESS GAME' : 'Connect Wallet'}
               </GlowButton>
             </div>
           </div>

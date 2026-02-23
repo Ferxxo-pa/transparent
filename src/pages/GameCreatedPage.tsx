@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import groupIcon from '../assets/Group.svg';
 import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
 import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
@@ -11,15 +12,16 @@ import transparentLogo from '../assets/trans 3.svg';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame } = useGame();
+  const { gameState, startGame, loading } = useGame();
+  const { connected, displayName } = usePrivyWallet();
 
   if (!gameState) {
     navigate('/');
     return null;
   }
 
-  const handleStartGame = () => {
-    startGame();
+  const handleStartGame = async () => {
+    await startGame();
     navigate('/game');
   };
 
@@ -38,7 +40,7 @@ export const GameCreatedPage: React.FC = () => {
 
       <div className="absolute top-10 right-10">
         <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          waa.sol
+          {connected ? displayName : 'Not Connected'}
         </div>
       </div>
 
@@ -77,7 +79,7 @@ export const GameCreatedPage: React.FC = () => {
             <div className="flex gap-4 w-full px-4">
               <GlowButton variant="purple" className="flex-1 !py-2">Share link</GlowButton>
               <GlowButton onClick={handleStartGame} variant="neon" className="flex-1 !py-2">
-                Start Game
+                {loading ? 'Starting...' : 'Start Game'}
               </GlowButton>
             </div>
           </div>
@@ -134,7 +136,7 @@ export const GameCreatedPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Players */}
+      {/* Real players from Supabase */}
       <div className="flex flex-wrap justify-center gap-8 mb-12">
         {gameState.players.map((player, index) => (
           <p
@@ -142,7 +144,7 @@ export const GameCreatedPage: React.FC = () => {
             className="text-[#BFFB4F] text-3xl font-bold"
             style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
           >
-            player {index + 1}
+            {player.name || `player ${index + 1}`}
           </p>
         ))}
       </div>
