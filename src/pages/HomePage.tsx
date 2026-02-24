@@ -184,7 +184,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
               whileTap={btnTap}
               whileHover={{ scale: 1.02 }}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              onClick={() => {}}
+              onClick={() => navigate('/waitlist')}
             >
               Get the physical game →
             </motion.button>
@@ -290,7 +290,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
                 </div>
               </div>
             </div>
-            <motion.button className="btn btn-secondary" style={{ marginTop: 4, fontSize: 13, height: 44 }} whileTap={btnTap} whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} onClick={() => {}}>
+            <motion.button className="btn btn-secondary" style={{ marginTop: 4, fontSize: 13, height: 44 }} whileTap={btnTap} whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} onClick={() => navigate('/waitlist')}>
               Get the physical game →
             </motion.button>
           </div>

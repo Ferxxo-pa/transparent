@@ -13,6 +13,7 @@ import { GameCreatedPage } from './pages/GameCreatedPage';
 import { WaitingRoomPage } from './pages/WaitingRoomPage';
 import { GamePlayPage } from './pages/GamePlayPage';
 import { GameOverPage } from './pages/GameOverPage';
+import { WaitlistPage } from './pages/WaitlistPage';
 
 // ── Page transition wrapper ────────────────────────────────
 export const pageVariants = {
@@ -69,6 +70,7 @@ function AnimatedRoutes() {
         <Route path="/waiting" element={<PageWrap><WaitingRoomPage /></PageWrap>} />
         <Route path="/game"    element={<PageWrap><GamePlayPage /></PageWrap>} />
         <Route path="/gameover"element={<PageWrap><GameOverPage /></PageWrap>} />
+        <Route path="/waitlist" element={<PageWrap><WaitlistPage /></PageWrap>} />
         <Route path="/login"   element={<PageWrap><HomePage /></PageWrap>} />
       </Routes>
     </AnimatePresence>
