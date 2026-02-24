@@ -21,8 +21,8 @@ export const JoinGamePage: React.FC = () => {
 
   const handleJoin = async () => {
     if (!canJoin) return;
-    await joinGame(code, nickname.trim() || undefined);
-    navigate('/waiting');
+    const ok = await joinGame(code, nickname.trim() || undefined);
+    if (ok) navigate('/waiting');
   };
 
   return (

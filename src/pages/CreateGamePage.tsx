@@ -25,8 +25,8 @@ export const CreateGamePage: React.FC = () => {
   const handleCreate = async () => {
     const filtered = mode === 'custom' ? customQs.filter(q => q.trim()) : undefined;
     if (mode === 'custom' && !filtered?.length) return;
-    await createGame(parseFloat(buyIn) || 0.1, roomName.trim() || 'Game Room', mode, filtered, nickname.trim() || undefined);
-    navigate('/created');
+    const ok = await createGame(parseFloat(buyIn) || 0.1, roomName.trim() || 'Game Room', mode, filtered, nickname.trim() || undefined);
+    if (ok) navigate('/created');
   };
 
   return (

@@ -35,8 +35,8 @@ interface GameContextType {
   gameState: GameState | null;
   loading: boolean;
   error: string | null;
-  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string) => Promise<void>;
-  joinGame: (roomCode: string, playerName?: string) => Promise<void>;
+  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string) => Promise<boolean>;
+  joinGame: (roomCode: string, playerName?: string) => Promise<boolean>;
   startGame: () => Promise<void>;
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
   submitQuestion: (text: string) => Promise<void>;
@@ -257,9 +257,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 7. Subscribe to real-time updates
         setupSubscription(game.id, wallet.publicKey.toBase58());
+        return true;
       } catch (err: any) {
         console.error('Create game error:', err);
         setError(err.message || 'Failed to create game');
+        return false;
       } finally {
         setLoading(false);
       }
@@ -359,9 +361,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 6. Subscribe
         setupSubscription(game.id, game.host_wallet);
+        return true;
       } catch (err: any) {
         console.error('Join game error:', err);
         setError(err.message || 'Failed to join game');
+        return false;
       } finally {
         setLoading(false);
       }
