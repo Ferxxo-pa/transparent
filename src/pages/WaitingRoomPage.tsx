@@ -7,7 +7,7 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame } = useGame();
+  const { gameState, startGame, loading, error } = useGame();
   const { publicKey } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
 
@@ -88,6 +88,12 @@ export const WaitingRoomPage: React.FC = () => {
         </div>
       </div>
 
+      {error && (
+        <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13, width: '100%' }}>
+          {error}
+        </div>
+      )}
+
       {/* CTA */}
       <div style={{ width: '100%', paddingTop: 16 }}>
         {isHost ? (
@@ -95,11 +101,12 @@ export const WaitingRoomPage: React.FC = () => {
             <motion.button
               className="btn btn-primary"
               onClick={async () => { await startGame(); navigate('/game'); }}
+              disabled={loading}
               whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+              whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
             >
-              Start Game →
+              {loading ? 'Starting…' : 'Start Game →'}
             </motion.button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
               Start with any number of players
