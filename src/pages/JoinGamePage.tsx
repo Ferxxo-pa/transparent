@@ -1,11 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { GlassCard } from '../components/GlassCard';
-import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import transparentLogo from '../assets/trans 3.svg';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,106 +12,72 @@ export const JoinGamePage: React.FC = () => {
   const [nickname, setNickname] = useState('');
 
   const handleRoomCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/[^0-9]/g, '');
-    if (value.length > 3) {
-      value = value.slice(0, 3) + '-' + value.slice(3, 6);
-    }
-    setRoomCode(value);
+    let v = e.target.value.replace(/[^0-9]/g, '');
+    if (v.length > 3) v = v.slice(0, 3) + '-' + v.slice(3, 6);
+    setRoomCode(v);
   };
 
   const handleJoin = async () => {
-    if (!connected) {
-      login();
-      return;
-    }
+    if (!connected) { login(); return; }
     if (roomCode.length === 7) {
       await joinGame(roomCode, nickname.trim() || undefined);
       navigate('/waiting');
     }
   };
 
+  const isReady = roomCode.length === 7 && connected;
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8">
-      <div className="absolute top-10 left-10">
+    <div className="page">
+      <nav className="navbar">
+        <button className="btn btn-icon" onClick={() => navigate('/')} style={{ border: 'none' }}>
+          <ArrowLeft size={18} />
+        </button>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>Join Game</span>
+        <div className="badge badge-neutral">{connected ? displayName : 'Not connected'}</div>
+      </nav>
+
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
+        {/* Room code input */}
+        <div>
+          <label className="label">Room Code</label>
+          <input
+            className="input-code"
+            value={roomCode}
+            onChange={handleRoomCodeChange}
+            placeholder="000-000"
+            maxLength={7}
+          />
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8, textAlign: 'center' }}>
+            Ask the host for the 6-digit code
+          </p>
+        </div>
+
+        {/* Nickname */}
+        <div>
+          <label className="label">Your Nickname</label>
+          <input
+            className="input"
+            type="text"
+            value={nickname}
+            onChange={e => setNickname(e.target.value)}
+            placeholder="How should people know you?"
+            maxLength={20}
+          />
+        </div>
+
+        {error && <p style={{ color: 'var(--danger)', fontSize: 13, textAlign: 'center' }}>{error}</p>}
+
         <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans']"
+          className="btn btn-primary"
+          onClick={handleJoin}
+          disabled={loading || (!connected ? false : !isReady)}
+          style={{ fontSize: 16, padding: '18px' }}
         >
-          <ArrowLeft size={20} color="#BFFB4F" />
-          <span>Back</span>
+          {loading ? 'Joining...' : !connected ? 'Connect Wallet to Join' : isReady ? 'Join Game →' : 'Enter Room Code'}
         </button>
       </div>
-
-      <div className="absolute top-10 right-10">
-        <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          {connected ? displayName : 'Not Connected'}
-        </div>
-      </div>
-
-      <div className="absolute top-10 left-1/2 -translate-x-1/2">
-        <img
-          src={transparentLogo}
-          alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
-        />
-      </div>
-
-      <GlassCard className="w-full max-w-xl">
-        <div className="flex flex-col items-center gap-8 py-8">
-          <h2 className="text-white text-4xl font-bold">Join Game</h2>
-
-          <div className="w-full">
-            {/* Nickname input */}
-            <p
-              className="text-white/90 text-2xl text-center mb-3 font-bold"
-              style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-            >
-              Your Name
-            </p>
-            <div className="backdrop-blur-md bg-black/80 rounded-full p-4 mb-6">
-              <input
-                type="text"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder="Enter nickname..."
-                maxLength={20}
-                className="w-full bg-transparent text-[#BFFB4F] text-2xl text-center font-bold outline-none placeholder-[#BFFB4F]/40"
-                style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-              />
-            </div>
-
-            <p
-              className="text-white/90 text-3xl text-center mb-6"
-              style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-            >
-              Enter The Room Code To Join
-            </p>
-
-            <div className="backdrop-blur-md bg-black/80 rounded-full p-4 mb-6">
-              <input
-                type="text"
-                value={roomCode}
-                onChange={handleRoomCodeChange}
-                placeholder="X X X - X X X"
-                maxLength={7}
-                className="w-full bg-transparent text-[#BFFB4F] text-4xl text-center font-bold outline-none placeholder-[#BFFB4F]/40"
-                style={{ fontFamily: 'Pixelify Sans, sans-serif', letterSpacing: '0.5em' }}
-              />
-            </div>
-
-            {/* Error display */}
-            {error && (
-              <p className="text-red-400 text-sm text-center mb-4">{error}</p>
-            )}
-
-            <div className="flex justify-center">
-              <GlowButton onClick={handleJoin} variant="purple">
-                {loading ? 'Joining...' : connected ? 'ACCESS GAME' : 'Connect Wallet'}
-              </GlowButton>
-            </div>
-          </div>
-        </div>
-      </GlassCard>
     </div>
   );
 };

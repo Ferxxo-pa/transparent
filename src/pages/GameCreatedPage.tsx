@@ -1,152 +1,120 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { GlassCard } from '../components/GlassCard';
-import { GlowButton } from '../components/GlowButton';
+import { Copy, Check } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import groupIcon from '../assets/Group.svg';
-import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
-import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
-import transparentLogo from '../assets/trans 3.svg';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, startGame, loading } = useGame();
-  const { connected, displayName } = usePrivyWallet();
+  const { displayName } = usePrivyWallet();
+  const [copied, setCopied] = useState(false);
 
-  if (!gameState) {
-    navigate('/');
-    return null;
-  }
+  if (!gameState) { navigate('/'); return null; }
 
-  const handleStartGame = async () => {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(gameState.roomCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleStart = async () => {
     await startGame();
     navigate('/game');
   };
 
+  const potTotal = (gameState.players.length * gameState.buyInAmount).toFixed(2);
+
   return (
-    <div className="min-h-screen flex flex-col items-center px-8">
-      {/* Top buttons */}
-      <div className="absolute top-10 left-10">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans']"
-        >
-          <ArrowLeft size={20} color="#BFFB4F" />
-          <span>Back</span>
-        </button>
-      </div>
+    <div className="page">
+      <nav className="navbar">
+        <div className="badge badge-lime">🎮 Lobby</div>
+        <div className="badge badge-neutral">{displayName}</div>
+      </nav>
 
-      <div className="absolute top-10 right-10">
-        <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          {connected ? displayName : 'Not Connected'}
-        </div>
-      </div>
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-      {/* Centered logo */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2">
-        <img
-          src={transparentLogo}
-          alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
-        />
-      </div>
-
-      {/* ✅ Match JoinGamePage card positioning */}
-      <div className="flex flex-col items-center justify-center mt-[180px]">
-        <GlassCard className="w-full max-w-2xl mb-8">
-          <div className="flex flex-col items-center gap-8 py-12">
-            <h3
-              className="text-white text-4xl font-bold"
-              style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+        {/* Room code */}
+        <div className="card-lg" style={{ textAlign: 'center' }}>
+          <p className="label" style={{ textAlign: 'center', marginBottom: 12 }}>Share this code</p>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16,
+            marginBottom: 12
+          }}>
+            <span style={{
+              fontFamily: 'Pixelify Sans', fontSize: 40, fontWeight: 700,
+              color: 'var(--lime)', letterSpacing: '0.2em'
+            }}>
+              {gameState.roomCode}
+            </span>
+            <button
+              onClick={handleCopy}
+              className="btn btn-icon"
+              style={{ color: copied ? 'var(--lime)' : 'var(--text-2)' }}
             >
-              Room Code
-            </h3>
-
-            <div className="backdrop-blur-md bg-black/80 rounded-full px-8 py-4">
-              <p
-                className="text-[#BFFB4F] text-5xl font-bold"
-                style={{
-                  fontFamily: 'Pixelify Sans, sans-serif',
-                  letterSpacing: '0.3em',
-                }}
-              >
-                {gameState.roomCode}
-              </p>
-            </div>
-
-            <div className="flex gap-4 w-full px-4">
-              <GlowButton variant="purple" className="flex-1 !py-2">Share link</GlowButton>
-              <GlowButton onClick={handleStartGame} variant="neon" className="flex-1 !py-2">
-                {loading ? 'Starting...' : 'Start Game'}
-              </GlowButton>
-            </div>
+              {copied ? <Check size={18} /> : <Copy size={18} />}
+            </button>
           </div>
-        </GlassCard>
-      </div>
-
-      <div className="grid grid-cols-3 gap-12 mb-12">
-        <div className="flex flex-col items-center gap-4">
-          <img src={moneyIcon} alt="Buy-In" className="w-20 h-20" />
-          <p
-            className="text-white font-bold text-xl"
-            style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-          >
-            Buy-In
-          </p>
-          <p
-            className="text-[#BFFB4F] text-3xl font-bold"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-          >
-            {gameState.buyInAmount} SOL
+          <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
+            {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''} in lobby
           </p>
         </div>
 
-        <div className="flex flex-col items-center gap-4">
-          <img src={groupIcon} alt="Players" className="w-20 h-20" />
-          <p
-            className="text-white font-bold text-xl"
-            style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-          >
-            Players
-          </p>
-          <p
-            className="text-[#BFFB4F] text-3xl font-bold"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-          >
-            {gameState.players.length} / 10
-          </p>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          {[
+            { label: 'Buy-In', value: `${gameState.buyInAmount} SOL` },
+            { label: 'Players', value: `${gameState.players.length}` },
+            { label: 'Total Pot', value: `${potTotal} SOL` },
+          ].map(s => (
+            <div key={s.label} className="card" style={{ textAlign: 'center', padding: '14px 12px' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+                {s.label}
+              </div>
+              <div style={{ fontFamily: 'Pixelify Sans', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
+                {s.value}
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="flex flex-col items-center gap-4">
-          <img src={moneyBagIcon} alt="Total Pot" className="w-20 h-20" />
-          <p
-            className="text-white font-bold text-xl"
-            style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-          >
-            Total Pot
-          </p>
-          <p
-            className="text-[#BFFB4F] text-3xl font-bold"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-          >
-            {gameState.currentPot.toFixed(1)} SOL
-          </p>
+        {/* Players */}
+        <div>
+          <label className="label">Players</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {gameState.players.map((p, i) => (
+              <div key={p.id} className="player-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'var(--surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, color: 'var(--text-3)'
+                  }}>{i + 1}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name || `Player ${i + 1}`}</span>
+                  {p.isHost && <span className="badge badge-lime" style={{ padding: '2px 8px', fontSize: 10 }}>Host</span>}
+                </div>
+                <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Pixelify Sans', fontWeight: 700 }}>
+                  {gameState.buyInAmount} SOL
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Real players from Supabase */}
-      <div className="flex flex-wrap justify-center gap-8 mb-12">
-        {gameState.players.map((player, index) => (
-          <p
-            key={player.id}
-            className="text-[#BFFB4F] text-3xl font-bold"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn btn-secondary" style={{ flex: 1 }} onClick={handleCopy}>
+            {copied ? '✓ Copied!' : '📋 Copy Code'}
+          </button>
+          <button
+            className="btn btn-primary"
+            style={{ flex: 2 }}
+            onClick={handleStart}
+            disabled={loading || gameState.players.length < 1}
           >
-            {player.name || `player ${index + 1}`}
-          </p>
-        ))}
+            {loading ? 'Starting...' : 'Start Game →'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,137 +1,109 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { GlassCard } from './GlassCard';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
-interface QuestionVotePhaseProps {
+interface Props {
   hotSeatPlayerName: string;
   onTimerEnd: () => void;
 }
 
-export const QuestionVotePhase: React.FC<QuestionVotePhaseProps> = ({
-  hotSeatPlayerName,
-  onTimerEnd,
-}) => {
+export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerEnd }) => {
   const { gameState, voteForQuestion } = useGame();
   const { publicKey } = usePrivyWallet();
   const [timeLeft, setTimeLeft] = useState(15);
   const [votedId, setVotedId] = useState<string | null>(null);
-  const [winnerRevealed, setWinnerRevealed] = useState(false);
+  const [revealed, setRevealed] = useState(false);
 
   const myWallet = publicKey?.toBase58() ?? '';
   const alreadyVoted = votedId !== null || !!(gameState?.questionVotes?.[myWallet]);
 
   useEffect(() => {
     if (timeLeft <= 0) {
-      // Brief delay to show winner before advancing
-      if (!winnerRevealed) {
-        setWinnerRevealed(true);
-        setTimeout(() => onTimerEnd(), 2000);
+      if (!revealed) {
+        setRevealed(true);
+        setTimeout(onTimerEnd, 2000);
       }
       return;
     }
+    const t = setTimeout(() => setTimeLeft(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [timeLeft, revealed, onTimerEnd]);
 
-    const timer = setTimeout(() => setTimeLeft((t) => t - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [timeLeft, winnerRevealed, onTimerEnd]);
-
-  const handleVote = useCallback(
-    async (questionId: string) => {
-      if (alreadyVoted) return;
-      setVotedId(questionId);
-      await voteForQuestion(questionId);
-    },
-    [alreadyVoted, voteForQuestion],
-  );
+  const handleVote = useCallback(async (id: string) => {
+    if (alreadyVoted) return;
+    setVotedId(id);
+    await voteForQuestion(id);
+  }, [alreadyVoted, voteForQuestion]);
 
   const questions = gameState?.submittedQuestions ?? [];
-
-  // Find the winning question
-  const winningQuestion = questions.reduce(
-    (best, q) => (q.votes > (best?.votes ?? -1) ? q : best),
-    questions[0],
-  );
+  const winner = questions.reduce((b, q) => (q.votes > (b?.votes ?? -1) ? q : b), questions[0]);
 
   return (
-    <GlassCard className="w-full max-w-xl">
-      <div className="flex flex-col items-center gap-6 py-8">
-        {/* Timer */}
-        <div
-          className="text-[#BFFB4F] text-4xl font-bold"
-          style={{
-            fontFamily: 'Pixelify Sans, sans-serif',
-            textShadow: timeLeft <= 5 ? '0 0 20px #ff4444, 0 0 40px #ff4444' : '0 0 20px #BFFB4F',
-          }}
-        >
-          {winnerRevealed ? '🔥' : `${timeLeft}s`}
-        </div>
+    <div className="card-lg animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Timer */}
+      <div style={{ textAlign: 'center' }}>
+        {revealed ? (
+          <div style={{ fontSize: 32 }}>🔥</div>
+        ) : (
+          <div className={`timer ${timeLeft <= 5 ? 'urgent' : ''}`}>{timeLeft}s</div>
+        )}
+      </div>
 
-        <h2
-          className="text-white text-3xl font-bold text-center"
-          style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-        >
-          {winnerRevealed ? 'Winning Question!' : 'Vote for the Best Question'}
-        </h2>
-
-        <p className="text-white/60 text-lg text-center">
-          for <span className="text-[#BFFB4F] font-bold">{hotSeatPlayerName}</span>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+          {revealed ? 'Winning question!' : 'Vote for the best question'}
         </p>
+        <p style={{ fontFamily: 'Pixelify Sans', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
+          for {hotSeatPlayerName}
+        </p>
+      </div>
 
-        {/* Question Cards */}
-        <div className="w-full space-y-4">
-          {questions.map((q) => {
-            const isMyVote = votedId === q.id;
-            const isWinner = winnerRevealed && q.id === winningQuestion?.id;
+      {/* Questions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {questions.map(q => {
+          const isMyVote = votedId === q.id;
+          const isWinner = revealed && q.id === winner?.id;
 
-            return (
-              <button
-                key={q.id}
-                onClick={() => handleVote(q.id)}
-                disabled={alreadyVoted && !winnerRevealed}
-                className={`
-                  w-full text-left backdrop-blur-md rounded-3xl p-5 transition-all duration-300
-                  ${isWinner
-                    ? 'bg-[#BFFB4F]/30 ring-2 ring-[#BFFB4F] shadow-[0_0_30px_#BFFB4F,0_0_60px_#BFFB4F] scale-105'
-                    : isMyVote
-                      ? 'bg-[#664FFB]/40 ring-2 ring-[#664FFB]'
-                      : 'bg-black/80 hover:bg-black/60'
-                  }
-                  ${!alreadyVoted ? 'cursor-pointer hover:scale-[1.02]' : 'cursor-default'}
-                `}
-              >
-                <p
-                  className="text-white text-xl mb-2"
-                  style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                >
-                  "{q.text}"
-                </p>
-                <div className="flex justify-between items-center">
-                  <span className="text-white/40 text-sm">Anonymous</span>
-                  <span
-                    className={`text-sm font-bold ${
-                      isWinner ? 'text-[#BFFB4F]' : 'text-white/60'
-                    }`}
-                  >
-                    {q.votes} vote{q.votes !== 1 ? 's' : ''}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
+          return (
+            <button
+              key={q.id}
+              onClick={() => handleVote(q.id)}
+              disabled={alreadyVoted && !revealed}
+              style={{
+                textAlign: 'left',
+                padding: '14px 16px',
+                borderRadius: 12,
+                border: isWinner ? '2px solid var(--lime)' : isMyVote ? '2px solid var(--purple)' : '1px solid var(--border)',
+                background: isWinner ? 'rgba(191,251,79,0.08)' : isMyVote ? 'rgba(102,79,251,0.1)' : 'var(--surface-2)',
+                cursor: alreadyVoted && !revealed ? 'default' : 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+                "{q.text}"
+              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Anonymous</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--lime)' : 'var(--text-3)' }}>
+                  {q.votes} vote{q.votes !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </button>
+          );
+        })}
 
-          {questions.length === 0 && (
-            <p className="text-white/40 text-center text-lg">
-              No questions were submitted...
-            </p>
-          )}
-        </div>
-
-        {alreadyVoted && !winnerRevealed && (
-          <p className="text-[#BFFB4F]/60 text-lg mt-2">
-            Vote cast! Waiting for timer...
+        {questions.length === 0 && (
+          <p style={{ color: 'var(--text-3)', textAlign: 'center', fontSize: 14 }}>
+            No questions submitted...
           </p>
         )}
       </div>
-    </GlassCard>
+
+      {alreadyVoted && !revealed && (
+        <p style={{ color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>
+          ✓ Vote cast — waiting for timer
+        </p>
+      )}
+    </div>
   );
 };

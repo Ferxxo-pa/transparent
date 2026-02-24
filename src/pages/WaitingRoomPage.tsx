@@ -1,142 +1,111 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Copy, Check } from 'lucide-react';
-import { GlassCard } from '../components/GlassCard';
-import { GlowButton } from '../components/GlowButton';
+import { Copy, Check } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import transparentLogo from '../assets/trans 3.svg';
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, startGame } = useGame();
-  const { connected, displayName, publicKey } = usePrivyWallet();
+  const { publicKey, displayName } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
 
   const isHost = publicKey?.toBase58() === (gameState as any)?.hostWallet;
 
   useEffect(() => {
-    if (gameState?.gameStatus === 'playing') {
-      navigate('/game');
-    }
+    if (gameState?.gameStatus === 'playing') navigate('/game');
   }, [gameState?.gameStatus, navigate]);
 
-  const handleReady = () => {
-    startGame();
-  };
+  if (!gameState) { navigate('/'); return null; }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(gameState?.roomCode ?? '');
+    navigator.clipboard.writeText(gameState.roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  if (!gameState) {
-    navigate('/');
-    return null;
-  }
+  const potTotal = (gameState.players.length * gameState.buyInAmount).toFixed(2);
 
   return (
-    <>
-      {/* Absolute UI (same as Join page) */}
-      <div className="absolute top-10 left-10">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans']"
-        >
-          <ArrowLeft size={20} color="#BFFB4F" />
-          <span>Back</span>
-        </button>
-      </div>
+    <div className="page">
+      <nav className="navbar">
+        <div className="badge badge-lime pulse-lime">🟢 Waiting</div>
+        <div className="badge badge-neutral">{displayName}</div>
+      </nav>
 
-      <div className="absolute top-10 right-10">
-        <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          {connected ? displayName : 'Not Connected'}
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* Code */}
+        <div className="card-lg" style={{ textAlign: 'center' }}>
+          <p className="label" style={{ textAlign: 'center', marginBottom: 10 }}>Room Code</p>
+          <button
+            onClick={handleCopy}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+              background: 'none', border: 'none', cursor: 'pointer', width: '100%', marginBottom: 8
+            }}
+          >
+            <span style={{ fontFamily: 'Pixelify Sans', fontSize: 36, fontWeight: 700, color: 'var(--lime)', letterSpacing: '0.2em' }}>
+              {gameState.roomCode}
+            </span>
+            <span style={{ color: copied ? 'var(--lime)' : 'var(--text-3)' }}>
+              {copied ? <Check size={18} /> : <Copy size={18} />}
+            </span>
+          </button>
+          {copied && <p style={{ fontSize: 12, color: 'var(--lime)', marginBottom: 4 }}>Copied!</p>}
+          <p style={{ fontSize: 12, color: 'var(--text-3)' }}>
+            {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''} · {potTotal} SOL pot
+          </p>
         </div>
-      </div>
 
-      <div className="absolute top-10 left-1/2 -translate-x-1/2">
-        <img
-          src={transparentLogo}
-          alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
-        />
-      </div>
-
-      {/* 1) Centered card area */}
-      <div className="min-h-screen flex flex-col items-center justify-center px-8">
-        <GlassCard className="w-full max-w-xl">
-          <div className="flex flex-col items-center gap-8 py-8">
-            <h2 className="text-white text-4xl font-bold">You're In!</h2>
-
-            <div className="w-full text-center">
-              <p
-                className="text-white/60 text-sm uppercase tracking-widest mb-3"
-              >
-                Share this code with your friends
-              </p>
-
-              {/* Room code + copy button */}
-              <button
-                onClick={handleCopy}
-                className="flex items-center justify-center gap-4 mx-auto mb-2 group"
-              >
-                <p
-                  className="text-[#BFFB4F] text-3xl font-bold"
-                  style={{
-                    fontFamily: 'Pixelify Sans, sans-serif',
-                    letterSpacing: '0.3em',
-                  }}
-                >
-                  {gameState.roomCode}
-                </p>
-                <span className="text-[#BFFB4F]/60 group-hover:text-[#BFFB4F] transition-colors">
-                  {copied ? <Check size={28} /> : <Copy size={28} />}
-                </span>
-              </button>
-
-              {copied && (
-                <p className="text-[#BFFB4F]/60 text-sm mb-4">Copied!</p>
-              )}
-
-              <p className="text-white/30 text-sm mb-6">
-                {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''} in lobby
-                {!isHost && ' · Waiting for host to start...'}
-              </p>
-
-              {isHost && (
-                <div className="flex justify-center">
-                  <GlowButton onClick={handleReady} variant="purple">
-                    START GAME →
-                  </GlowButton>
+        {/* Players */}
+        <div>
+          <label className="label">In the Room</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {gameState.players.map((p, i) => (
+              <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'active' : ''}`}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'var(--surface)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, color: 'var(--text-3)'
+                  }}>{i + 1}</span>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name || `Player ${i + 1}`}</span>
+                  {p.isHost && <span className="badge badge-lime" style={{ padding: '2px 8px', fontSize: 10 }}>Host</span>}
+                  {p.id === publicKey?.toBase58() && !p.isHost && (
+                    <span className="badge badge-neutral" style={{ padding: '2px 8px', fontSize: 10 }}>You</span>
+                  )}
                 </div>
-              )}
+                <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Pixelify Sans', fontWeight: 700 }}>
+                  {gameState.buyInAmount} SOL
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTA */}
+        {isHost ? (
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: 16, padding: '18px' }}
+            onClick={async () => { await startGame(); navigate('/game'); }}
+          >
+            Start Game →
+          </button>
+        ) : (
+          <div className="card" style={{ textAlign: 'center', padding: '18px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              color: 'var(--text-2)', fontSize: 14
+            }}>
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+              Waiting for host to start the game...
             </div>
           </div>
-        </GlassCard>
+        )}
       </div>
-
-      {/* 2) Players section — real players from Supabase real-time subscription */}
-      <div className="text-center -mt-20">
-        <h3
-          className="text-white text-4xl font-bold mb-6"
-          style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-        >
-          Players
-        </h3>
-
-        <div className="flex flex-wrap justify-center gap-x-12 gap-y-4">
-          {gameState.players.map((player) => (
-            <p
-              key={player.id}
-              className="text-2xl font-bold text-white"
-              style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-            >
-              {player.name}: {gameState.buyInAmount.toFixed(2)} SOL
-            </p>
-          ))}
-        </div>
-      </div>
-    </>
+    </div>
   );
 };

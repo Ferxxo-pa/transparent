@@ -1,284 +1,177 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X } from 'lucide-react';
-import { GlassCard } from '../components/GlassCard';
-import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionMode } from '../types/game';
-import transparentLogo from '../assets/trans 3.svg';
 
-const MODE_INFO: Record<QuestionMode, { emoji: string; title: string; desc: string }> = {
-  classic: {
-    emoji: '🎲',
-    title: 'Classic',
-    desc: 'Random questions from the built-in collection',
-  },
-  custom: {
-    emoji: '✏️',
-    title: 'Custom',
-    desc: 'Host writes all the questions before the game starts',
-  },
-  'hot-take': {
-    emoji: '🔥',
-    title: 'Hot Take',
-    desc: 'Each round, players anonymously submit & vote on questions',
-  },
-};
+const MODES: { id: QuestionMode; icon: string; title: string; desc: string }[] = [
+  { id: 'classic', icon: '🎲', title: 'Classic', desc: 'Questions from the built-in collection' },
+  { id: 'hot-take', icon: '🔥', title: 'Hot Take', desc: 'Players write questions each round' },
+  { id: 'custom', icon: '✏️', title: 'Custom', desc: 'You write all the questions' },
+];
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
   const { connected, login, displayName } = usePrivyWallet();
-  const [buyIn, setBuyIn] = useState('');
+
+  const [buyIn, setBuyIn] = useState('0.1');
   const [roomName, setRoomName] = useState('');
   const [nickname, setNickname] = useState('');
-  const [questionMode, setQuestionMode] = useState<QuestionMode>('classic');
-  const [customQuestions, setCustomQuestions] = useState<string[]>(['']);
+  const [mode, setMode] = useState<QuestionMode>('classic');
+  const [customQs, setCustomQs] = useState<string[]>(['', '']);
 
   const handleCreate = async () => {
-    if (!connected) {
-      login();
-      return;
-    }
-    const buyInAmount = parseFloat(buyIn) || 1;
-
-    // For custom mode, filter out empty questions
-    const filteredQuestions =
-      questionMode === 'custom'
-        ? customQuestions.filter((q) => q.trim().length > 0)
-        : undefined;
-
-    if (questionMode === 'custom' && (!filteredQuestions || filteredQuestions.length === 0)) {
-      return; // Don't create without questions
-    }
-
-    await createGame(buyInAmount, roomName, questionMode, filteredQuestions, nickname.trim() || undefined);
+    if (!connected) { login(); return; }
+    const filtered = mode === 'custom' ? customQs.filter(q => q.trim()) : undefined;
+    if (mode === 'custom' && (!filtered || filtered.length === 0)) return;
+    await createGame(parseFloat(buyIn) || 0.1, roomName || 'Game Room', mode, filtered, nickname.trim() || undefined);
     navigate('/created');
   };
 
-  const addQuestion = () => {
-    setCustomQuestions((prev) => [...prev, '']);
-  };
-
-  const removeQuestion = (index: number) => {
-    setCustomQuestions((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const updateQuestion = (index: number, value: string) => {
-    setCustomQuestions((prev) => {
-      const updated = [...prev];
-      updated[index] = value;
-      return updated;
-    });
-  };
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-8">
-      {/* Back button */}
-      <div className="absolute top-10 left-10">
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full hover:bg-black/90 transition-all font-['Plus_Jakarta_Sans']"
-        >
-          <ArrowLeft size={20} color="#BFFB4F" />
-          <span>Back</span>
+    <div className="page">
+      <nav className="navbar">
+        <button className="btn btn-icon" onClick={() => navigate('/')} style={{ border: 'none' }}>
+          <ArrowLeft size={18} />
         </button>
-      </div>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>Create Game</span>
+        <div className="badge badge-neutral">{connected ? displayName : 'Not connected'}</div>
+      </nav>
 
-      {/* wallet badge */}
-      <div className="absolute top-10 right-10">
-        <div className="backdrop-blur-md bg-black/80 text-white px-6 py-2 rounded-full font-['Plus_Jakarta_Sans']">
-          {connected ? displayName : 'Not Connected'}
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+        {/* Buy In */}
+        <div>
+          <label className="label">Buy-In (SOL)</label>
+          <input
+            className="input"
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={buyIn}
+            onChange={e => setBuyIn(e.target.value)}
+            placeholder="0.1"
+          />
         </div>
-      </div>
 
-      {/* Centered logo */}
-      <div className="absolute top-10 left-1/2 -translate-x-1/2">
-        <img
-          src={transparentLogo}
-          alt="Transparent"
-          style={{ height: '100px', width: 'auto' }}
-        />
-      </div>
+        {/* Room Name */}
+        <div>
+          <label className="label">Room Name</label>
+          <input
+            className="input"
+            type="text"
+            value={roomName}
+            onChange={e => setRoomName(e.target.value)}
+            placeholder="College Night, Squad Room..."
+            maxLength={32}
+          />
+        </div>
 
-      {/* ✅ Match JoinGamePage box position */}
-      <div className="flex flex-col items-center justify-center mt-[180px]">
-        <GlassCard className="w-full max-w-xl">
-          <div className="flex flex-col items-center gap-8 py-8">
-            <div className="w-full space-y-8">
-              {/* Buy-In Section */}
-              <div>
-                <h3
-                  className="text-white text-lg text-center mb-3 font-bold"
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                >
-                  Buy-In Amount
-                </h3>
-                <div className="backdrop-blur-md bg-black/80 rounded-full p-4">
-                  <input
-                    type="text"
-                    value={buyIn}
-                    onChange={(e) => setBuyIn(e.target.value)}
-                    placeholder="0.1 SOL"
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
-                    style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                  />
-                </div>
-              </div>
+        {/* Your Name */}
+        <div>
+          <label className="label">Your Nickname</label>
+          <input
+            className="input"
+            type="text"
+            value={nickname}
+            onChange={e => setNickname(e.target.value)}
+            placeholder="What should people call you?"
+            maxLength={20}
+          />
+        </div>
 
-              {/* Room Name Section */}
-              <div>
-                <h3
-                  className="text-white text-lg text-center mb-3 font-bold"
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                >
-                  Room Name
-                </h3>
-                <div className="backdrop-blur-md bg-black/80 rounded-full p-4">
-                  <input
-                    type="text"
-                    value={roomName}
-                    onChange={(e) => setRoomName(e.target.value)}
-                    placeholder="College Night"
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
-                    style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                  />
-                </div>
-              </div>
-
-              {/* Host Nickname */}
-              <div>
-                <h3
-                  className="text-white text-lg text-center mb-3 font-bold"
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                >
-                  Your Name
-                </h3>
-                <div className="backdrop-blur-md bg-black/80 rounded-full p-4">
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="Enter nickname..."
-                    maxLength={20}
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
-                    style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                  />
-                </div>
-              </div>
-
-              {/* Question Mode Selector */}
-              <div>
-                <h3
-                  className="text-white text-lg text-center mb-3 font-bold"
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                >
-                  Question Mode
-                </h3>
-                <div className="flex flex-col gap-3">
-                  {(Object.keys(MODE_INFO) as QuestionMode[]).map((mode) => {
-                    const info = MODE_INFO[mode];
-                    const isSelected = questionMode === mode;
-                    return (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setQuestionMode(mode)}
-                        className={`
-                          w-full text-left backdrop-blur-md rounded-3xl p-5 transition-all duration-300
-                          ${isSelected
-                            ? 'bg-[#664FFB]/40 ring-2 ring-[#BFFB4F] shadow-[0_0_20px_rgba(191,251,79,0.3)]'
-                            : 'bg-black/80 hover:bg-black/60'
-                          }
-                          cursor-pointer
-                        `}
-                      >
-                        <div className="flex items-center gap-4">
-                          <span className="text-3xl">{info.emoji}</span>
-                          <div>
-                            <p
-                              className={`text-2xl font-bold ${isSelected ? 'text-[#BFFB4F]' : 'text-white'}`}
-                              style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                            >
-                              {info.title}
-                            </p>
-                            <p className="text-white/50 text-sm mt-1" style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-                              {info.desc}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Custom Questions Input (only shown in custom mode) */}
-              {questionMode === 'custom' && (
+        {/* Mode */}
+        <div>
+          <label className="label">Question Mode</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {MODES.map(m => (
+              <button
+                key={m.id}
+                className={`mode-card ${mode === m.id ? 'selected' : ''}`}
+                onClick={() => setMode(m.id)}
+                style={{ textAlign: 'left', background: mode === m.id ? 'rgba(102,79,251,0.1)' : 'var(--surface-2)' }}
+              >
+                <span style={{ fontSize: 22 }}>{m.icon}</span>
                 <div>
-                  <h3
-                    className="text-white text-base text-center mb-3 font-bold"
-                    style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                  >
-                    Your Questions
-                  </h3>
-                  <div className="space-y-3">
-                    {customQuestions.map((q, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <div className="flex-1 backdrop-blur-md bg-black/80 rounded-2xl p-3">
-                          <input
-                            type="text"
-                            value={q}
-                            onChange={(e) => updateQuestion(i, e.target.value)}
-                            placeholder={`Question ${i + 1}...`}
-                            className="w-full bg-transparent text-white text-lg outline-none placeholder:text-white/30"
-                            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
-                          />
-                        </div>
-                        {customQuestions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeQuestion(i)}
-                            className="text-white/40 hover:text-red-400 transition-colors p-2"
-                          >
-                            <X size={20} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={addQuestion}
-                      className="flex items-center gap-2 text-[#BFFB4F]/60 hover:text-[#BFFB4F] transition-colors mx-auto mt-2"
-                    >
-                      <Plus size={20} />
-                      <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-                        Add Question
-                      </span>
-                    </button>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: mode === m.id ? 'var(--purple-light)' : 'var(--text)' }}>
+                    {m.title}
                   </div>
-                  <p className="text-white/30 text-sm text-center mt-3">
-                    {customQuestions.filter((q) => q.trim()).length} question
-                    {customQuestions.filter((q) => q.trim()).length !== 1 ? 's' : ''} added
-                  </p>
+                  <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{m.desc}</div>
                 </div>
-              )}
-            </div>
+                {mode === m.id && (
+                  <div style={{ marginLeft: 'auto', color: 'var(--purple-light)', fontSize: 16 }}>✓</div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
 
-            {/* Error display */}
-            {error && (
-              <p className="text-red-400 text-sm text-center">{error}</p>
-            )}
-
-            {/* Create Button */}
-            <div className="flex justify-center mt-4">
-              <GlowButton onClick={handleCreate} variant="purple">
-                {loading ? 'Creating...' : connected ? 'Create Game' : 'Connect Wallet'}
-              </GlowButton>
+        {/* Custom questions */}
+        {mode === 'custom' && (
+          <div>
+            <label className="label">Your Questions</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {customQs.map((q, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    className="input"
+                    value={q}
+                    onChange={e => {
+                      const u = [...customQs]; u[i] = e.target.value; setCustomQs(u);
+                    }}
+                    placeholder={`Question ${i + 1}...`}
+                  />
+                  {customQs.length > 2 && (
+                    <button
+                      className="btn btn-icon"
+                      onClick={() => setCustomQs(customQs.filter((_, j) => j !== i))}
+                      style={{ flexShrink: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                onClick={() => setCustomQs([...customQs, ''])}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  color: 'var(--text-3)', fontSize: 13, fontWeight: 600,
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0'
+                }}
+              >
+                <Plus size={14} /> Add question
+              </button>
             </div>
           </div>
-        </GlassCard>
+        )}
+
+        {/* Summary */}
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buy-In</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--lime)', fontFamily: 'Pixelify Sans', marginTop: 4 }}>{buyIn || '0.1'} SOL</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', fontFamily: 'Pixelify Sans', marginTop: 4 }}>
+              {MODES.find(m => m.id === mode)?.icon} {MODES.find(m => m.id === mode)?.title}
+            </div>
+          </div>
+        </div>
+
+        {error && <p style={{ color: 'var(--danger)', fontSize: 13, textAlign: 'center' }}>{error}</p>}
+
+        <button
+          className="btn btn-primary"
+          onClick={handleCreate}
+          disabled={loading}
+          style={{ fontSize: 16, padding: '18px' }}
+        >
+          {loading ? 'Creating...' : connected ? 'Create Game →' : 'Connect Wallet to Create'}
+        </button>
       </div>
     </div>
   );
