@@ -36,40 +36,47 @@ export const GamePlayPage: React.FC = () => {
   const votesIn = gameState.voteCount;
   const totalVoters = Math.max(gameState.players.length - 1, 1);
 
+  // ── Shared nav for all hot-take phases ──────────────────────
+  const HotTakeNav = () => (
+    <nav className="navbar">
+      <div className="badge badge-lime">Round {round}/{totalRounds}</div>
+      <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
+    </nav>
+  );
+
   // ── Hot-Take: Submitting Questions ──────────────────────────
   if (isHotTake && phase === 'submitting-questions') {
     return (
-      <div className="page">
-        <nav className="navbar">
-          <div className="badge badge-lime">Round {round}/{totalRounds}</div>
-          <button
-            onClick={() => navigate('/gameover')}
-            style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            End Game
-          </button>
-        </nav>
+      <div className="page page-full">
+        <HotTakeNav />
         <div className="page-content animate-in">
-          {isHotSeat ? (
-            <div className="card-lg" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>🪑</div>
-              <h2 style={{ fontFamily: 'Space Grotesk', fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
-                You're in the Hot Seat
-              </h2>
-              <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
-                Players are writing questions for you...
-              </p>
-              <p style={{ color: 'var(--text-3)', fontSize: 13, marginTop: 12 }}>
-                {gameState.submittedQuestions?.length ?? 0} / {gameState.players.length - 1} submitted
-              </p>
+          <div className="game-grid">
+            <div className="game-main">
+              {isHotSeat ? (
+                <div className="card-lg" style={{ textAlign: 'center' }}>
+                  <img src={fireIconSrc} alt="" style={{ width: 48, height: 48, filter: 'brightness(0) saturate(100%) invert(94%) sepia(48%) saturate(700%) hue-rotate(40deg)', opacity: 0.9, marginBottom: 16 }} />
+                  <h2 style={{ fontFamily: 'Space Grotesk', fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+                    You're in the Hot Seat
+                  </h2>
+                  <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Players are writing questions for you...</p>
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Questions submitted</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
+                        {gameState.submittedQuestions?.length ?? 0} / {gameState.players.length - 1}
+                      </span>
+                    </div>
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${((gameState.submittedQuestions?.length ?? 0) / Math.max(gameState.players.length - 1, 1)) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <QuestionSubmitPhase hotSeatPlayerName={currentPlayer?.name || 'Unknown'} onTimerEnd={handleAdvancePhase} />
+              )}
             </div>
-          ) : (
-            <QuestionSubmitPhase
-              hotSeatPlayerName={currentPlayer?.name || 'Unknown'}
-              onTimerEnd={handleAdvancePhase}
-            />
-          )}
-          <ScoreboardSection gameState={gameState} myWallet={myWallet} />
+            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
+          </div>
         </div>
       </div>
     );
@@ -78,14 +85,15 @@ export const GamePlayPage: React.FC = () => {
   // ── Hot-Take: Voting on Questions ────────────────────────────
   if (isHotTake && phase === 'voting-question') {
     return (
-      <div className="page">
-        <nav className="navbar">
-          <div className="badge badge-lime">Round {round}/{totalRounds}</div>
-          <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
-        </nav>
+      <div className="page page-full">
+        <HotTakeNav />
         <div className="page-content animate-in">
-          <QuestionVotePhase hotSeatPlayerName={currentPlayer?.name || 'Unknown'} onTimerEnd={handleAdvancePhase} />
-          <ScoreboardSection gameState={gameState} myWallet={myWallet} />
+          <div className="game-grid">
+            <div className="game-main">
+              <QuestionVotePhase hotSeatPlayerName={currentPlayer?.name || 'Unknown'} onTimerEnd={handleAdvancePhase} />
+            </div>
+            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
+          </div>
         </div>
       </div>
     );
@@ -94,31 +102,24 @@ export const GamePlayPage: React.FC = () => {
   // ── Hot-Take: Answering phase ─────────────────────────────────
   if (isHotTake && phase === 'answering') {
     return (
-      <div className="page">
-        <nav className="navbar">
-          <div className="badge badge-lime">Round {round}/{totalRounds}</div>
-          <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
-        </nav>
-        <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <HotSeatBanner name={currentPlayer?.name || ''} isMe={isHotSeat} />
-          <div className="card-lg" style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>
-              🔥 Hot Take Question
-            </p>
-            <p className="question-text" style={{ marginBottom: 24 }}>
-              {gameState.currentQuestion || 'No question selected'}
-            </p>
-            {isHotSeat ? (
-              <button className="btn btn-primary" onClick={handleAdvancePhase}>
-                I've Answered ✓
-              </button>
-            ) : (
-              <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
-                Listen to {currentPlayer?.name}'s answer...
-              </p>
-            )}
+      <div className="page page-full">
+        <HotTakeNav />
+        <div className="page-content animate-in">
+          <div className="game-grid">
+            <div className="game-main">
+              <HotSeatBanner name={currentPlayer?.name || ''} isMe={isHotSeat} />
+              <div className="card-lg" style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Hot Take Question</p>
+                <p className="question-text" style={{ marginBottom: 24 }}>{gameState.currentQuestion || 'No question selected'}</p>
+                {isHotSeat ? (
+                  <button className="btn btn-primary" style={{ maxWidth: 260, margin: '0 auto' }} onClick={handleAdvancePhase}>I've Answered ✓</button>
+                ) : (
+                  <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Listen to {currentPlayer?.name}'s answer...</p>
+                )}
+              </div>
+            </div>
+            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
           </div>
-          <ScoreboardSection gameState={gameState} myWallet={myWallet} />
         </div>
       </div>
     );
@@ -126,7 +127,7 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Default / Classic / Custom / Voting-Honesty Phase ─────────
   return (
-    <div className="page">
+    <div className="page page-full">
       <nav className="navbar">
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div className="badge badge-neutral">Round {round}/{totalRounds}</div>
@@ -135,69 +136,60 @@ export const GamePlayPage: React.FC = () => {
         <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
       </nav>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Hot seat banner */}
-        <HotSeatBanner name={currentPlayer?.name || 'Unknown'} isMe={isHotSeat} />
+      <div className="page-content animate-in">
+        <div className="game-grid">
+          {/* Main content */}
+          <div className="game-main">
+            <HotSeatBanner name={currentPlayer?.name || 'Unknown'} isMe={isHotSeat} />
 
-        {/* Question */}
-        <div className="card-lg" style={{ textAlign: 'center' }}>
-          <p className="question-text">{gameState.currentQuestion}</p>
-        </div>
-
-        {/* Voting */}
-        {isHotSeat ? (
-          <div className="card" style={{ textAlign: 'center', padding: 16 }}>
-            <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
-              Answer honestly — others are voting on whether to believe you
-            </p>
-          </div>
-        ) : (
-          <div>
-            <label className="label" style={{ textAlign: 'center' }}>
-              Is {currentPlayer?.name} being transparent?
-            </label>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                className="vote-btn vote-transparent"
-                onClick={() => castVote('transparent')}
-                disabled={hasVoted}
-              >
-                ✅ Transparent
-              </button>
-              <button
-                className="vote-btn vote-fake"
-                onClick={() => castVote('fake')}
-                disabled={hasVoted}
-              >
-                ❌ Fake
-              </button>
+            <div className="card-lg" style={{ textAlign: 'center' }}>
+              <p className="question-text">{gameState.currentQuestion}</p>
             </div>
 
-            {/* Progress */}
-            {votesIn > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                    {hasVoted ? '✓ Vote cast' : 'Waiting for votes'}
-                  </span>
-                  <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{votesIn}/{totalVoters}</span>
+            {isHotSeat ? (
+              <div className="card" style={{ textAlign: 'center', padding: 18 }}>
+                <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
+                  Answer honestly — others are voting on whether to believe you
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <label className="label" style={{ textAlign: 'center' }}>
+                  Is {currentPlayer?.name} being transparent?
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button className="vote-btn vote-transparent" onClick={() => castVote('transparent')} disabled={hasVoted}>
+                    ✅ Transparent
+                  </button>
+                  <button className="vote-btn vote-fake" onClick={() => castVote('fake')} disabled={hasVoted}>
+                    ❌ Fake
+                  </button>
                 </div>
-                <div className="progress-track">
-                  <div className="progress-fill" style={{ width: `${(votesIn / totalVoters) * 100}%` }} />
-                </div>
+
+                {votesIn > 0 && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{hasVoted ? '✓ Vote cast' : 'Waiting for votes'}</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{votesIn}/{totalVoters}</span>
+                    </div>
+                    <div className="progress-track">
+                      <div className="progress-fill" style={{ width: `${(votesIn / totalVoters) * 100}%` }} />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
+
+            {isHotTake && phase === 'voting-honesty' && hasVoted && isHost && (
+              <button className="btn btn-secondary" onClick={handleAdvancePhase}>Next Round →</button>
+            )}
           </div>
-        )}
 
-        {/* Host advance for hot-take voting-honesty */}
-        {isHotTake && phase === 'voting-honesty' && hasVoted && isHost && (
-          <button className="btn btn-secondary" onClick={handleAdvancePhase}>
-            Next Round →
-          </button>
-        )}
-
-        <ScoreboardSection gameState={gameState} myWallet={myWallet} />
+          {/* Sidebar scoreboard — always visible, sticky on desktop */}
+          <div className="game-sidebar">
+            <ScoreboardSection gameState={gameState} myWallet={myWallet} />
+          </div>
+        </div>
       </div>
     </div>
   );

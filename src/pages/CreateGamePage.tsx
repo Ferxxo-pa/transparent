@@ -46,29 +46,29 @@ export const CreateGamePage: React.FC = () => {
 
       <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Buy In */}
-        <div>
-          <label className="label">Buy-In (SOL)</label>
-          <input
-            className="input"
-            type="number" min="0.01" step="0.01"
-            value={buyIn}
-            onChange={e => setBuyIn(e.target.value)}
-            placeholder="0.1"
-          />
-        </div>
-
-        {/* Room Name */}
-        <div>
-          <label className="label">Room Name</label>
-          <input
-            className="input"
-            type="text"
-            value={roomName}
-            onChange={e => setRoomName(e.target.value)}
-            placeholder="College Night, Squad Room..."
-            maxLength={32}
-          />
+        {/* Buy-in + Room Name side by side on tablet+ */}
+        <div className="form-row">
+          <div>
+            <label className="label">Buy-In (SOL)</label>
+            <input
+              className="input"
+              type="number" min="0.01" step="0.01"
+              value={buyIn}
+              onChange={e => setBuyIn(e.target.value)}
+              placeholder="0.1"
+            />
+          </div>
+          <div>
+            <label className="label">Room Name</label>
+            <input
+              className="input"
+              type="text"
+              value={roomName}
+              onChange={e => setRoomName(e.target.value)}
+              placeholder="College Night, Squad Room..."
+              maxLength={32}
+            />
+          </div>
         </div>
 
         {/* Nickname */}
