@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Copy, Check } from 'lucide-react';
@@ -7,9 +7,28 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame, loading } = useGame();
+  const { gameState, startGame, loading, predictions, predictionPot, placePrediction } = useGame();
   const { publicKey } = usePrivyWallet();
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]         = useState(false);
+  const [selectedPlayer, setSelected] = useState<string | null>(null);
+  const [betAmount, setBetAmount]     = useState(0.01);
+  const [placing, setPlacing]         = useState(false);
+  const [placed, setPlaced]           = useState(false);
+  const { displayName } = usePrivyWallet();
+  const LAMPORTS = 1_000_000_000;
+  const predTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    predictions.forEach(p => { totals[p.predicted_winner_wallet] = (totals[p.predicted_winner_wallet] ?? 0) + p.amount_lamports; });
+    return totals;
+  }, [predictions]);
+  const predPotSol = (predictionPot / LAMPORTS).toFixed(3);
+  const handlePredict = async () => {
+    if (!selectedPlayer || placing) return;
+    setPlacing(true);
+    const ok = await placePrediction(selectedPlayer, betAmount, displayName);
+    setPlacing(false);
+    if (ok) { setPlaced(true); setSelected(null); }
+  };
 
   // Auto-navigate when game starts (real-time update)
   useEffect(() => {
@@ -111,6 +130,46 @@ export const GameCreatedPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Prediction Market */}
+      {gameState.players.length >= 2 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <p className="label-cipher">🎯 Prediction Market</p>
+            {predictionPot > 0 && <span style={{ fontSize: 12, color: 'var(--lavender)', fontWeight: 700 }}>{predPotSol} SOL pot</span>}
+          </div>
+          <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {placed ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <p style={{ color: 'var(--lime)', fontWeight: 700 }}>✅ Prediction locked!</p>
+                <button onClick={() => setPlaced(false)} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', marginTop: 6, fontFamily: 'Space Grotesk' }}>Place another</button>
+              </div>
+            ) : (
+              <>
+                <p style={{ fontSize: 13, color: 'var(--muted)' }}>Bet on who you think wins. Even you can bet on yourself 👀</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {gameState.players.map(p => (
+                    <button key={p.id} onClick={() => setSelected(p.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 13px', borderRadius: 'var(--r-sm)', border: `1px solid ${selectedPlayer === p.id ? 'var(--lavender)' : 'var(--border)'}`, background: selectedPlayer === p.id ? 'rgba(180,120,255,0.1)' : 'var(--glass)', cursor: 'pointer', fontFamily: 'Space Grotesk' }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{p.name || 'Player'}{p.isHost ? ' 👑' : ''}</span>
+                      {(predTotals[p.id] ?? 0) > 0 && <span style={{ fontSize: 11, color: 'var(--lavender)' }}>{((predTotals[p.id]) / LAMPORTS).toFixed(3)} SOL bet</span>}
+                    </button>
+                  ))}
+                </div>
+                {selectedPlayer && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    {[0.01, 0.05, 0.1, 0.25].map(amt => (
+                      <button key={amt} onClick={() => setBetAmount(amt)} style={{ padding: '5px 12px', borderRadius: 'var(--r-pill)', border: `1px solid ${betAmount === amt ? 'var(--lavender)' : 'var(--border)'}`, background: betAmount === amt ? 'rgba(180,120,255,0.15)' : 'var(--glass)', color: betAmount === amt ? 'var(--lavender)' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk' }}>{amt} SOL</button>
+                    ))}
+                    <button onClick={handlePredict} disabled={placing} style={{ marginLeft: 'auto', padding: '7px 16px', borderRadius: 'var(--r-pill)', background: 'rgba(180,120,255,0.2)', border: '1px solid var(--lavender)', color: 'var(--lavender)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'Space Grotesk' }}>
+                      {placing ? 'Placing…' : `Bet ${betAmount} SOL`}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* CTA */}
       <div style={{ width: '100%', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>

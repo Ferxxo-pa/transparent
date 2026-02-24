@@ -6,7 +6,7 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const GameOverPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, resetGame, distributeWinnings } = useGame();
+  const { gameState, resetGame, distributeWinnings, distributePredictions, predictions, predictionPot } = useGame();
   const { publicKey } = usePrivyWallet();
   const [selected,    setSelected]    = useState<string | null>(null);
   const [confirmed,   setConfirmed]   = useState(false);
@@ -36,6 +36,10 @@ export const GameOverPage: React.FC = () => {
     setDistErr(null);
     try {
       await distributeWinnings(activeWinner);
+      // Also settle prediction pot
+      if (predictions.length > 0) {
+        await distributePredictions(activeWinner).catch(() => {});
+      }
       setConfirmed(true);
     } catch (e: any) {
       setDistErr(e?.message || 'Distribution failed');
@@ -43,6 +47,15 @@ export const GameOverPage: React.FC = () => {
     }
     setDistributing(false);
   };
+
+  // Compute prediction winners
+  const LAMPORTS = 1_000_000_000;
+  const correctPredictions = predictions.filter(p => p.predicted_winner_wallet === activeWinner);
+  const incorrectPredictions = predictions.filter(p => p.predicted_winner_wallet !== activeWinner);
+  const predPotSol = (predictionPot / LAMPORTS).toFixed(3);
+  const perWinner = correctPredictions.length > 0
+    ? (predictionPot / LAMPORTS / correctPredictions.length).toFixed(3)
+    : '0';
 
   return (
     <div className="page fade-in">
@@ -151,6 +164,50 @@ export const GameOverPage: React.FC = () => {
           <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13 }}>
             {distErr}
           </div>
+        )}
+
+        {/* Prediction Market Results */}
+        {predictions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <p className="label-cipher">🎯 Prediction Market</p>
+              <span style={{ fontSize: 12, color: 'var(--lavender)', fontWeight: 700 }}>
+                {predPotSol} SOL pot
+              </span>
+            </div>
+            <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {correctPredictions.length > 0 ? (
+                <>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--lime)' }}>
+                    ✅ {correctPredictions.length} correct predictor{correctPredictions.length !== 1 ? 's' : ''} · each wins ~{perWinner} SOL
+                  </p>
+                  {correctPredictions.map(p => (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: 'var(--text)', fontWeight: 600 }}>{p.bettor_name}</span>
+                      <span style={{ color: 'var(--lime)' }}>+{perWinner} SOL</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: 'var(--muted)' }}>Nobody predicted the winner — pot stays 🤷</p>
+              )}
+              {incorrectPredictions.length > 0 && (
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 2 }}>
+                  {incorrectPredictions.map(p => (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: 'var(--muted)' }}>{p.bettor_name}</span>
+                      <span style={{ color: 'var(--red)' }}>L</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
 

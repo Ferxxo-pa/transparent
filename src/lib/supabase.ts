@@ -53,6 +53,17 @@ export interface QuestionSubmissionRow {
   created_at: string;
 }
 
+export interface PredictionRow {
+  id: string;
+  game_id: string;
+  bettor_wallet: string;
+  bettor_name: string;
+  predicted_winner_wallet: string;
+  amount_lamports: number;
+  settled: boolean;
+  created_at: string;
+}
+
 // ── CRUD Helpers ────────────────────────────────────────────
 
 export async function createGameInDB(data: {
@@ -190,6 +201,42 @@ export async function getQuestionsForRound(
   return data ?? [];
 }
 
+// ── Prediction Market Helpers ───────────────────────────────
+
+export async function placePrediction(data: {
+  game_id: string;
+  bettor_wallet: string;
+  bettor_name: string;
+  predicted_winner_wallet: string;
+  amount_lamports: number;
+}): Promise<PredictionRow> {
+  const { data: row, error } = await supabase
+    .from('predictions')
+    .insert(data)
+    .select()
+    .single();
+  if (error) throw error;
+  return row;
+}
+
+export async function getPredictionsForGame(gameId: string): Promise<PredictionRow[]> {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('*')
+    .eq('game_id', gameId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function settlePredictions(gameId: string): Promise<void> {
+  const { error } = await supabase
+    .from('predictions')
+    .update({ settled: true })
+    .eq('game_id', gameId);
+  if (error) throw error;
+}
+
 // ── Real-Time Subscriptions ─────────────────────────────────
 
 export function subscribeToGame(
@@ -198,6 +245,7 @@ export function subscribeToGame(
   onPlayersChange: (players: PlayerRow[]) => void,
   onVotesChange: (votes: VoteRow[]) => void,
   onQuestionsChange?: (questions: QuestionSubmissionRow[]) => void,
+  onPredictionsChange?: (predictions: PredictionRow[]) => void,
 ): RealtimeChannel {
   const channel = supabase
     .channel(`game-${gameId}`)
@@ -237,6 +285,15 @@ export function subscribeToGame(
         const q = payload.new as QuestionSubmissionRow;
         const questions = await getQuestionsForRound(gameId, q.round);
         onQuestionsChange(questions);
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'predictions', filter: `game_id=eq.${gameId}` },
+      async () => {
+        if (!onPredictionsChange) return;
+        const predictions = await getPredictionsForGame(gameId);
+        onPredictionsChange(predictions);
       },
     )
     .subscribe();

@@ -12,12 +12,16 @@ import {
   getVotesForRound,
   submitQuestionToDB,
   voteForQuestionInDB,
+  placePrediction as placePredictionInDB,
+  getPredictionsForGame,
+  settlePredictions,
   subscribeToGame,
   unsubscribeFromGame,
   GameRow,
   PlayerRow,
   VoteRow,
   QuestionSubmissionRow,
+  PredictionRow,
 } from '../lib/supabase';
 import {
   createGameOnChain,
@@ -35,6 +39,8 @@ interface GameContextType {
   gameState: GameState | null;
   loading: boolean;
   error: string | null;
+  predictions: PredictionRow[];
+  predictionPot: number; // total lamports in prediction pot
   createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string) => Promise<boolean>;
   joinGame: (roomCode: string, playerName?: string) => Promise<boolean>;
   startGame: () => Promise<void>;
@@ -44,11 +50,13 @@ interface GameContextType {
   advanceHotTakePhase: () => Promise<void>;
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
+  distributePredictions: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
   endGameNow: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
+  placePrediction: (predictedWallet: string, amountSol: number, bettorName: string) => Promise<boolean>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -87,6 +95,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [predictions, setPredictions] = useState<PredictionRow[]>([]);
 
   const walletRef = useRef<WalletAdapter | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -212,6 +221,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               submittedQuestions: mapped,
             };
           });
+        },
+        // onPredictionsChange — live update prediction bets
+        (newPredictions: PredictionRow[]) => {
+          setPredictions(newPredictions);
         },
       );
 
@@ -857,6 +870,99 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
   }, []);
 
+  // ── Prediction Market ────────────────────────────────────
+
+  const placePrediction = useCallback(async (
+    predictedWallet: string,
+    amountSol: number,
+    bettorName: string,
+  ): Promise<boolean> => {
+    const wallet = walletRef.current;
+    const gameId = gameIdRef.current;
+    if (!gameId) { setError('No active game'); return false; }
+
+    const amountLamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // On-chain: send prediction SOL to the game host as escrow
+      // (in production this would go to the game PDA)
+      if (wallet && amountLamports > 0) {
+        const { gameState: gs } = { gameState: await (async () => {
+          // get host wallet from current game state
+          return gameState;
+        })() };
+        const hostWallet = gs?.hostWallet;
+        if (hostWallet && hostWallet !== wallet.publicKey.toBase58()) {
+          const { joinGameOnChainWithAmount } = await import('../lib/anchor');
+          await joinGameOnChainWithAmount(wallet, new PublicKey(hostWallet), amountLamports).catch(() => {});
+        }
+      }
+
+      // Off-chain: record prediction in Supabase
+      await placePredictionInDB({
+        game_id: gameId,
+        bettor_wallet: wallet?.publicKey.toBase58() ?? 'anonymous',
+        bettor_name: bettorName,
+        predicted_winner_wallet: predictedWallet,
+        amount_lamports: amountLamports,
+      });
+
+      // Refresh predictions
+      const updated = await getPredictionsForGame(gameId);
+      setPredictions(updated);
+      return true;
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to place prediction');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [gameState]);
+
+  const distributePredictions = useCallback(async (winnerWallet: string): Promise<void> => {
+    const wallet = walletRef.current;
+    const gameId = gameIdRef.current;
+    if (!wallet || !gameId) return;
+
+    // Find correct predictors
+    const correctBets = predictions.filter(p => p.predicted_winner_wallet === winnerWallet && !p.settled);
+    if (!correctBets.length) {
+      await settlePredictions(gameId);
+      return;
+    }
+
+    const totalPot = correctBets.reduce((sum, p) => sum + p.amount_lamports, 0);
+    const totalCorrect = correctBets.length;
+
+    try {
+      // Pay out each correct predictor proportionally
+      // (simplified: equal split for now)
+      const perWinner = Math.floor(totalPot / totalCorrect);
+      for (const bet of correctBets) {
+        if (perWinner > 0 && bet.bettor_wallet !== wallet.publicKey.toBase58()) {
+          const { joinGameOnChainWithAmount } = await import('../lib/anchor');
+          await joinGameOnChainWithAmount(wallet, new PublicKey(bet.bettor_wallet), perWinner).catch(() => {});
+        }
+      }
+      await settlePredictions(gameId);
+      const updated = await getPredictionsForGame(gameId);
+      setPredictions(updated);
+    } catch (err: any) {
+      console.error('distributePredictions:', err);
+    }
+  }, [predictions]);
+
+  // Also load predictions when game is loaded from DB
+  useEffect(() => {
+    const gameId = gameIdRef.current;
+    if (gameId && gameState?.gameId === gameId && predictions.length === 0) {
+      getPredictionsForGame(gameId).then(setPredictions).catch(() => {});
+    }
+  }, [gameState?.gameId]);
+
   // ── Simulate (noop in real mode, kept for compat) ──────
 
   const simulateAutoPlay = useCallback(() => {
@@ -870,6 +976,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         gameState,
         loading,
         error,
+        predictions,
+        predictionPot: predictions.reduce((s, p) => s + p.amount_lamports, 0),
         createGame,
         joinGame,
         startGame,
@@ -879,11 +987,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         advanceHotTakePhase,
         selectWinner,
         distributeWinnings,
+        distributePredictions,
         forceAdvanceRound,
         endGameNow,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,
+        placePrediction,
       }}
     >
       {children}
