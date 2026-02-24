@@ -37,7 +37,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Shared Navbar ──────────────────────────────────────────
   const Nav = () => (
     <nav className="navbar">
-      <span className="chip chip-muted">Round {round} / {total}</span>
+      <span className="chip chip-lavender">Round {round} / {total}</span>
       <button
         onClick={() => navigate('/gameover')}
         style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
@@ -49,10 +49,10 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Hot Seat Banner ────────────────────────────────────────
   const HotSeatCard = () => (
-    <div className="hot-seat">
+    <div className="hot-seat scan-lines corner-accent">
       <div style={{ fontSize: 28, flexShrink: 0 }}>🔥</div>
       <div style={{ flex: 1 }}>
-        <p className="label-sm" style={{ marginBottom: 2 }}>In the hot seat</p>
+        <p className="label-cipher" style={{ marginBottom: 2 }}>In the hot seat</p>
         <p style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.03em', color: 'var(--lime)', lineHeight: 1 }}>
           {player?.name ?? 'Unknown'}
           {isHotSeat && <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--muted)', marginLeft: 8 }}>(you)</span>}
@@ -67,7 +67,7 @@ export const GamePlayPage: React.FC = () => {
     if (!Object.keys(scores).length) return null;
     return (
       <div>
-        <p className="label" style={{ marginBottom: 8 }}>Scores</p>
+        <div className="section-header" style={{ marginBottom: 8 }}><p className="label-cipher">Scores</p></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {gameState.players.map((p, i) => {
             const s = scores[p.id];
@@ -170,7 +170,7 @@ export const GamePlayPage: React.FC = () => {
         <HotSeatCard />
 
         {/* The question — center of screen */}
-        <div className="card" style={{ padding: '24px 20px', textAlign: 'center', flex: 0 }}>
+        <div className="card-pixel corner-accent" style={{ padding: '24px 20px', textAlign: 'center', flex: 0 }}>
           <p className="question">{gameState.currentQuestion}</p>
         </div>
 
@@ -194,7 +194,7 @@ export const GamePlayPage: React.FC = () => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <p className="label" style={{ textAlign: 'center' }}>
+            <p className="label-cipher" style={{ textAlign: 'center', marginBottom: 4 }}>
               Is {player?.name} being honest?
             </p>
 

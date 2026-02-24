@@ -59,8 +59,10 @@ export const HomePage: React.FC = () => {
 
         {/* How it works */}
         <div style={{ marginTop: 8 }}>
-          <p className="label" style={{ marginBottom: 14 }}>How it works</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div className="section-header" style={{ marginBottom: 14 }}>
+            <p className="label-cipher">How it works</p>
+          </div>
+          <div className="card-pixel corner-accent" style={{ padding: '4px 16px' }}>
             {[
               ['01', 'Host creates a room', 'Set buy-in amount in SOL'],
               ['02', 'Players join & stake', 'Buy-in goes to host wallet'],
@@ -70,13 +72,13 @@ export const HomePage: React.FC = () => {
             ].map(([num, title, sub], i, arr) => (
               <React.Fragment key={num}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--faint)', letterSpacing: '0.05em', width: 20, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{num}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--lavender)', letterSpacing: '0.05em', width: 20, flexShrink: 0, fontVariantNumeric: 'tabular-nums', opacity: 0.7 }}>{num}</span>
                   <div style={{ flex: 1 }}>
                     <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
                     <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 8 }}>{sub}</span>
                   </div>
                 </div>
-                {i < arr.length - 1 && <hr className="divider" />}
+                {i < arr.length - 1 && <hr className="divider-pixel" />}
               </React.Fragment>
             ))}
           </div>

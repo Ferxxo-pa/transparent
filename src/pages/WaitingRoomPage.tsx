@@ -38,8 +38,8 @@ export const WaitingRoomPage: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 
         {/* Room code */}
-        <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
-          <p className="label" style={{ marginBottom: 14 }}>Room Code</p>
+        <div className="card-pixel corner-accent scan-lines" style={{ textAlign: 'center', padding: '28px 20px' }}>
+          <p className="label-cipher" style={{ marginBottom: 14 }}>Room Code</p>
           <div className="code">{gameState.roomCode}</div>
           <button
             onClick={copy}
@@ -58,7 +58,9 @@ export const WaitingRoomPage: React.FC = () => {
 
         {/* Players */}
         <div>
-          <p className="label" style={{ marginBottom: 10 }}>Players</p>
+          <div className="section-header" style={{ marginBottom: 10 }}>
+            <p className="label-cipher">Players</p>
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {gameState.players.map((p, i) => (
               <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}>
