@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion } from '../types/game';
@@ -771,7 +771,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const hostPubkey = new PublicKey(hostWallet);
             const [gamePDA] = deriveGamePDA(hostPubkey, gameState.roomName);
             const winnerPubkey = new PublicKey(winnerWallet);
-            await distributeOnChain(wallet, gamePDA, winnerPubkey);
+            // Pass exact pot lamports — prevents draining host's full wallet
+            const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
+            await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
           } catch (chainErr) {
             console.warn('On-chain distribution failed (non-fatal):', chainErr);
             // Game still recorded as over — host can send manually

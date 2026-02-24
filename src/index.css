@@ -649,6 +649,24 @@ textarea.textarea::placeholder { color: var(--muted); }
   mix-blend-mode: overlay;
 }
 
+/* Winner celebration */
+@keyframes celebrate {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.18) rotate(-2deg); }
+  30%  { transform: scale(0.95) rotate(2deg); }
+  45%  { transform: scale(1.10) rotate(-1deg); }
+  60%  { transform: scale(0.98) rotate(1deg); }
+  75%  { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+.celebrate { animation: celebrate 0.65s ease forwards; }
+
+/* Emoji float animation */
+@keyframes float-up {
+  0%   { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-80px) scale(1.5); }
+}
+
 @keyframes blob-a {
   0%, 100% { transform: translate(0px,   0px)  scale(1.00) rotate(0deg);   }
   20%       { transform: translate(60px, -50px) scale(1.12) rotate(15deg);  }

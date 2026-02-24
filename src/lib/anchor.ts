@@ -135,26 +135,37 @@ export async function joinGameOnChainWithAmount(
 }
 
 /**
- * distributeOnChain: Host sends total pot SOL → winner wallet.
- * gamePDA here is the host pubkey (host IS the escrow).
+ * distributeOnChain: Host sends exact pot SOL → winner wallet.
+ * potLamports must be passed explicitly to avoid draining the host's
+ * full wallet. If omitted, falls back to (balance - reserve) — use only
+ * as a last resort when pot tracking is unavailable.
  */
 export async function distributeOnChain(
   wallet: WalletAdapter,
   _gamePDA: PublicKey,
   winnerPubkey: PublicKey,
+  potLamports?: number,
 ): Promise<string> {
-  // Get host balance minus rent reserve
-  const balance = await connection.getBalance(wallet.publicKey, 'confirmed');
-  const reserve = 5000; // keep a little for fees
-  const potLamports = Math.max(balance - reserve, 0);
+  let sendLamports: number;
 
-  if (potLamports <= 0) throw new Error('Host wallet has no SOL to distribute');
+  if (potLamports && potLamports > 0) {
+    // Use the tracked pot amount — safe, exact
+    sendLamports = potLamports;
+  } else {
+    // Fallback: read balance and send minus rent reserve
+    // (only triggers if caller doesn't pass potLamports)
+    const balance = await connection.getBalance(wallet.publicKey, 'confirmed');
+    const reserve = 5000;
+    sendLamports = Math.max(balance - reserve, 0);
+  }
+
+  if (sendLamports <= 0) throw new Error('No SOL to distribute — pot is empty');
 
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: wallet.publicKey,
       toPubkey: winnerPubkey,
-      lamports: potLamports,
+      lamports: sendLamports,
     }),
   );
 
