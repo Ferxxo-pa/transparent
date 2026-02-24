@@ -1,32 +1,34 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet } from 'lucide-react';
+import { Wallet, LogOut } from 'lucide-react';
 import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
 /**
  * Shows a wallet setup screen when the user is logged in but has no Solana wallet.
- * Wrap any page that requires a wallet with this gate.
  */
 export const WalletSetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { connected, walletReady, setupWallet } = usePrivyWallet();
-  const { linkWallet } = usePrivy();
-  const [loading, setLoading] = useState(false);
+  const { connected, walletReady, setupWallet, logout, login } = usePrivyWallet();
+  const [creatingWallet, setCreatingWallet] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Not logged in or wallet already ready — render children normally
   if (!connected || walletReady) return <>{children}</>;
 
   const handleCreate = async () => {
-    setLoading(true);
+    setCreatingWallet(true);
     setError(null);
     try {
       await setupWallet();
     } catch (e: any) {
       setError(e?.message ?? 'Something went wrong');
     } finally {
-      setLoading(false);
+      setCreatingWallet(false);
     }
+  };
+
+  const handleSwitchToPhantom = async () => {
+    await logout();
+    login();
   };
 
   return (
@@ -43,45 +45,45 @@ export const WalletSetupGate: React.FC<{ children: React.ReactNode }> = ({ child
 
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 8 }}>
-            Connect a wallet to play
+            Connect a Solana wallet
           </h2>
           <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
-            You need a Solana wallet to create or join a game.
+            This game runs on Solana. Sign in with Phantom or Solflare to play — or create a free embedded wallet below.
           </p>
         </div>
 
-        {error && (
-          <p style={{ fontSize: 12, color: 'var(--red)' }}>{error}</p>
-        )}
+        {error && <p style={{ fontSize: 12, color: 'var(--red)' }}>{error}</p>}
 
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {/* Connect Phantom / external wallet */}
+          {/* Primary: log out + re-login with wallet */}
           <motion.button
             className="btn btn-primary"
-            onClick={() => linkWallet()}
+            onClick={handleSwitchToPhantom}
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-            Connect Phantom / Solflare →
+            <LogOut size={15} />
+            Sign in with Phantom / Solflare
           </motion.button>
 
-          {/* Create embedded wallet (no seed phrase) */}
+          {/* Secondary: create embedded wallet */}
           <motion.button
             className="btn"
             onClick={handleCreate}
-            disabled={loading}
+            disabled={creatingWallet}
             style={{ background: 'var(--glass)', border: '1px solid var(--border)', color: 'var(--text)' }}
             whileTap={{ scale: 0.96 }}
-            whileHover={!loading ? { scale: 1.02 } : {}}
+            whileHover={!creatingWallet ? { scale: 1.02 } : {}}
             transition={{ type: 'spring', stiffness: 400, damping: 20 }}
           >
-            {loading ? 'Setting up…' : 'Create embedded wallet (no seed phrase)'}
+            {creatingWallet ? 'Creating wallet…' : 'Create embedded wallet (no seed phrase)'}
           </motion.button>
         </div>
 
         <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>
-          Make sure your wallet is set to <strong style={{ color: 'var(--text)' }}>devnet</strong> for testnet play
+          Set Phantom to <strong style={{ color: 'var(--text)' }}>devnet</strong> to play with testnet SOL
         </p>
       </motion.div>
     </div>
