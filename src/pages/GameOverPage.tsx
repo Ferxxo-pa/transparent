@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -60,8 +61,14 @@ export const GameOverPage: React.FC = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 
-        {/* Pot */}
-        <div className="card-lime" style={{ textAlign: 'center', padding: '28px 20px' }}>
+        {/* Pot / Winner */}
+        <motion.div
+          className="card-lime"
+          style={{ textAlign: 'center', padding: '28px 20px' }}
+          initial={{ opacity: 0, scale: 0.85, y: 24 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+        >
           {confirmed && winnerPlayer ? (
             <>
               <p className="label" style={{ marginBottom: 10 }}>Winner</p>
@@ -81,7 +88,7 @@ export const GameOverPage: React.FC = () => {
               </p>
             </>
           )}
-        </div>
+        </motion.div>
 
         {/* Leaderboard */}
         <div>
@@ -100,10 +107,15 @@ export const GameOverPage: React.FC = () => {
             {ranked.map(({ p, s, honesty }, i) => {
               const isWinner = p.id === activeWinner;
               return (
-                <div
+                <motion.div
                   key={p.id}
                   className={`lb-row ${isWinner ? 'winner' : ''} ${isHost && !confirmed ? 'selectable' : ''}`}
                   onClick={() => isHost && !confirmed && setSelected(p.id)}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 26, delay: i * 0.08 }}
+                  whileHover={isHost && !confirmed ? { scale: 1.02 } : {}}
+                  whileTap={isHost && !confirmed ? { scale: 0.98 } : {}}
                 >
                   <span style={{ fontWeight: 800, fontSize: 18, color: i === 0 ? 'var(--lime)' : 'var(--muted)', width: 24, flexShrink: 0, letterSpacing: '-0.03em' }}>
                     {i + 1}
@@ -129,7 +141,7 @@ export const GameOverPage: React.FC = () => {
                       +{gameState.currentPot.toFixed(2)} SOL
                     </span>
                   )}
-                </div>
+                </motion.div>
               );
             })}
           </div>
@@ -144,15 +156,39 @@ export const GameOverPage: React.FC = () => {
 
       {/* CTA */}
       <div style={{ width: '100%', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {isHost && !confirmed ? (
-          <button className="btn btn-primary" onClick={distribute} disabled={distributing || !activeWinner}>
-            {distributing ? 'Sending…' : `Send ${gameState.currentPot.toFixed(2)} SOL to ${winnerPlayer?.name ?? 'Winner'}`}
-          </button>
-        ) : (
-          <button className="btn btn-secondary" onClick={() => { resetGame(); navigate('/'); }}>
-            Play Again
-          </button>
-        )}
+        <AnimatePresence mode="wait">
+          {isHost && !confirmed ? (
+            <motion.button
+              key="distribute"
+              className="btn btn-primary"
+              onClick={distribute}
+              disabled={distributing || !activeWinner}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            >
+              {distributing ? 'Sending…' : gameState.buyInAmount > 0
+                ? `Send ${gameState.currentPot.toFixed(2)} SOL to ${winnerPlayer?.name ?? 'Winner'}`
+                : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
+              }
+            </motion.button>
+          ) : (
+            <motion.button
+              key="play-again"
+              className="btn btn-secondary"
+              onClick={() => { resetGame(); navigate('/'); }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileTap={{ scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+            >
+              Play Again
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

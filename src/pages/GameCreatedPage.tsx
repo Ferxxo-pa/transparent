@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Copy, Check } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
@@ -9,6 +10,11 @@ export const GameCreatedPage: React.FC = () => {
   const { gameState, startGame, loading } = useGame();
   const { publicKey } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
+
+  // Auto-navigate when game starts (real-time update)
+  useEffect(() => {
+    if (gameState?.gameStatus === 'playing') navigate('/game');
+  }, [gameState?.gameStatus, navigate]);
 
   if (!gameState) { navigate('/'); return null; }
 
@@ -32,8 +38,14 @@ export const GameCreatedPage: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 
         {/* Room code — the most important element */}
-        <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
-          <p className="label" style={{ marginBottom: 14 }}>Share this code</p>
+        <motion.div
+          className="card-pixel corner-accent"
+          style={{ textAlign: 'center', padding: '28px 20px' }}
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 24 }}
+        >
+          <p className="label-cipher" style={{ marginBottom: 14 }}>Share this code</p>
           <div className="code">{gameState.roomCode}</div>
           <button
             onClick={copy}
@@ -48,7 +60,7 @@ export const GameCreatedPage: React.FC = () => {
             {copied ? <Check size={13} /> : <Copy size={13} />}
             {copied ? 'Copied!' : 'Copy code'}
           </button>
-        </div>
+        </motion.div>
 
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
@@ -72,7 +84,13 @@ export const GameCreatedPage: React.FC = () => {
           <p className="label" style={{ marginBottom: 10 }}>In the lobby</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {gameState.players.map((p, i) => (
-              <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}>
+              <motion.div
+                key={p.id}
+                className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 340, damping: 28, delay: i * 0.07 }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                     {String(i + 1).padStart(2, '0')}
@@ -83,7 +101,7 @@ export const GameCreatedPage: React.FC = () => {
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lime)' }}>
                   {gameState.buyInAmount} SOL
                 </span>
-              </div>
+              </motion.div>
             ))}
 
             {/* Waiting indicator */}
@@ -96,11 +114,18 @@ export const GameCreatedPage: React.FC = () => {
 
       {/* CTA */}
       <div style={{ width: '100%', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <button className="btn btn-primary" onClick={async () => { await startGame(); navigate('/game'); }} disabled={loading}>
-          {loading ? 'Starting…' : 'Start Game'}
-        </button>
+        <motion.button
+          className="btn btn-primary"
+          onClick={async () => { await startGame(); navigate('/game'); }}
+          disabled={loading}
+          whileTap={{ scale: 0.96 }}
+          whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        >
+          {loading ? 'Starting…' : 'Start Game →'}
+        </motion.button>
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>
-          You can start with any number of players
+          Start with any number of players
         </p>
       </div>
     </div>

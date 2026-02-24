@@ -111,7 +111,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } else if (questionMode === 'custom' && prev.customQuestions) {
               currentQuestion = prev.customQuestions[game.current_question_index] || prev.customQuestions[0] || '';
             }
-            // For hot-take, currentQuestion is set when voting completes
+
+            // Reset votes whenever the round advances (syncs all clients)
+            const roundChanged = (game.current_round ?? 0) !== (prev.currentRound ?? 0);
+            const playerChanged = game.current_hot_seat_player !== prev.currentPlayerInHotSeat;
 
             return {
               ...prev,
@@ -120,6 +123,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               currentPlayerInHotSeat: game.current_hot_seat_player,
               gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
               currentRound: game.current_round ?? prev.currentRound,
+              // Clear votes for all clients when round or player changes
+              ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
             };
           });
         },
@@ -136,19 +141,34 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             };
           });
         },
-        // onVotesChange
+        // onVotesChange — runs on ALL clients, calculates scores when all votes in
         (votes: VoteRow[]) => {
           setGameState((prev) => {
             if (!prev) return prev;
             const voteMap: Record<string, 'transparent' | 'fake'> = {};
-            votes.forEach((v) => {
-              voteMap[v.voter_wallet] = v.vote;
-            });
-            return {
-              ...prev,
-              votes: voteMap,
-              voteCount: votes.length,
-            };
+            votes.forEach((v) => { voteMap[v.voter_wallet] = v.vote; });
+
+            // Check if all eligible votes are in and calculate scores for everyone
+            const hotSeatWallet = prev.currentPlayerInHotSeat;
+            const eligibleVoters = prev.players.filter(p => p.id !== hotSeatWallet).length;
+            const votesNeeded = Math.max(eligibleVoters, 1);
+            let newScores = prev.scores ?? {};
+
+            if (votes.length >= votesNeeded && hotSeatWallet) {
+              const transparentVotes = votes.filter(v => v.vote === 'transparent').length;
+              const fakeVotes = votes.filter(v => v.vote === 'fake').length;
+              const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+              newScores = {
+                ...newScores,
+                [hotSeatWallet]: {
+                  transparent: transparentVotes,
+                  fake: fakeVotes,
+                  rounds: (existing.rounds ?? 0) + 1,
+                },
+              };
+            }
+
+            return { ...prev, votes: voteMap, voteCount: votes.length, scores: newScores };
           });
         },
         // onQuestionsChange (hot-take mode)
@@ -496,27 +516,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const votesNeeded = eligibleVoters > 0 ? eligibleVoters : gameState.players.length;
 
         if (allVotes.length >= votesNeeded) {
-          // All votes in — tally scores for this round
-          const transparentVotes = allVotes.filter((v) => v.vote === 'transparent').length;
-          const fakeVotes = allVotes.filter((v) => v.vote === 'fake').length;
-
-          setGameState((prev) => {
-            if (!prev || !hotSeatWallet) return prev;
-            const prevScores = prev.scores ?? {};
-            const playerScore = prevScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
-            return {
-              ...prev,
-              scores: {
-                ...prevScores,
-                [hotSeatWallet]: {
-                  transparent: playerScore.transparent + transparentVotes,
-                  fake: playerScore.fake + fakeVotes,
-                  rounds: playerScore.rounds + 1,
-                },
-              },
-            };
-          });
-
+          // Scores are calculated in onVotesChange for all clients
           // Advance to next player or end game
           const currentIdx = gameState.players.findIndex((p) => p.id === hotSeatWallet);
           const nextIdx = currentIdx + 1;
@@ -718,19 +718,23 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setLoading(true);
       try {
-        const hostWallet = (gameState as any).hostWallet;
-        if (!hostWallet) throw new Error('No host wallet found');
-
-        const hostPubkey = new PublicKey(hostWallet);
-        const [gamePDA] = deriveGamePDA(hostPubkey, gameState.roomName);
-        const winnerPubkey = new PublicKey(winnerWallet);
-
-        await distributeOnChain(wallet, gamePDA, winnerPubkey);
-
         const gid = (gameState as any).gameId;
-        if (gid) {
-          await updateGameStatus(gid, { status: 'gameover' });
+
+        // Only attempt on-chain distribution if there's an actual buy-in
+        if (gameState.buyInAmount > 0) {
+          try {
+            const hostWallet = (gameState as any).hostWallet;
+            const hostPubkey = new PublicKey(hostWallet);
+            const [gamePDA] = deriveGamePDA(hostPubkey, gameState.roomName);
+            const winnerPubkey = new PublicKey(winnerWallet);
+            await distributeOnChain(wallet, gamePDA, winnerPubkey);
+          } catch (chainErr) {
+            console.warn('On-chain distribution failed (non-fatal):', chainErr);
+            // Game still recorded as over — host can send manually
+          }
         }
+
+        if (gid) await updateGameStatus(gid, { status: 'gameover' });
 
         setGameState((prev) =>
           prev ? { ...prev, gameStatus: 'gameover', winner: winnerWallet } : null,
