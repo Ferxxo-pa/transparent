@@ -8,9 +8,9 @@ interface Props {
 
 export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerEnd }) => {
   const { gameState, submitQuestion } = useGame();
-  const [question, setQuestion] = useState('');
+  const [question,  setQuestion]  = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft,  setTimeLeft]  = useState(30);
 
   const handleSubmit = useCallback(async () => {
     if (!question.trim() || submitted) return;
@@ -29,58 +29,61 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
   }, [timeLeft, submitted, question, handleSubmit, onTimerEnd]);
 
   const submittedCount = gameState?.submittedQuestions?.length ?? 0;
-  const totalOther = (gameState?.players.length ?? 1) - 1;
+  const total = Math.max((gameState?.players.length ?? 1) - 1, 1);
+
+  if (submitted) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '32px 20px' }}>
+        <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
+        <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--lime)' }}>Submitted!</p>
+        <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>Waiting for others…</p>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+            <span style={{ color: 'var(--muted)' }}>Submitted</span>
+            <span style={{ color: 'var(--muted)' }}>{submittedCount}/{total}</span>
+          </div>
+          <div className="progress">
+            <div className="progress-bar" style={{ width: `${(submittedCount / total) * 100}%` }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="card-lg animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Timer */}
-      <div style={{ textAlign: 'center' }}>
-        <div className={`timer ${timeLeft <= 10 ? 'urgent' : ''}`}>{timeLeft}s</div>
-        <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 4 }}>
-          {submittedCount}/{totalOther} submitted
-        </p>
-      </div>
-
-      {/* Header */}
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-          Write a question for
-        </p>
-        <p style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)' }}>
-          {hotSeatPlayerName}
-        </p>
-      </div>
-
-      {!submitted ? (
-        <>
-          <textarea
-            className="input-area"
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            placeholder={`Ask ${hotSeatPlayerName} something revealing...`}
-            maxLength={200}
-            rows={3}
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{question.length}/200</span>
-            <button
-              className="btn btn-primary"
-              style={{ width: 'auto', padding: '10px 20px' }}
-              onClick={handleSubmit}
-              disabled={!question.trim()}
-            >
-              Submit
-            </button>
-          </div>
-        </>
-      ) : (
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', marginBottom: 4 }}>
-            ✓ Submitted!
-          </div>
-          <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Waiting for others...</p>
+    <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Timer + context */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <p className="label-sm" style={{ marginBottom: 2 }}>Write a question for</p>
+          <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+            {hotSeatPlayerName}
+          </p>
         </div>
-      )}
+        <div className={`timer ${timeLeft <= 10 ? 'urgent' : ''}`}>{timeLeft}</div>
+      </div>
+
+      <textarea
+        className="textarea"
+        value={question}
+        onChange={e => setQuestion(e.target.value)}
+        placeholder={`Ask ${hotSeatPlayerName} something they won't want to answer…`}
+        maxLength={200}
+        rows={3}
+        autoFocus
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{question.length}/200</span>
+        <button
+          className="btn btn-primary"
+          style={{ width: 'auto', height: 42, padding: '0 20px', fontSize: 14 }}
+          onClick={handleSubmit}
+          disabled={!question.trim()}
+        >
+          Submit
+        </button>
+      </div>
     </div>
   );
 };

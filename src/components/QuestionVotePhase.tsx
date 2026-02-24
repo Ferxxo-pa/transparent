@@ -11,10 +11,10 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
   const { gameState, voteForQuestion } = useGame();
   const { publicKey } = usePrivyWallet();
   const [timeLeft, setTimeLeft] = useState(15);
-  const [votedId, setVotedId] = useState<string | null>(null);
+  const [votedId,  setVotedId]  = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
 
-  const myWallet = publicKey?.toBase58() ?? '';
+  const myWallet    = publicKey?.toBase58() ?? '';
   const alreadyVoted = votedId !== null || !!(gameState?.questionVotes?.[myWallet]);
 
   useEffect(() => {
@@ -29,62 +29,61 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
     return () => clearTimeout(t);
   }, [timeLeft, revealed, onTimerEnd]);
 
-  const handleVote = useCallback(async (id: string) => {
+  const vote = useCallback(async (id: string) => {
     if (alreadyVoted) return;
     setVotedId(id);
     await voteForQuestion(id);
   }, [alreadyVoted, voteForQuestion]);
 
   const questions = gameState?.submittedQuestions ?? [];
-  const winner = questions.reduce((b, q) => (q.votes > (b?.votes ?? -1) ? q : b), questions[0]);
+  const winner    = questions.reduce((b, q) => (q.votes > (b?.votes ?? -1) ? q : b), questions[0]);
 
   return (
-    <div className="card-lg animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Timer */}
-      <div style={{ textAlign: 'center' }}>
-        {revealed ? (
-          <div style={{ fontSize: 32 }}>🔥</div>
-        ) : (
-          <div className={`timer ${timeLeft <= 5 ? 'urgent' : ''}`}>{timeLeft}s</div>
-        )}
+    <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <p className="label-sm" style={{ marginBottom: 2 }}>
+            {revealed ? 'Winning question' : 'Vote for best question'}
+          </p>
+          <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+            for {hotSeatPlayerName}
+          </p>
+        </div>
+        {revealed
+          ? <span style={{ fontSize: 28 }}>🔥</span>
+          : <div className={`timer ${timeLeft <= 5 ? 'urgent' : ''}`}>{timeLeft}</div>
+        }
       </div>
 
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-          {revealed ? 'Winning question!' : 'Vote for the best question'}
-        </p>
-        <p style={{ fontFamily: 'Space Grotesk', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
-          for {hotSeatPlayerName}
-        </p>
-      </div>
-
-      {/* Questions */}
+      {/* Options */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {questions.map(q => {
-          const isMyVote = votedId === q.id;
+          const isMyVote = votedId === q.id || gameState?.questionVotes?.[myWallet] === q.id;
           const isWinner = revealed && q.id === winner?.id;
 
           return (
             <button
               key={q.id}
-              onClick={() => handleVote(q.id)}
+              onClick={() => vote(q.id)}
               disabled={alreadyVoted && !revealed}
               style={{
                 textAlign: 'left',
                 padding: '14px 16px',
-                borderRadius: 12,
-                border: isWinner ? '2px solid var(--lime)' : isMyVote ? '2px solid rgba(232,223,200,0.5)' : '1px solid var(--border)',
-                background: isWinner ? 'rgba(191,251,79,0.08)' : isMyVote ? 'rgba(102,79,251,0.1)' : 'var(--glass-2)',
+                borderRadius: 'var(--r-sm)',
+                border: `1.5px solid ${isWinner ? 'var(--lime-border)' : isMyVote ? 'var(--border-2)' : 'var(--border)'}`,
+                background: isWinner ? 'var(--lime-bg)' : isMyVote ? 'var(--card-2)' : 'var(--card)',
                 cursor: alreadyVoted && !revealed ? 'default' : 'pointer',
-                transition: 'all 0.15s',
+                transition: 'border-color 0.1s, background 0.1s',
+                width: '100%',
               }}
             >
               <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
                 "{q.text}"
               </p>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Anonymous</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--lime)' : 'var(--text-3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Anonymous</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--lime)' : 'var(--muted)' }}>
                   {q.votes} vote{q.votes !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -93,14 +92,14 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
         })}
 
         {questions.length === 0 && (
-          <p style={{ color: 'var(--text-3)', textAlign: 'center', fontSize: 14 }}>
-            No questions submitted...
+          <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14, padding: '16px 0' }}>
+            No questions submitted…
           </p>
         )}
       </div>
 
       {alreadyVoted && !revealed && (
-        <p style={{ color: 'var(--text-2)', fontSize: 13, textAlign: 'center' }}>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
           ✓ Vote cast — waiting for timer
         </p>
       )}

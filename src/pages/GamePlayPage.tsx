@@ -4,267 +4,245 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
 import { QuestionVotePhase } from '../components/QuestionVotePhase';
-import fireIconSrc from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
-import groupIconSrc from '../assets/Group.svg';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, castVote, advanceHotTakePhase } = useGame();
-  const { publicKey, displayName } = usePrivyWallet();
+  const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
-  const isHost = myWallet === (gameState as any)?.hostWallet;
+  const isHost   = myWallet === (gameState as any)?.hostWallet;
 
   useEffect(() => {
     if (gameState?.gameStatus === 'gameover') navigate('/gameover');
   }, [gameState?.gameStatus, navigate]);
 
-  const handleAdvancePhase = useCallback(() => {
+  const advance = useCallback(() => {
     if (isHost) advanceHotTakePhase();
   }, [advanceHotTakePhase, isHost]);
 
   if (!gameState) { navigate('/'); return null; }
 
-  const currentPlayer = gameState.players.find(p => p.id === gameState.currentPlayerInHotSeat);
-  const hasVoted = !!gameState.votes[myWallet];
-  const isHotSeat = myWallet === gameState.currentPlayerInHotSeat;
-  const isHotTake = gameState.questionMode === 'hot-take';
-  const phase = gameState.gamePhase;
-  const scores = gameState.scores ?? {};
-  const round = (gameState.currentRound ?? 0) + 1;
-  const totalRounds = gameState.players.length;
-  const votesIn = gameState.voteCount;
-  const totalVoters = Math.max(gameState.players.length - 1, 1);
+  const player     = gameState.players.find(p => p.id === gameState.currentPlayerInHotSeat);
+  const hasVoted   = !!gameState.votes[myWallet];
+  const isHotSeat  = myWallet === gameState.currentPlayerInHotSeat;
+  const isHotTake  = gameState.questionMode === 'hot-take';
+  const phase      = gameState.gamePhase;
+  const round      = (gameState.currentRound ?? 0) + 1;
+  const total      = gameState.players.length;
+  const votesIn    = gameState.voteCount;
+  const voterCount = Math.max(total - 1, 1);
+  const myVote     = gameState.votes[myWallet];
 
-  // ── Shared nav for all hot-take phases ──────────────────────
-  const HotTakeNav = () => (
+  // ── Shared Navbar ──────────────────────────────────────────
+  const Nav = () => (
     <nav className="navbar">
-      <div className="badge badge-lime">Round {round}/{totalRounds}</div>
-      <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
+      <span className="chip chip-muted">Round {round} / {total}</span>
+      <button
+        onClick={() => navigate('/gameover')}
+        style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
+      >
+        End Game
+      </button>
     </nav>
   );
 
-  // ── Hot-Take: Submitting Questions ──────────────────────────
+  // ── Hot Seat Banner ────────────────────────────────────────
+  const HotSeatCard = () => (
+    <div className="hot-seat">
+      <div style={{ fontSize: 28, flexShrink: 0 }}>🔥</div>
+      <div style={{ flex: 1 }}>
+        <p className="label-sm" style={{ marginBottom: 2 }}>In the hot seat</p>
+        <p style={{ fontWeight: 800, fontSize: 22, letterSpacing: '-0.03em', color: 'var(--lime)', lineHeight: 1 }}>
+          {player?.name ?? 'Unknown'}
+          {isHotSeat && <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--muted)', marginLeft: 8 }}>(you)</span>}
+        </p>
+      </div>
+    </div>
+  );
+
+  // ── Score mini sidebar (shown at bottom) ───────────────────
+  const Scores = () => {
+    const scores = gameState.scores ?? {};
+    if (!Object.keys(scores).length) return null;
+    return (
+      <div>
+        <p className="label" style={{ marginBottom: 8 }}>Scores</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {gameState.players.map((p, i) => {
+            const s = scores[p.id];
+            const t = s ? s.transparent + s.fake : 0;
+            const pct = t > 0 ? Math.round((s.transparent / t) * 100) : null;
+            return (
+              <div key={p.id} className="player-row" style={{ borderColor: p.id === gameState.currentPlayerInHotSeat ? 'var(--lime-border)' : undefined }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {p.id === gameState.currentPlayerInHotSeat && <span style={{ fontSize: 12 }}>🔥</span>}
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name || `P${i+1}`}</span>
+                  {p.id === myWallet && <span className="chip chip-muted" style={{ fontSize: 10, padding: '1px 6px' }}>you</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 10, fontSize: 12, color: 'var(--muted)' }}>
+                  {s ? <><span style={{ color: 'var(--lime)' }}>✓{s.transparent}</span><span>✗{s.fake}</span>{pct !== null && <span>{pct}%</span>}</> : <span>{gameState.buyInAmount} SOL</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Hot-Take: Writing questions ────────────────────────────
   if (isHotTake && phase === 'submitting-questions') {
     return (
-      <div className="page page-full">
-        <HotTakeNav />
-        <div className="page-content animate-in">
-          <div className="game-grid">
-            <div className="game-main">
-              {isHotSeat ? (
-                <div className="card-lg" style={{ textAlign: 'center' }}>
-                  <img src={fireIconSrc} alt="" style={{ width: 48, height: 48, filter: 'brightness(0) saturate(100%) invert(94%) sepia(48%) saturate(700%) hue-rotate(40deg)', opacity: 0.9, marginBottom: 16 }} />
-                  <h2 style={{ fontFamily: 'Space Grotesk', fontSize: 'clamp(20px, 3vw, 26px)', fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
-                    You're in the Hot Seat
-                  </h2>
-                  <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Players are writing questions for you...</p>
-                  <div style={{ marginTop: 16 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>Questions submitted</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>
-                        {gameState.submittedQuestions?.length ?? 0} / {gameState.players.length - 1}
-                      </span>
-                    </div>
-                    <div className="progress-track">
-                      <div className="progress-fill" style={{ width: `${((gameState.submittedQuestions?.length ?? 0) / Math.max(gameState.players.length - 1, 1)) * 100}%` }} />
-                    </div>
-                  </div>
+      <div className="page fade-in">
+        <Nav />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
+          <HotSeatCard />
+          {isHotSeat ? (
+            <div className="card" style={{ textAlign: 'center', padding: '32px 20px' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>🪑</div>
+              <p style={{ fontWeight: 700, fontSize: 18 }}>You're in the hot seat</p>
+              <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 8 }}>Players are writing questions for you…</p>
+              <div style={{ marginTop: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Questions submitted</span>
+                  <span style={{ color: 'var(--muted)' }}>{gameState.submittedQuestions?.length ?? 0}/{total - 1}</span>
                 </div>
-              ) : (
-                <QuestionSubmitPhase hotSeatPlayerName={currentPlayer?.name || 'Unknown'} onTimerEnd={handleAdvancePhase} />
-              )}
+                <div className="progress">
+                  <div className="progress-bar" style={{ width: `${((gameState.submittedQuestions?.length ?? 0) / Math.max(total - 1, 1)) * 100}%` }} />
+                </div>
+              </div>
             </div>
-            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
-          </div>
+          ) : (
+            <QuestionSubmitPhase hotSeatPlayerName={player?.name || 'Unknown'} onTimerEnd={advance} />
+          )}
+          <Scores />
         </div>
       </div>
     );
   }
 
-  // ── Hot-Take: Voting on Questions ────────────────────────────
+  // ── Hot-Take: Voting on questions ──────────────────────────
   if (isHotTake && phase === 'voting-question') {
     return (
-      <div className="page page-full">
-        <HotTakeNav />
-        <div className="page-content animate-in">
-          <div className="game-grid">
-            <div className="game-main">
-              <QuestionVotePhase hotSeatPlayerName={currentPlayer?.name || 'Unknown'} onTimerEnd={handleAdvancePhase} />
-            </div>
-            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
-          </div>
+      <div className="page fade-in">
+        <Nav />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
+          <HotSeatCard />
+          <QuestionVotePhase hotSeatPlayerName={player?.name || 'Unknown'} onTimerEnd={advance} />
+          <Scores />
         </div>
       </div>
     );
   }
 
-  // ── Hot-Take: Answering phase ─────────────────────────────────
+  // ── Hot-Take: Answering ────────────────────────────────────
   if (isHotTake && phase === 'answering') {
     return (
-      <div className="page page-full">
-        <HotTakeNav />
-        <div className="page-content animate-in">
-          <div className="game-grid">
-            <div className="game-main">
-              <HotSeatBanner name={currentPlayer?.name || ''} isMe={isHotSeat} />
-              <div className="card-lg" style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>Hot Take Question</p>
-                <p className="question-text" style={{ marginBottom: 24 }}>{gameState.currentQuestion || 'No question selected'}</p>
-                {isHotSeat ? (
-                  <button className="btn btn-primary" style={{ maxWidth: 260, margin: '0 auto' }} onClick={handleAdvancePhase}>I've Answered ✓</button>
-                ) : (
-                  <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Listen to {currentPlayer?.name}'s answer...</p>
-                )}
-              </div>
-            </div>
-            <div className="game-sidebar"><ScoreboardSection gameState={gameState} myWallet={myWallet} /></div>
+      <div className="page fade-in">
+        <Nav />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
+          <HotSeatCard />
+          <div className="card" style={{ textAlign: 'center' }}>
+            <p className="label-sm" style={{ marginBottom: 14 }}>Hot Take Question</p>
+            <p className="question">{gameState.currentQuestion || 'No question selected'}</p>
           </div>
+          {isHotSeat ? (
+            <button className="btn btn-primary" onClick={advance}>I've Answered ✓</button>
+          ) : (
+            <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>
+              Listen to {player?.name}'s answer…
+            </p>
+          )}
+          <Scores />
         </div>
       </div>
     );
   }
 
-  // ── Default / Classic / Custom / Voting-Honesty Phase ─────────
+  // ── Classic / Custom / Voting-honesty ─────────────────────
   return (
-    <div className="page page-full">
-      <nav className="navbar">
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="badge badge-neutral">Round {round}/{totalRounds}</div>
-          {isHotTake && <div className="badge badge-lime">🔥 Hot Take</div>}
+    <div className="page fade-in">
+      <Nav />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
+
+        {/* Hot seat */}
+        <HotSeatCard />
+
+        {/* The question — center of screen */}
+        <div className="card" style={{ padding: '24px 20px', textAlign: 'center', flex: 0 }}>
+          <p className="question">{gameState.currentQuestion}</p>
         </div>
-        <button onClick={() => navigate('/gameover')} style={{ fontSize: 12, color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer' }}>End Game</button>
-      </nav>
 
-      <div className="page-content animate-in">
-        <div className="game-grid">
-          {/* Main content */}
-          <div className="game-main">
-            <HotSeatBanner name={currentPlayer?.name || 'Unknown'} isMe={isHotSeat} />
+        {/* Voting or answering */}
+        {isHotSeat ? (
+          <div className="card" style={{ textAlign: 'center', padding: '20px' }}>
+            <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Answer out loud. Others are voting on whether you're being honest.
+            </p>
+            {votesIn > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
+                  <span style={{ color: 'var(--muted)' }}>Votes in</span>
+                  <span style={{ color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
+                </div>
+                <div className="progress">
+                  <div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} />
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <p className="label" style={{ textAlign: 'center' }}>
+              Is {player?.name} being honest?
+            </p>
 
-            <div className="card-lg" style={{ textAlign: 'center' }}>
-              <p className="question-text">{gameState.currentQuestion}</p>
+            {/* Vote buttons — big, thumb-friendly, fill the space */}
+            <div className="vote-wrap">
+              <button
+                className={`vote-btn vote-honest ${myVote === 'transparent' ? 'voted' : ''}`}
+                onClick={() => castVote('transparent')}
+                disabled={hasVoted}
+              >
+                <span style={{ fontSize: 22 }}>✓</span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Honest</span>
+              </button>
+              <button
+                className={`vote-btn vote-fake ${myVote === 'fake' ? 'voted' : ''}`}
+                onClick={() => castVote('fake')}
+                disabled={hasVoted}
+              >
+                <span style={{ fontSize: 22 }}>✗</span>
+                <span style={{ fontSize: 14, fontWeight: 700 }}>Lying</span>
+              </button>
             </div>
 
-            {isHotSeat ? (
-              <div className="card" style={{ textAlign: 'center', padding: 18 }}>
-                <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
-                  Answer honestly — others are voting on whether to believe you
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <label className="label" style={{ textAlign: 'center' }}>
-                  Is {currentPlayer?.name} being transparent?
-                </label>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button className="vote-btn vote-transparent" onClick={() => castVote('transparent')} disabled={hasVoted}>
-                    ✅ Transparent
-                  </button>
-                  <button className="vote-btn vote-fake" onClick={() => castVote('fake')} disabled={hasVoted}>
-                    ❌ Fake
-                  </button>
-                </div>
-
-                {votesIn > 0 && (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{hasVoted ? '✓ Vote cast' : 'Waiting for votes'}</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-3)' }}>{votesIn}/{totalVoters}</span>
-                    </div>
-                    <div className="progress-track">
-                      <div className="progress-fill" style={{ width: `${(votesIn / totalVoters) * 100}%` }} />
-                    </div>
-                  </div>
-                )}
+            {/* Vote status */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                {hasVoted ? `You voted ${myVote === 'transparent' ? 'Honest' : 'Lying'}` : 'Cast your vote'}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--muted)' }}>{votesIn}/{voterCount} voted</span>
+            </div>
+            {votesIn > 0 && (
+              <div className="progress">
+                <div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} />
               </div>
             )}
-
-            {isHotTake && phase === 'voting-honesty' && hasVoted && isHost && (
-              <button className="btn btn-secondary" onClick={handleAdvancePhase}>Next Round →</button>
-            )}
           </div>
+        )}
 
-          {/* Sidebar scoreboard — always visible, sticky on desktop */}
-          <div className="game-sidebar">
-            <ScoreboardSection gameState={gameState} myWallet={myWallet} />
-          </div>
+        {/* Host advance */}
+        {isHotTake && phase === 'voting-honesty' && hasVoted && isHost && (
+          <button className="btn btn-secondary" onClick={advance}>Next Round →</button>
+        )}
+
+        {/* Live scores at bottom */}
+        <div style={{ marginTop: 4 }}>
+          <Scores />
         </div>
       </div>
     </div>
   );
 };
-
-// ── Sub-components ─────────────────────────────────────────────
-
-function HotSeatBanner({ name, isMe }: { name: string; isMe: boolean }) {
-  return (
-    <div className="hot-seat-banner" style={{ display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left' }}>
-      <div style={{
-        width: 52, height: 52, borderRadius: 16, flexShrink: 0,
-        background: 'rgba(191,251,79,0.08)',
-        border: '1px solid rgba(191,251,79,0.2)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-        <img src={fireIconSrc} alt="Hot Seat" style={{ width: 28, height: 28, filter: 'brightness(0) saturate(100%) invert(94%) sepia(48%) saturate(700%) hue-rotate(40deg) brightness(105%)', opacity: 0.9 }} />
-      </div>
-      <div>
-        <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-          In the Hot Seat
-        </div>
-        <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
-          {name}
-          {isMe && <span style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 500, marginLeft: 8 }}>(You)</span>}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScoreboardSection({ gameState, myWallet }: { gameState: any; myWallet: string }) {
-  const scores = gameState.scores ?? {};
-  const hasScores = Object.keys(scores).length > 0;
-
-  return (
-    <div style={{ marginTop: 4 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <img src={groupIconSrc} alt="" style={{ width: 14, height: 14, opacity: 0.4, filter: 'brightness(0) invert(1)' }} />
-        <label className="label" style={{ marginBottom: 0 }}>{hasScores ? 'Live Scores' : 'Players'}</label>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {gameState.players.map((p: any, i: number) => {
-          const score = scores[p.id];
-          const isHotSeat = p.id === gameState.currentPlayerInHotSeat;
-          const isMe = p.id === myWallet;
-          const total = score ? score.transparent + score.fake : 0;
-          const pct = total > 0 ? Math.round((score.transparent / total) * 100) : null;
-
-          return (
-            <div key={p.id} className={`player-row ${isHotSeat ? 'active' : ''}`}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {isHotSeat && <span style={{ fontSize: 12 }}>🔥</span>}
-                <span style={{ fontWeight: 600, fontSize: 13 }}>
-                  {p.name || `Player ${i + 1}`}
-                  {isMe && <span style={{ color: 'var(--text-3)', marginLeft: 4, fontSize: 11 }}>you</span>}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                {score ? (
-                  <>
-                    <span style={{ fontSize: 12, color: 'var(--lime)' }}>✅ {score.transparent}</span>
-                    <span style={{ fontSize: 12, color: 'var(--text-3)' }}>❌ {score.fake}</span>
-                    {pct !== null && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{pct}%</span>}
-                  </>
-                ) : (
-                  <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Space Grotesk', fontWeight: 700 }}>
-                    {gameState.buyInAmount} SOL
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}

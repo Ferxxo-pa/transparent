@@ -7,7 +7,7 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, startGame } = useGame();
-  const { publicKey, displayName } = usePrivyWallet();
+  const { publicKey } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
 
   const isHost = publicKey?.toBase58() === (gameState as any)?.hostWallet;
@@ -18,86 +18,76 @@ export const WaitingRoomPage: React.FC = () => {
 
   if (!gameState) { navigate('/'); return null; }
 
-  const handleCopy = () => {
+  const copy = () => {
     navigator.clipboard.writeText(gameState.roomCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const potTotal = (gameState.players.length * gameState.buyInAmount).toFixed(2);
+  const pot = (gameState.players.length * gameState.buyInAmount).toFixed(2);
 
   return (
-    <div className="page">
+    <div className="page fade-in">
       <nav className="navbar">
-        <div className="badge badge-lime pulse-lime">● Live</div>
-        <div className="badge badge-neutral">{displayName}</div>
+        <span className="chip chip-lime blink">● Waiting</span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+          {gameState.players.length} joined · {pot} SOL pot
+        </span>
       </nav>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 
-        {/* Room code card */}
-        <div className="card-lg" style={{ textAlign: 'center' }}>
-          <p className="label" style={{ textAlign: 'center', marginBottom: 14 }}>Room Code</p>
+        {/* Room code */}
+        <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
+          <p className="label" style={{ marginBottom: 14 }}>Room Code</p>
+          <div className="code">{gameState.roomCode}</div>
           <button
-            onClick={handleCopy}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, width: '100%', marginBottom: 10 }}
+            onClick={copy}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              marginTop: 16, background: 'var(--card-2)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r-pill)', padding: '8px 16px', cursor: 'pointer',
+              color: copied ? 'var(--lime)' : 'var(--muted)', fontSize: 13, fontWeight: 600,
+              fontFamily: 'Space Grotesk', transition: 'color 0.2s'
+            }}
           >
-            <span style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 44, color: 'var(--lime)', letterSpacing: '0.18em', fontVariantNumeric: 'tabular-nums' }}>
-              {gameState.roomCode}
-            </span>
-            <span style={{ color: copied ? 'var(--lime)' : 'var(--text-3)', transition: 'color 0.2s' }}>
-              {copied ? <Check size={18} /> : <Copy size={18} />}
-            </span>
+            {copied ? <Check size={13} /> : <Copy size={13} />}
+            {copied ? 'Copied!' : 'Copy code'}
           </button>
-          {copied && <p style={{ fontSize: 12, color: 'var(--lime)', marginBottom: 6 }}>Copied!</p>}
-          <p style={{ fontSize: 13, color: 'var(--text-3)' }}>
-            {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''} · <span style={{ color: 'var(--lime)' }}>{potTotal} SOL</span> pot
-          </p>
         </div>
 
         {/* Players */}
         <div>
-          <label className="label">In the Room</label>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p className="label" style={{ marginBottom: 10 }}>Players</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {gameState.players.map((p, i) => (
-              <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'active' : ''}`}>
+              <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    background: 'var(--glass-2)', border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'Space Grotesk', fontSize: 12, fontWeight: 700, color: 'var(--text-3)'
-                  }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--muted)', flexShrink: 0 }}>
                     {String(i + 1).padStart(2, '0')}
                   </span>
-                  <span style={{ fontWeight: 500, fontSize: 14 }}>{p.name || `Player ${i + 1}`}</span>
-                  {p.isHost && <span className="badge badge-cream" style={{ fontSize: 10, padding: '2px 8px' }}>Host</span>}
-                  {p.id === publicKey?.toBase58() && !p.isHost && (
-                    <span className="badge badge-neutral" style={{ fontSize: 10, padding: '2px 8px' }}>You</span>
-                  )}
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name || `Player ${i + 1}`}</span>
+                  {p.isHost && <span className="chip chip-muted" style={{ padding: '2px 8px', fontSize: 10 }}>Host</span>}
+                  {p.id === publicKey?.toBase58() && <span className="chip chip-white" style={{ padding: '2px 8px', fontSize: 10 }}>You</span>}
                 </div>
-                <span style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 14, color: 'var(--lime)' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lime)' }}>
                   {gameState.buyInAmount} SOL
                 </span>
               </div>
             ))}
           </div>
         </div>
+      </div>
 
-        {/* CTA */}
+      {/* CTA */}
+      <div style={{ width: '100%', paddingTop: 16 }}>
         {isHost ? (
-          <button
-            className="btn btn-primary"
-            style={{ fontSize: 15, padding: '18px', marginTop: 4 }}
-            onClick={async () => { await startGame(); navigate('/game'); }}
-          >
+          <button className="btn btn-primary" onClick={async () => { await startGame(); navigate('/game'); }}>
             Start Game
           </button>
         ) : (
-          <div className="card" style={{ textAlign: 'center', padding: '18px 24px' }}>
-            <p style={{ color: 'var(--text-3)', fontSize: 14 }}>
-              Waiting for host to start...
-            </p>
+          <div style={{ textAlign: 'center', padding: '18px 0' }}>
+            <p style={{ color: 'var(--muted)', fontSize: 14 }}>Waiting for the host to start…</p>
           </div>
         )}
       </div>

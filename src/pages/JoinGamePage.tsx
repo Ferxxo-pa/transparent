@@ -7,78 +7,84 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { joinGame, loading, error } = useGame();
-  const { connected, login, displayName } = usePrivyWallet();
-  const [roomCode, setRoomCode] = useState('');
+  const { displayName } = usePrivyWallet();
+  const [code, setCode]         = useState('');
   const [nickname, setNickname] = useState('');
 
-  const handleRoomCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/[^0-9]/g, '');
     if (v.length > 3) v = v.slice(0, 3) + '-' + v.slice(3, 6);
-    setRoomCode(v);
+    setCode(v);
   };
+
+  const canJoin = code.length === 7;
 
   const handleJoin = async () => {
-    if (!connected) { login(); return; }
-    if (roomCode.length === 7) {
-      await joinGame(roomCode, nickname.trim() || undefined);
-      navigate('/waiting');
-    }
+    if (!canJoin) return;
+    await joinGame(code, nickname.trim() || undefined);
+    navigate('/waiting');
   };
 
-  const isReady = roomCode.length === 7 && connected;
-
   return (
-    <div className="page">
+    <div className="page fade-in">
       <nav className="navbar">
         <button
           onClick={() => navigate('/')}
-          style={{ background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', backdropFilter: 'blur(10px)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={15} /> Back
         </button>
-        <span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Join Game</span>
-        <div className="badge badge-neutral">{connected ? displayName : 'Not connected'}</div>
+        <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>{displayName}</span>
       </nav>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* Room code */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1, justifyContent: 'center', paddingBottom: 80 }}>
         <div>
-          <label className="label">Room Code</label>
+          <div className="heading">Join a room</div>
+          <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>Enter the code from the host</p>
+        </div>
+
+        {/* Code input — hero element */}
+        <div>
+          <p className="label" style={{ marginBottom: 10 }}>Room Code</p>
           <input
             className="input-code"
-            value={roomCode}
-            onChange={handleRoomCodeChange}
+            value={code}
+            onChange={handleCodeChange}
             placeholder="000-000"
             maxLength={7}
+            inputMode="numeric"
+            autoFocus
           />
-          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10, textAlign: 'center' }}>
-            Ask the host for the 6-digit code
-          </p>
         </div>
 
         {/* Nickname */}
         <div>
-          <label className="label">Your Nickname</label>
+          <p className="label" style={{ marginBottom: 8 }}>Your Name</p>
           <input
             className="input"
             type="text"
             value={nickname}
             onChange={e => setNickname(e.target.value)}
-            placeholder="How should people know you?"
-            maxLength={20}
+            placeholder="What should people call you?"
+            maxLength={18}
           />
         </div>
 
-        {error && <p style={{ color: 'var(--danger)', fontSize: 13, textAlign: 'center' }}>{error}</p>}
+        {error && (
+          <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
+      </div>
 
+      {/* Sticky CTA */}
+      <div style={{ width: '100%', paddingTop: 8 }}>
         <button
           className="btn btn-primary"
-          onClick={connected ? handleJoin : undefined}
-          disabled={!connected || loading}
-          style={{ fontSize: 15, padding: '18px', opacity: connected ? (isReady ? 1 : 0.55) : 0.45 }}
+          onClick={handleJoin}
+          disabled={!canJoin || loading}
         >
-          {loading ? 'Joining...' : !connected ? '🔒 Connect Wallet' : isReady ? 'Join Game' : 'Enter Room Code'}
+          {loading ? 'Joining…' : canJoin ? 'Join Game' : 'Enter Room Code'}
         </button>
       </div>
     </div>
