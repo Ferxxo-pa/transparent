@@ -54,23 +54,12 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
       {!submitted ? (
         <>
           <textarea
+            className="input-area"
             value={question}
             onChange={e => setQuestion(e.target.value)}
             placeholder={`Ask ${hotSeatPlayerName} something revealing...`}
             maxLength={200}
             rows={3}
-            style={{
-              width: '100%',
-              background: 'var(--glass-2)',
-              border: '1px solid var(--border)',
-              borderRadius: 12,
-              padding: '14px 16px',
-              color: 'var(--text)',
-              fontFamily: 'Plus Jakarta Sans, sans-serif',
-              fontSize: 15,
-              resize: 'none',
-              outline: 'none',
-            }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{question.length}/200</span>

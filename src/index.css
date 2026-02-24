@@ -322,6 +322,40 @@ h1, h2, h3, .display {
   margin: 4px 0;
 }
 
+/* ─── Timer ─────────────────────────────────────────────── */
+.timer {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.timer.urgent {
+  color: var(--danger);
+  animation: pulse 0.6s ease-in-out infinite;
+}
+
+/* ─── Textarea ───────────────────────────────────────────── */
+textarea.input-area {
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  resize: none;
+  outline: none;
+  backdrop-filter: blur(10px);
+  transition: border-color 0.15s;
+  line-height: 1.5;
+}
+textarea.input-area:focus { border-color: var(--border-2); }
+textarea.input-area::placeholder { color: var(--text-3); }
+
 /* ─── Game-specific ──────────────────────────────────────── */
 .hot-seat-banner {
   background: rgba(191,251,79,0.06);
