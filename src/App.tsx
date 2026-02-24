@@ -1,5 +1,7 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
 import { WalletBridge } from './components/WalletBridge';
@@ -38,9 +40,28 @@ export const PageWrap = ({ children }: { children: React.ReactNode }) => (
   </motion.div>
 );
 
+function GameRedirect() {
+  const { gameState } = useGame();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!gameState || location.pathname !== '/') return;
+    if (gameState.gameStatus === 'playing') navigate('/game', { replace: true });
+    else if (gameState.gameStatus === 'gameover') navigate('/gameover', { replace: true });
+    else if (gameState.gameStatus === 'waiting') {
+      navigate('/created', { replace: true });
+    }
+  }, [gameState, location.pathname, navigate]);
+
+  return null;
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
+    <>
+    <GameRedirect />
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/"        element={<PageWrap><HomePage /></PageWrap>} />
@@ -53,6 +74,7 @@ function AnimatedRoutes() {
         <Route path="/login"   element={<PageWrap><HomePage /></PageWrap>} />
       </Routes>
     </AnimatePresence>
+    </>
   );
 }
 

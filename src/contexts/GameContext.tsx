@@ -44,6 +44,7 @@ interface GameContextType {
   advanceHotTakePhase: () => Promise<void>;
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
+  forceAdvanceRound: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
@@ -73,8 +74,16 @@ function playerRowsToPlayers(rows: PlayerRow[], hostWallet: string): Player[] {
 
 // ── Provider ────────────────────────────────────────────────
 
+const STORAGE_KEY = 'transparent_game_state';
+
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [gameState, setGameState] = useState<GameState | null>(null);
+  const [gameState, setGameState] = useState<GameState | null>(() => {
+    // Restore from localStorage on mount
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +94,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const setWalletAdapter = useCallback((adapter: WalletAdapter | null) => {
     walletRef.current = adapter;
   }, []);
+
+  // ── Persist gameState to localStorage ──────────────────
+  useEffect(() => {
+    if (gameState) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(gameState));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }, [gameState]);
 
   // ── Subscribe to real-time updates ─────────────────────
 
@@ -193,6 +211,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     },
     [],
   );
+
+  // ── Re-subscribe after page refresh ───────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && !channelRef.current) {
+      try {
+        const gs = JSON.parse(saved) as GameState;
+        if (gs.gameId && gs.gameStatus !== 'gameover') {
+          setupSubscription(gs.gameId, gs.hostWallet ?? '');
+        }
+      } catch { /* ignore */ }
+    }
+  }, [setupSubscription]);
 
   // ── Create Game ────────────────────────────────────────
 
@@ -398,9 +430,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const startGame = useCallback(async () => {
     if (!gameState) return;
 
+    if (gameState.players.length < 2) {
+      setError('Need at least 2 players to start');
+      return;
+    }
+
     const gid = gameState.gameId;
     if (!gid) {
-      // Fallback: just update local state
       setGameState((prev) => (prev ? { ...prev, gameStatus: 'playing', currentPlayerInHotSeat: prev.players[0]?.id ?? null } : null));
       return;
     }
@@ -749,6 +785,46 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [gameState],
   );
 
+  // ── Force Advance Round (host skip) ───────────────────
+
+  const forceAdvanceRound = useCallback(async () => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    if (!gid) return;
+    const hotSeatWallet = gameState.currentPlayerInHotSeat;
+    const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
+    const nextIdx = currentIdx + 1;
+
+    try {
+      if (nextIdx >= gameState.players.length) {
+        await updateGameStatus(gid, { status: 'gameover' });
+        setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
+      } else {
+        const nextPlayer = gameState.players[nextIdx];
+        const nextRound = (gameState.currentRound ?? 0) + 1;
+        const questionPool = gameState.questionMode === 'custom' && gameState.customQuestions?.length
+          ? gameState.customQuestions : QUESTIONS;
+        const nextQIdx = Math.floor(Math.random() * questionPool.length);
+        await updateGameStatus(gid, {
+          current_hot_seat_player: nextPlayer.id,
+          current_question_index: nextQIdx,
+          current_round: nextRound,
+          game_phase: 'answering',
+        });
+        setGameState(prev => prev ? {
+          ...prev,
+          currentPlayerInHotSeat: nextPlayer.id,
+          currentQuestion: questionPool[nextQIdx],
+          currentRound: nextRound,
+          votes: {}, voteCount: 0,
+          gamePhase: 'answering',
+        } : null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to advance round');
+    }
+  }, [gameState]);
+
   // ── Reset ──────────────────────────────────────────────
 
   const resetGame = useCallback(() => {
@@ -783,6 +859,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         advanceHotTakePhase,
         selectWinner,
         distributeWinnings,
+        forceAdvanceRound,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,

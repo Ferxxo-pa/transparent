@@ -8,7 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -249,9 +249,25 @@ export const GamePlayPage: React.FC = () => {
           </div>
         )}
 
-        {/* Host advance */}
-        {isHotTake && phase === 'voting-honesty' && hasVoted && isHost && (
-          <button className="btn btn-secondary" onClick={advance}>Next Round →</button>
+        {/* Host advance — hot-take */}
+        {isHotTake && phase === 'voting-honesty' && isHost && (
+          <motion.button
+            className="btn btn-secondary"
+            onClick={advance}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            whileTap={{ scale: 0.96 }}
+          >Next Round →</motion.button>
+        )}
+        {/* Host advance — classic/custom: skip when votes stall */}
+        {!isHotSeat && !isHotTake && isHost && votesIn > 0 && (
+          <motion.button
+            className="btn btn-ghost"
+            style={{ width: '100%', height: 40, fontSize: 13, color: 'var(--muted)' }}
+            onClick={forceAdvanceRound}
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            whileTap={{ scale: 0.96 }}
+          >Force next round ({votesIn}/{voterCount} voted)</motion.button>
         )}
 
         {/* Live scores at bottom */}
