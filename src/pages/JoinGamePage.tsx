@@ -30,16 +30,19 @@ export const JoinGamePage: React.FC = () => {
   return (
     <div className="page">
       <nav className="navbar">
-        <button className="btn btn-icon" onClick={() => navigate('/')} style={{ border: 'none' }}>
-          <ArrowLeft size={18} />
+        <button
+          onClick={() => navigate('/')}
+          style={{ background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 10, padding: 10, cursor: 'pointer', color: 'var(--text-2)', display: 'flex', alignItems: 'center', backdropFilter: 'blur(10px)' }}
+        >
+          <ArrowLeft size={16} />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 15 }}>Join Game</span>
+        <span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Join Game</span>
         <div className="badge badge-neutral">{connected ? displayName : 'Not connected'}</div>
       </nav>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* Room code input */}
+        {/* Room code */}
         <div>
           <label className="label">Room Code</label>
           <input
@@ -49,7 +52,7 @@ export const JoinGamePage: React.FC = () => {
             placeholder="000-000"
             maxLength={7}
           />
-          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 8, textAlign: 'center' }}>
+          <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 10, textAlign: 'center' }}>
             Ask the host for the 6-digit code
           </p>
         </div>
@@ -73,9 +76,9 @@ export const JoinGamePage: React.FC = () => {
           className="btn btn-primary"
           onClick={connected ? handleJoin : undefined}
           disabled={!connected || loading}
-          style={{ fontSize: 16, padding: '18px', opacity: connected ? (isReady ? 1 : 0.6) : 0.5, cursor: connected ? (isReady ? 'pointer' : 'default') : 'not-allowed' }}
+          style={{ fontSize: 15, padding: '18px', opacity: connected ? (isReady ? 1 : 0.55) : 0.45 }}
         >
-          {loading ? 'Joining...' : !connected ? '🔒 Connect Wallet' : isReady ? 'Join Game →' : 'Enter Room Code'}
+          {loading ? 'Joining...' : !connected ? '🔒 Connect Wallet' : isReady ? 'Join Game' : 'Enter Room Code'}
         </button>
       </div>
     </div>

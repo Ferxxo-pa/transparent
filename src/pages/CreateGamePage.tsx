@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { Plus, X, ArrowLeft } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionMode } from '../types/game';
 
 const MODES: { id: QuestionMode; icon: string; title: string; desc: string }[] = [
-  { id: 'classic', icon: '🎲', title: 'Classic', desc: 'Questions from the built-in collection' },
-  { id: 'hot-take', icon: '🔥', title: 'Hot Take', desc: 'Players write questions each round' },
-  { id: 'custom', icon: '✏️', title: 'Custom', desc: 'You write all the questions' },
+  { id: 'classic',  icon: '🎲', title: 'Classic',  desc: 'Built-in question pool' },
+  { id: 'hot-take', icon: '🔥', title: 'Hot Take', desc: 'Players write questions' },
+  { id: 'custom',   icon: '✏️', title: 'Custom',   desc: 'You write all questions' },
 ];
 
 export const CreateGamePage: React.FC = () => {
@@ -16,10 +16,10 @@ export const CreateGamePage: React.FC = () => {
   const { createGame, loading, error } = useGame();
   const { connected, login, displayName } = usePrivyWallet();
 
-  const [buyIn, setBuyIn] = useState('0.1');
+  const [buyIn,    setBuyIn]    = useState('0.1');
   const [roomName, setRoomName] = useState('');
   const [nickname, setNickname] = useState('');
-  const [mode, setMode] = useState<QuestionMode>('classic');
+  const [mode,     setMode]     = useState<QuestionMode>('classic');
   const [customQs, setCustomQs] = useState<string[]>(['', '']);
 
   const handleCreate = async () => {
@@ -33,23 +33,21 @@ export const CreateGamePage: React.FC = () => {
   return (
     <div className="page">
       <nav className="navbar">
-        <button className="btn btn-icon" onClick={() => navigate('/')} style={{ border: 'none' }}>
-          <ArrowLeft size={18} />
+        <button className="btn-icon" onClick={() => navigate('/')} style={{ border: '1px solid var(--border)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', padding: 10, borderRadius: 10, background: 'var(--glass)', color: 'var(--text-2)' }}>
+          <ArrowLeft size={16} />
         </button>
-        <span style={{ fontWeight: 700, fontSize: 15 }}>Create Game</span>
+        <span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Create Game</span>
         <div className="badge badge-neutral">{connected ? displayName : 'Not connected'}</div>
       </nav>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Buy In */}
         <div>
           <label className="label">Buy-In (SOL)</label>
           <input
             className="input"
-            type="number"
-            min="0.01"
-            step="0.01"
+            type="number" min="0.01" step="0.01"
             value={buyIn}
             onChange={e => setBuyIn(e.target.value)}
             placeholder="0.1"
@@ -69,7 +67,7 @@ export const CreateGamePage: React.FC = () => {
           />
         </div>
 
-        {/* Your Name */}
+        {/* Nickname */}
         <div>
           <label className="label">Your Nickname</label>
           <input
@@ -91,17 +89,17 @@ export const CreateGamePage: React.FC = () => {
                 key={m.id}
                 className={`mode-card ${mode === m.id ? 'selected' : ''}`}
                 onClick={() => setMode(m.id)}
-                style={{ textAlign: 'left', background: mode === m.id ? 'rgba(102,79,251,0.1)' : 'var(--surface-2)' }}
+                style={{ textAlign: 'left', width: '100%' }}
               >
-                <span style={{ fontSize: 22 }}>{m.icon}</span>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: mode === m.id ? 'var(--purple-light)' : 'var(--text)' }}>
+                <span style={{ fontSize: 20 }}>{m.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 14, color: mode === m.id ? 'var(--cream)' : 'var(--text)' }}>
                     {m.title}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{m.desc}</div>
                 </div>
                 {mode === m.id && (
-                  <div style={{ marginLeft: 'auto', color: 'var(--purple-light)', fontSize: 16 }}>✓</div>
+                  <span style={{ color: 'var(--cream)', fontSize: 14 }}>✓</span>
                 )}
               </button>
             ))}
@@ -118,16 +116,13 @@ export const CreateGamePage: React.FC = () => {
                   <input
                     className="input"
                     value={q}
-                    onChange={e => {
-                      const u = [...customQs]; u[i] = e.target.value; setCustomQs(u);
-                    }}
+                    onChange={e => { const u = [...customQs]; u[i] = e.target.value; setCustomQs(u); }}
                     placeholder={`Question ${i + 1}...`}
                   />
                   {customQs.length > 2 && (
                     <button
-                      className="btn btn-icon"
                       onClick={() => setCustomQs(customQs.filter((_, j) => j !== i))}
-                      style={{ flexShrink: 0 }}
+                      style={{ flexShrink: 0, background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, cursor: 'pointer', color: 'var(--text-2)', display: 'flex' }}
                     >
                       <X size={14} />
                     </button>
@@ -136,27 +131,26 @@ export const CreateGamePage: React.FC = () => {
               ))}
               <button
                 onClick={() => setCustomQs([...customQs, ''])}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  color: 'var(--text-3)', fontSize: 13, fontWeight: 600,
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0'
-                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-3)', fontSize: 13, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
               >
-                <Plus size={14} /> Add question
+                <Plus size={13} /> Add question
               </button>
             </div>
           </div>
         )}
 
         {/* Summary */}
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buy-In</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--lime)', fontFamily: 'Pixelify Sans', marginTop: 4 }}>{buyIn || '0.1'} SOL</div>
+        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 24px' }}>
+          <div>
+            <div className="label" style={{ marginBottom: 4 }}>Buy-In</div>
+            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 24, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+              {buyIn || '0.1'} <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text-3)' }}>SOL</span>
+            </div>
           </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mode</div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', fontFamily: 'Pixelify Sans', marginTop: 4 }}>
+          <div style={{ width: 1, height: 36, background: 'var(--border)' }} />
+          <div>
+            <div className="label" style={{ marginBottom: 4 }}>Mode</div>
+            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
               {MODES.find(m => m.id === mode)?.icon} {MODES.find(m => m.id === mode)?.title}
             </div>
           </div>
@@ -168,9 +162,9 @@ export const CreateGamePage: React.FC = () => {
           className="btn btn-primary"
           onClick={connected ? handleCreate : undefined}
           disabled={!connected || loading}
-          style={{ fontSize: 16, padding: '18px', opacity: connected ? 1 : 0.5, cursor: connected ? 'pointer' : 'not-allowed' }}
+          style={{ fontSize: 15, padding: '18px', marginTop: 4 }}
         >
-          {loading ? 'Creating...' : connected ? 'Create Game →' : '🔒 Connect Wallet'}
+          {loading ? 'Creating...' : connected ? 'Create Game' : '🔒 Connect Wallet'}
         </button>
       </div>
     </div>

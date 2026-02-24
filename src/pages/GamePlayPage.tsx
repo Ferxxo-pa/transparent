@@ -51,7 +51,7 @@ export const GamePlayPage: React.FC = () => {
           {isHotSeat ? (
             <div className="card-lg" style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>🪑</div>
-              <h2 style={{ fontFamily: 'Pixelify Sans', fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
+              <h2 style={{ fontFamily: 'Space Grotesk', fontSize: 24, fontWeight: 700, marginBottom: 8 }}>
                 You're in the Hot Seat
               </h2>
               <p style={{ color: 'var(--text-2)', fontSize: 14 }}>
@@ -209,8 +209,8 @@ function HotSeatBanner({ name, isMe }: { name: string; isMe: boolean }) {
       <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
         In the Hot Seat
       </div>
-      <div style={{ fontFamily: 'Pixelify Sans', fontSize: 20, fontWeight: 700, color: 'var(--lime)' }}>
-        🪑 {name} {isMe && <span style={{ fontSize: 14, color: 'var(--text-2)' }}>(You)</span>}
+      <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+        🪑 {name} {isMe && <span style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 500 }}>(You)</span>}
       </div>
     </div>
   );
@@ -248,7 +248,7 @@ function ScoreboardSection({ gameState, myWallet }: { gameState: any; myWallet: 
                     {pct !== null && <span style={{ fontSize: 11, color: 'var(--text-3)' }}>{pct}%</span>}
                   </>
                 ) : (
-                  <span style={{ fontSize: 12, color: 'var(--lime)', fontFamily: 'Pixelify Sans' }}>
+                  <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Space Grotesk', fontWeight: 700 }}>
                     {gameState.buyInAmount} SOL
                   </span>
                 )}

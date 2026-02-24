@@ -42,7 +42,7 @@ export const GameCreatedPage: React.FC = () => {
             marginBottom: 12
           }}>
             <span style={{
-              fontFamily: 'Pixelify Sans', fontSize: 40, fontWeight: 700,
+              fontFamily: 'Space Grotesk', fontSize: 40, fontWeight: 700,
               color: 'var(--lime)', letterSpacing: '0.2em'
             }}>
               {gameState.roomCode}
@@ -71,7 +71,7 @@ export const GameCreatedPage: React.FC = () => {
               <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
                 {s.label}
               </div>
-              <div style={{ fontFamily: 'Pixelify Sans', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
+              <div style={{ fontFamily: 'Space Grotesk', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
                 {s.value}
               </div>
             </div>
@@ -87,14 +87,14 @@ export const GameCreatedPage: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
                     width: 28, height: 28, borderRadius: 8,
-                    background: 'var(--surface)',
+                    background: 'var(--glass)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, fontWeight: 700, color: 'var(--text-3)'
                   }}>{i + 1}</span>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name || `Player ${i + 1}`}</span>
                   {p.isHost && <span className="badge badge-lime" style={{ padding: '2px 8px', fontSize: 10 }}>Host</span>}
                 </div>
-                <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Pixelify Sans', fontWeight: 700 }}>
+                <span style={{ fontSize: 13, color: 'var(--lime)', fontFamily: 'Space Grotesk', fontWeight: 700 }}>
                   {gameState.buyInAmount} SOL
                 </span>
               </div>

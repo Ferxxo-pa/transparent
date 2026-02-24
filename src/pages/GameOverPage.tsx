@@ -48,7 +48,7 @@ export const GameOverPage: React.FC = () => {
   return (
     <div className="page">
       <nav className="navbar">
-        <div style={{ fontFamily: 'Pixelify Sans', fontSize: 20, fontWeight: 700, color: 'var(--lime)' }}>
+        <div style={{ fontFamily: 'Space Grotesk', fontSize: 20, fontWeight: 700, color: 'var(--lime)' }}>
           GAME OVER
         </div>
         <button
@@ -65,7 +65,7 @@ export const GameOverPage: React.FC = () => {
         {/* Pot */}
         <div className="card-lg" style={{ textAlign: 'center' }}>
           <p className="label" style={{ textAlign: 'center', marginBottom: 8 }}>Total Pot</p>
-          <p style={{ fontFamily: 'Pixelify Sans', fontSize: 48, fontWeight: 700, color: 'var(--lime)', lineHeight: 1 }}>
+          <p style={{ fontFamily: 'Space Grotesk', fontSize: 48, fontWeight: 700, color: 'var(--lime)', lineHeight: 1 }}>
             {gameState.currentPot.toFixed(2)}
             <span style={{ fontSize: 20, marginLeft: 6, color: 'var(--text-2)' }}>SOL</span>
           </p>
@@ -100,7 +100,7 @@ export const GameOverPage: React.FC = () => {
                 >
                   {/* Rank */}
                   <span style={{
-                    fontFamily: 'Pixelify Sans', fontSize: 18, fontWeight: 700,
+                    fontFamily: 'Space Grotesk', fontSize: 18, fontWeight: 700,
                     color: i === 0 ? 'var(--lime)' : 'var(--text-3)',
                     width: 28, flexShrink: 0
                   }}>
@@ -125,7 +125,7 @@ export const GameOverPage: React.FC = () => {
 
                   {/* Winnings */}
                   {confirmed && isWinner && (
-                    <span style={{ fontFamily: 'Pixelify Sans', fontSize: 16, fontWeight: 700, color: 'var(--lime)' }}>
+                    <span style={{ fontFamily: 'Space Grotesk', fontSize: 16, fontWeight: 700, color: 'var(--lime)' }}>
                       +{gameState.currentPot.toFixed(2)} SOL
                     </span>
                   )}

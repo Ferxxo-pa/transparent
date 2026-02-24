@@ -46,7 +46,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
         <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
           Write a question for
         </p>
-        <p style={{ fontFamily: 'Pixelify Sans', fontSize: 22, fontWeight: 700, color: 'var(--lime)' }}>
+        <p style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)' }}>
           {hotSeatPlayerName}
         </p>
       </div>
@@ -61,7 +61,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
             rows={3}
             style={{
               width: '100%',
-              background: 'var(--surface-2)',
+              background: 'var(--glass-2)',
               border: '1px solid var(--border)',
               borderRadius: 12,
               padding: '14px 16px',
@@ -86,7 +86,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
         </>
       ) : (
         <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <div style={{ fontFamily: 'Pixelify Sans', fontSize: 22, fontWeight: 700, color: 'var(--lime)', marginBottom: 4 }}>
+          <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', marginBottom: 4 }}>
             ✓ Submitted!
           </div>
           <p style={{ color: 'var(--text-2)', fontSize: 14 }}>Waiting for others...</p>

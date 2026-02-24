@@ -53,7 +53,7 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
         <p style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
           {revealed ? 'Winning question!' : 'Vote for the best question'}
         </p>
-        <p style={{ fontFamily: 'Pixelify Sans', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
+        <p style={{ fontFamily: 'Space Grotesk', fontSize: 18, fontWeight: 700, color: 'var(--lime)' }}>
           for {hotSeatPlayerName}
         </p>
       </div>
@@ -73,8 +73,8 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
                 textAlign: 'left',
                 padding: '14px 16px',
                 borderRadius: 12,
-                border: isWinner ? '2px solid var(--lime)' : isMyVote ? '2px solid var(--purple)' : '1px solid var(--border)',
-                background: isWinner ? 'rgba(191,251,79,0.08)' : isMyVote ? 'rgba(102,79,251,0.1)' : 'var(--surface-2)',
+                border: isWinner ? '2px solid var(--lime)' : isMyVote ? '2px solid rgba(232,223,200,0.5)' : '1px solid var(--border)',
+                background: isWinner ? 'rgba(191,251,79,0.08)' : isMyVote ? 'rgba(102,79,251,0.1)' : 'var(--glass-2)',
                 cursor: alreadyVoted && !revealed ? 'default' : 'pointer',
                 transition: 'all 0.15s',
               }}
