@@ -166,13 +166,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const voteMap: Record<string, 'transparent' | 'fake'> = {};
             votes.forEach((v) => { voteMap[v.voter_wallet] = v.vote; });
 
-            // Check if all eligible votes are in and calculate scores for everyone
+            // Guard: only apply scores if votes belong to the CURRENT round
+            // Prevents stale realtime events from corrupting state after round advances
+            const voteRound = votes[0]?.round ?? -1;
+            const isCurrentRound = voteRound === (prev.currentRound ?? 0);
+
             const hotSeatWallet = prev.currentPlayerInHotSeat;
             const eligibleVoters = prev.players.filter(p => p.id !== hotSeatWallet).length;
             const votesNeeded = Math.max(eligibleVoters, 1);
             let newScores = prev.scores ?? {};
 
-            if (votes.length >= votesNeeded && hotSeatWallet) {
+            if (isCurrentRound && votes.length >= votesNeeded && hotSeatWallet) {
               const transparentVotes = votes.filter(v => v.vote === 'transparent').length;
               const fakeVotes = votes.filter(v => v.vote === 'fake').length;
               const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
@@ -185,6 +189,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 },
               };
             }
+
+            // If votes are stale (old round), just update the voteMap without overwriting
+            if (!isCurrentRound) return { ...prev };
 
             return { ...prev, votes: voteMap, voteCount: votes.length, scores: newScores };
           });
