@@ -79,7 +79,7 @@ export const CreateGamePage: React.FC = () => {
 
           {/* Buy-in */}
           <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 8 }}>Buy-in (SOL)</p>
+            <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
             <input
               className="input"
               type="number" min="0" step="0.01"
@@ -88,7 +88,7 @@ export const CreateGamePage: React.FC = () => {
               placeholder="0 for free game"
             />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-              {parseFloat(buyIn) > 0 ? `Each player stakes ${buyIn} SOL · winner takes the pot` : 'Free game — no SOL required'}
+              {parseFloat(buyIn) > 0 ? `Each player puts in ${buyIn} SOL · winner takes everything` : 'Free game · no entry fee'}
             </p>
           </motion.div>
 

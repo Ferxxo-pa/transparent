@@ -688,20 +688,56 @@ textarea.textarea::placeholder { color: var(--muted); }
 }
 
 /* ─── Wallet adapter overrides ───────────────────────────── */
+.wallet-adapter-modal-overlay {
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
 .wallet-adapter-modal-wrapper {
   background: var(--card) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--r) !important;
-}
-.wallet-adapter-button {
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6) !important;
   font-family: 'Space Grotesk', sans-serif !important;
-  border-radius: var(--r-pill) !important;
-  background: var(--lime) !important;
-  color: #0D0D0D !important;
-  font-weight: 700 !important;
+  max-width: 380px !important;
+  padding: 28px !important;
 }
 .wallet-adapter-modal-title {
   font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
   color: var(--text) !important;
 }
-.wallet-adapter-modal-list li { color: var(--text) !important; }
+.wallet-adapter-modal-list {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.wallet-adapter-modal-list li {
+  padding: 0 !important;
+}
+.wallet-adapter-button {
+  font-family: 'Space Grotesk', sans-serif !important;
+  border-radius: var(--r-sm) !important;
+  background: var(--glass) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  width: 100% !important;
+  height: 52px !important;
+  transition: border-color 0.15s, background 0.15s !important;
+}
+.wallet-adapter-button:hover {
+  background: var(--card-2) !important;
+  border-color: var(--lime-border) !important;
+}
+.wallet-adapter-button:not([disabled]):hover {
+  background: var(--card-2) !important;
+}
+.wallet-adapter-modal-list-more-button {
+  color: var(--muted) !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  font-size: 13px !important;
+}
+.wallet-adapter-modal-collapse-button svg { fill: var(--muted) !important; }
