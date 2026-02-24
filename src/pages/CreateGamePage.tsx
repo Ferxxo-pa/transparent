@@ -110,7 +110,7 @@ export const CreateGamePage: React.FC = () => {
               {/* Buy-In Section */}
               <div>
                 <h3
-                  className="text-white text-4xl text-center mb-4 font-bold"
+                  className="text-white text-lg text-center mb-3 font-bold"
                   style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 >
                   Buy-In Amount
@@ -121,7 +121,7 @@ export const CreateGamePage: React.FC = () => {
                     value={buyIn}
                     onChange={(e) => setBuyIn(e.target.value)}
                     placeholder="0.1 SOL"
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-4xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50"
+                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
                     style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
                   />
                 </div>
@@ -130,7 +130,7 @@ export const CreateGamePage: React.FC = () => {
               {/* Room Name Section */}
               <div>
                 <h3
-                  className="text-white text-4xl text-center mb-4 font-bold"
+                  className="text-white text-lg text-center mb-3 font-bold"
                   style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 >
                   Room Name
@@ -141,7 +141,7 @@ export const CreateGamePage: React.FC = () => {
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
                     placeholder="College Night"
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-4xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50"
+                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
                     style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
                   />
                 </div>
@@ -150,7 +150,7 @@ export const CreateGamePage: React.FC = () => {
               {/* Host Nickname */}
               <div>
                 <h3
-                  className="text-white text-4xl text-center mb-4 font-bold"
+                  className="text-white text-lg text-center mb-3 font-bold"
                   style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 >
                   Your Name
@@ -162,7 +162,7 @@ export const CreateGamePage: React.FC = () => {
                     onChange={(e) => setNickname(e.target.value)}
                     placeholder="Enter nickname..."
                     maxLength={20}
-                    className="w-full bg-transparent text-[#BFFB4F]/50 text-4xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50"
+                    className="w-full bg-transparent text-[#BFFB4F]/50 text-xl text-center font-bold outline-none placeholder:text-[#BFFB4F]/50 font-medium"
                     style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
                   />
                 </div>
@@ -171,7 +171,7 @@ export const CreateGamePage: React.FC = () => {
               {/* Question Mode Selector */}
               <div>
                 <h3
-                  className="text-white text-4xl text-center mb-4 font-bold"
+                  className="text-white text-lg text-center mb-3 font-bold"
                   style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 >
                   Question Mode
@@ -218,7 +218,7 @@ export const CreateGamePage: React.FC = () => {
               {questionMode === 'custom' && (
                 <div>
                   <h3
-                    className="text-white text-3xl text-center mb-4 font-bold"
+                    className="text-white text-base text-center mb-3 font-bold"
                     style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                   >
                     Your Questions

@@ -45,7 +45,7 @@ export const QuestionSubmitPhase: React.FC<QuestionSubmitPhaseProps> = ({
         {/* Timer */}
         <div className="relative">
           <div
-            className="text-[#BFFB4F] text-7xl font-bold"
+            className="text-[#BFFB4F] text-4xl font-bold"
             style={{
               fontFamily: 'Pixelify Sans, sans-serif',
               textShadow: timeLeft <= 10 ? '0 0 20px #ff4444, 0 0 40px #ff4444' : '0 0 20px #BFFB4F',

@@ -82,7 +82,7 @@ export const WaitingRoomPage: React.FC = () => {
                 className="flex items-center justify-center gap-4 mx-auto mb-2 group"
               >
                 <p
-                  className="text-[#BFFB4F] text-5xl font-bold"
+                  className="text-[#BFFB4F] text-3xl font-bold"
                   style={{
                     fontFamily: 'Pixelify Sans, sans-serif',
                     letterSpacing: '0.3em',

@@ -21,7 +21,7 @@ import {
 } from '../lib/supabase';
 import {
   createGameOnChain,
-  joinGameOnChain,
+  joinGameOnChainWithAmount,
   distributeOnChain,
   deriveGamePDA,
   WalletAdapter,
@@ -295,14 +295,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return;
         }
 
-        // 2. Join on-chain
+        // 2. Send buy-in SOL to host wallet on-chain
         try {
           const hostPubkey = new PublicKey(game.host_wallet);
-          const [gamePDA] = deriveGamePDA(hostPubkey, game.room_name);
-          await joinGameOnChain(wallet, gamePDA);
+          const buyInLamports = game.buy_in_lamports;
+          if (buyInLamports > 0 && wallet.publicKey.toBase58() !== game.host_wallet) {
+            await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+          }
         } catch (chainErr) {
-          console.warn('On-chain join failed:', chainErr);
-          // Continue — on-chain is optional during dev
+          console.warn('On-chain buy-in failed:', chainErr);
+          // Non-fatal during dev — game continues in Supabase
         }
 
         // 3. Add player to Supabase

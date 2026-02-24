@@ -126,7 +126,7 @@ export const GamePlayPage: React.FC = () => {
               </p>
 
               <p
-                className="text-white text-center text-3xl max-w-2xl leading-relaxed"
+                className="text-white text-center text-xl max-w-2xl leading-relaxed"
                 style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
               >
                 {gameState.currentQuestion || 'No question selected'}
@@ -184,7 +184,7 @@ export const GamePlayPage: React.FC = () => {
             </div>
 
             <p
-              className="text-white text-center text-3xl max-w-2xl leading-relaxed"
+              className="text-white text-center text-xl max-w-2xl leading-relaxed"
               style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
             >
               {gameState.currentQuestion}

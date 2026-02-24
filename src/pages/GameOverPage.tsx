@@ -104,7 +104,7 @@ export const GameOverPage: React.FC = () => {
       {/* ✅ "GAME OVER" replaces transparent logo position */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2">
         <h1
-          className="text-[#BFFB4F] text-8xl font-bold text-center"
+          className="text-[#BFFB4F] text-4xl font-bold text-center"
           style={{
             fontFamily: 'Pixelify Sans, sans-serif',
             textShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',
@@ -124,7 +124,7 @@ export const GameOverPage: React.FC = () => {
             Total Pot
           </h2>
           <p
-            className="text-[#A67BEC] text-7xl font-bold"
+            className="text-[#A67BEC] text-3xl font-bold"
             style={{
               fontFamily: 'Pixelify Sans, sans-serif',
               textShadow: '0px 4px 4px rgba(0, 0, 0, 0.25)',

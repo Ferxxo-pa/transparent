@@ -44,35 +44,32 @@ export const HomePage: React.FC = () => {
       </button>
 
       {/* Frame wrapper pinned to Figma width + TOP PADDING to clear Login */}
-      <div className="w-full max-w-[1440px] mx-auto pt-[80px]">
-        {/* Cropped logo; exact 69px visual gap below it */}
-        <TransparentLogo className="mb-[-200px]" />
+      <div className="w-full max-w-2xl mx-auto pt-[80px]">
+        <TransparentLogo className="mb-6" />
 
         <div className="w-full relative z-10">
           {/* Gap between buttons from your design; adjust if needed */}
-          <div className="flex gap-[80px] justify-center">
+          <div className="flex gap-8 justify-center flex-wrap">
             <button
               onClick={() => navigate('/join')}
-              className="hover:scale-105 transition-all duration-300"
-              style={{ width: '580px', height: '204px' }}
+              className="hover:scale-105 transition-all duration-300 w-full max-w-[280px]"
             >
               <GlassCard className="h-full">
-                <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-                  <img src={addIcon} alt="Add" className="w-28 h-28" />
-                  <h2 className="text-white text-4xl font-bold">Join Game</h2>
+                <div className="w-full flex flex-col items-center justify-center gap-4 py-8 px-6">
+                  <img src={addIcon} alt="Add" className="w-16 h-16" />
+                  <h2 className="text-white text-2xl font-bold">Join Game</h2>
                 </div>
               </GlassCard>
             </button>
 
             <button
               onClick={() => navigate('/create')}
-              className="hover:scale-105 transition-all duration-300"
-              style={{ width: '580px', height: '204px' }}
+              className="hover:scale-105 transition-all duration-300 w-full max-w-[280px]"
             >
               <GlassCard className="h-full">
-                <div className="w-full h-full flex flex-col items-center justify-center gap-6">
-                  <img src={starIcon} alt="Star" className="w-28 h-28" />
-                  <h2 className="text-white text-4xl font-bold">Create Game</h2>
+                <div className="w-full flex flex-col items-center justify-center gap-4 py-8 px-6">
+                  <img src={starIcon} alt="Star" className="w-16 h-16" />
+                  <h2 className="text-white text-2xl font-bold">Create Game</h2>
                 </div>
               </GlassCard>
             </button>
@@ -80,35 +77,28 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* 69px from buttons to HOW TO PLAY */}
-        <div className="w-full mt-[69px] max-w-[1200px] mx-auto">
+        <div className="w-full mt-10 max-w-2xl mx-auto">
           <h2
-            className="text-white/70 text-4xl font-bold text-center mb-8"
-            style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+            className="text-white/50 text-sm font-bold text-center mb-6 uppercase tracking-widest"
           >
-            HOW TO PLAY
+            How to Play
           </h2>
 
-          <div className="grid grid-cols-6 gap-8">
+          <div className="grid grid-cols-6 gap-4">
             {howToPlaySteps.map((step) => (
-              <div key={step.number} className="flex flex-col items-center gap-3">
-                <div className="w-20 h-20 flex items-center justify-center relative">
-                  <div
-                    className="absolute top-0 -left-6 text-white text-lg font-bold"
-                    style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
-                  >
-                    {step.number}.
-                  </div>
+              <div key={step.number} className="flex flex-col items-center gap-2">
+                <div className="w-12 h-12 flex items-center justify-center relative">
                   <img
                     src={step.iconSrc}
                     alt={step.title}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain opacity-80"
                   />
                 </div>
                 <p
-                  className="text-white text-center font-bold text-sm"
+                  className="text-white/60 text-center text-xs"
                   style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
                 >
-                  {step.title}
+                  {step.number}. {step.title}
                 </p>
               </div>
             ))}
