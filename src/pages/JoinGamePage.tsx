@@ -100,12 +100,12 @@ export const JoinGamePage: React.FC = () => {
         <motion.button
           className="btn btn-primary"
           onClick={handleJoin}
-          disabled={!canJoin || loading || !walletReady}
+          disabled={!canJoin || loading}
           whileTap={{ scale: 0.96 }}
           whileHover={canJoin && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         >
-          {!walletReady ? '⏳ Setting up wallet…' : loading ? 'Joining…' : canJoin ? 'Join Game →' : 'Enter Room Code'}
+          {loading ? 'Joining…' : canJoin ? 'Join Game →' : 'Enter Room Code'}
         </motion.button>
       </div>
     </div>

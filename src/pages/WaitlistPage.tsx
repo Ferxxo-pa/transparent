@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Package, Nfc, Zap, Check } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 export const WaitlistPage: React.FC = () => {
@@ -51,44 +51,13 @@ export const WaitlistPage: React.FC = () => {
       >
         {/* Header */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(196,255,60,0.1)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Package size={18} color="var(--lime)" />
-            </div>
-            <span className="chip chip-lime">Coming Soon</span>
-          </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.2, marginBottom: 10 }}>
-            The Physical Game
+          <span className="chip chip-lime" style={{ marginBottom: 16, display: 'inline-block' }}>Coming Soon</span>
+          <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>
+            Stay in the loop.
           </h1>
-          <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.6 }}>
-            A real card deck with NFC chips built in. Tap to launch the game instantly — no room codes, no typing. Just deal and play.
+          <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.7 }}>
+            New modes, physical cards with NFC, on-chain stakes, and more — drop your email and we'll hit you when it's ready.
           </p>
-        </div>
-
-        {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            { icon: <Nfc size={15} />, title: 'NFC tap to launch', desc: 'One tap on the chip loads the game for everyone. No link sharing needed.' },
-            { icon: <Package size={15} />, title: 'Full card deck included', desc: 'Premium cards with the original question set. Works standalone, no app required.' },
-            { icon: <Zap size={15} />, title: 'On-chain stakes built in', desc: 'The NFC chip connects directly to your wallet. Entry fees and payouts are instant.' },
-          ].map((f, i) => (
-            <motion.div
-              key={i}
-              className="card"
-              style={{ padding: '16px 18px', display: 'flex', alignItems: 'flex-start', gap: 14 }}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 + i * 0.07, type: 'spring', stiffness: 300, damping: 28 }}
-            >
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--glass)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--lime)', flexShrink: 0 }}>
-                {f.icon}
-              </div>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3 }}>{f.title}</p>
-                <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>{f.desc}</p>
-              </div>
-            </motion.div>
-          ))}
         </div>
 
         {/* Form */}
@@ -99,23 +68,19 @@ export const WaitlistPage: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="card"
-              style={{ padding: '28px 24px', textAlign: 'center', background: 'rgba(196,255,60,0.06)', border: '1px solid var(--lime-border)' }}
+              style={{ padding: '32px 24px', textAlign: 'center', background: 'rgba(196,255,60,0.06)', border: '1px solid var(--lime-border)' }}
             >
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
                 <Check size={22} color="var(--lime)" />
               </div>
-              <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--lime)', marginBottom: 6 }}>You're on the list 🎉</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--lime)', marginBottom: 8 }}>You're in 🎉</p>
               <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                We'll ping you the moment the physical game drops. First to know, first to cop.
+                First to know when something drops. We won't spam you.
               </p>
             </motion.div>
           ) : (
             <motion.div key="form" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Get pinged when it drops</p>
-                  <p style={{ fontSize: 12, color: 'var(--muted)' }}>No spam. Just a heads up when the cards are ready.</p>
-                </div>
                 <input
                   className="input"
                   type="text"
@@ -143,8 +108,11 @@ export const WaitlistPage: React.FC = () => {
                 whileHover={valid && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
               >
-                {loading ? 'Joining…' : 'Join the waitlist →'}
+                {loading ? 'Joining…' : 'Keep me posted →'}
               </motion.button>
+              <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
+                No spam. Unsubscribe anytime.
+              </p>
             </motion.div>
           )}
         </AnimatePresence>

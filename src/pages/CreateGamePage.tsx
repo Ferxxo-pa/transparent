@@ -222,12 +222,12 @@ export const CreateGamePage: React.FC = () => {
         <motion.button
           className="btn btn-primary"
           onClick={handleCreate}
-          disabled={loading || !walletReady}
+          disabled={loading}
           whileTap={{ scale: 0.96 }}
           whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         >
-          {!walletReady ? '⏳ Setting up wallet…' : loading ? 'Creating…' : 'Create Game →'}
+          {loading ? 'Creating…' : 'Create Game →'}
         </motion.button>
       </div>
     </div>
