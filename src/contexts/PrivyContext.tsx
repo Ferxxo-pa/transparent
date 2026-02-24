@@ -38,12 +38,20 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { logout } = useLogout();
   const { wallets } = useWallets();
 
-  // Prefer embedded wallet, fall back to first connected Solana wallet
+  // Prefer Solana embedded wallet (chainType='solana' + walletClientType='privy')
+  // Fall back to any external Solana wallet, then first available wallet
   const solanaWallet = useMemo(() => {
     if (!wallets.length) return null;
-    const embedded = getEmbeddedConnectedWallet(wallets);
-    if (embedded) return embedded;
-    return wallets.find(w => w.type === 'solana') ?? wallets[0] ?? null;
+    // 1. Privy Solana embedded wallet
+    const embeddedSolana = wallets.find(
+      (w: any) => w.chainType === 'solana' && w.walletClientType === 'privy'
+    );
+    if (embeddedSolana) return embeddedSolana;
+    // 2. Any external Solana wallet (Phantom, Solflare)
+    const externalSolana = wallets.find((w: any) => w.chainType === 'solana');
+    if (externalSolana) return externalSolana;
+    // 3. Fallback: ETH embedded wallet (for testing only)
+    return getEmbeddedConnectedWallet(wallets) ?? wallets[0] ?? null;
   }, [wallets]);
 
   const publicKey = useMemo(() => {

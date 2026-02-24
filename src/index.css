@@ -85,9 +85,19 @@ body::before {
 }
 
 /* On desktop, center everything like a phone UI */
-@media (min-width: 640px) {
+/* ─── Responsive helpers ──────────────────────────────────── */
+.desktop-only { display: none; }
+.mobile-only  { display: block; }
+
+@media (min-width: 1024px) {
+  .desktop-only { display: block; }
+  .mobile-only  { display: none; }
+}
+
+/* Mobile: center the narrow page column */
+@media (max-width: 1023px) {
   body { display: flex; justify-content: center; }
-  .page { width: 480px; padding: 0 24px 48px; }
+  .page { width: min(480px, 100%); padding: 0 20px 48px; }
 }
 
 /* ─── Navbar ─────────────────────────────────────────────── */
