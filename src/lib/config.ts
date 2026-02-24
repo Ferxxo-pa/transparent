@@ -12,9 +12,6 @@ export const SOLANA_RPC = 'https://api.devnet.solana.com';
 /** Anchor program ID (deployed on devnet) */
 export const PROGRAM_ID = '656vXmoQ3oYXdghy1PoVQ2NSzduwWW5XVfjJMqQ1fF44';
 
-/** Privy App ID */
-export const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || '';
-
 /** Supabase project URL */
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
