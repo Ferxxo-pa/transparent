@@ -4,6 +4,8 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
 import { QuestionVotePhase } from '../components/QuestionVotePhase';
+import fireIconSrc from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
+import groupIconSrc from '../assets/Group.svg';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -205,12 +207,23 @@ export const GamePlayPage: React.FC = () => {
 
 function HotSeatBanner({ name, isMe }: { name: string; isMe: boolean }) {
   return (
-    <div className="hot-seat-banner">
-      <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
-        In the Hot Seat
+    <div className="hot-seat-banner" style={{ display: 'flex', alignItems: 'center', gap: 16, textAlign: 'left' }}>
+      <div style={{
+        width: 52, height: 52, borderRadius: 16, flexShrink: 0,
+        background: 'rgba(191,251,79,0.08)',
+        border: '1px solid rgba(191,251,79,0.2)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        <img src={fireIconSrc} alt="Hot Seat" style={{ width: 28, height: 28, filter: 'brightness(0) saturate(100%) invert(94%) sepia(48%) saturate(700%) hue-rotate(40deg) brightness(105%)', opacity: 0.9 }} />
       </div>
-      <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
-        🪑 {name} {isMe && <span style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 500 }}>(You)</span>}
+      <div>
+        <div style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>
+          In the Hot Seat
+        </div>
+        <div style={{ fontFamily: 'Space Grotesk', fontSize: 22, fontWeight: 700, color: 'var(--lime)', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+          {name}
+          {isMe && <span style={{ fontSize: 14, color: 'var(--text-2)', fontWeight: 500, marginLeft: 8 }}>(You)</span>}
+        </div>
       </div>
     </div>
   );
@@ -222,7 +235,10 @@ function ScoreboardSection({ gameState, myWallet }: { gameState: any; myWallet: 
 
   return (
     <div style={{ marginTop: 4 }}>
-      <label className="label">{hasScores ? 'Live Scores' : 'Players'}</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <img src={groupIconSrc} alt="" style={{ width: 14, height: 14, opacity: 0.4, filter: 'brightness(0) invert(1)' }} />
+        <label className="label" style={{ marginBottom: 0 }}>{hasScores ? 'Live Scores' : 'Players'}</label>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {gameState.players.map((p: any, i: number) => {
           const score = scores[p.id];

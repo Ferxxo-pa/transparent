@@ -5,10 +5,14 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionMode } from '../types/game';
 
-const MODES: { id: QuestionMode; icon: string; title: string; desc: string }[] = [
-  { id: 'classic',  icon: '🎲', title: 'Classic',  desc: 'Built-in question pool' },
-  { id: 'hot-take', icon: '🔥', title: 'Hot Take', desc: 'Players write questions' },
-  { id: 'custom',   icon: '✏️', title: 'Custom',   desc: 'You write all questions' },
+import fireIconSrc from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
+import moneyBagSrc from '../assets/business-products-bag-money--Streamline-Pixel.svg';
+import messageIconSrc from '../assets/email-mail-chat--Streamline-Pixel.svg';
+
+const MODES: { id: QuestionMode; pixelIcon: string; title: string; desc: string }[] = [
+  { id: 'classic',  pixelIcon: moneyBagSrc,    title: 'Classic',  desc: 'Built-in question pool' },
+  { id: 'hot-take', pixelIcon: fireIconSrc,     title: 'Hot Take', desc: 'Players write questions' },
+  { id: 'custom',   pixelIcon: messageIconSrc,  title: 'Custom',   desc: 'You write all questions' },
 ];
 
 export const CreateGamePage: React.FC = () => {
@@ -91,7 +95,14 @@ export const CreateGamePage: React.FC = () => {
                 onClick={() => setMode(m.id)}
                 style={{ textAlign: 'left', width: '100%' }}
               >
-                <span style={{ fontSize: 20 }}>{m.icon}</span>
+                <div style={{
+                  width: 36, height: 36, borderRadius: 10,
+                  background: mode === m.id ? 'rgba(232,223,200,0.1)' : 'var(--glass-2)',
+                  border: `1px solid ${mode === m.id ? 'rgba(232,223,200,0.2)' : 'var(--border)'}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                }}>
+                  <img src={m.pixelIcon} alt={m.title} style={{ width: 20, height: 20, objectFit: 'contain', opacity: 0.75, filter: 'brightness(0) invert(1)' }} />
+                </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 14, color: mode === m.id ? 'var(--cream)' : 'var(--text)' }}>
                     {m.title}
@@ -150,8 +161,11 @@ export const CreateGamePage: React.FC = () => {
           <div style={{ width: 1, height: 36, background: 'var(--border)' }} />
           <div>
             <div className="label" style={{ marginBottom: 4 }}>Mode</div>
-            <div style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
-              {MODES.find(m => m.id === mode)?.icon} {MODES.find(m => m.id === mode)?.title}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <img src={MODES.find(m => m.id === mode)?.pixelIcon} alt="" style={{ width: 18, height: 18, opacity: 0.6, filter: 'brightness(0) invert(1)' }} />
+              <span style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: 18, color: 'var(--text)' }}>
+                {MODES.find(m => m.id === mode)?.title}
+              </span>
             </div>
           </div>
         </div>
