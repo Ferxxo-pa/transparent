@@ -3,18 +3,19 @@ import {
   PrivyProvider as _PrivyProvider,
   usePrivy,
   useLogin,
-  useWallets,
   useLogout,
-  getEmbeddedConnectedWallet,
   type ConnectedWallet,
 } from '@privy-io/react-auth';
-import { toSolanaWalletConnectors, useCreateWallet } from '@privy-io/react-auth/solana';
+import {
+  toSolanaWalletConnectors,
+  useCreateWallet,
+  useWallets as useSolanaWallets,
+} from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { PRIVY_APP_ID } from '../lib/config';
 
 // ============================================================
 // Privy v3 Context — embedded wallets + social login
-// Maintains same interface as wallet-adapter version
 // ============================================================
 
 export interface PrivyWallet {
@@ -37,60 +38,24 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { user, authenticated, ready } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
-  const { wallets } = useWallets();
+
+  // Use the Solana-specific useWallets — only returns actual Solana wallets
+  // (embedded Solana + external Phantom/Solflare), NOT Ethereum wallets
+  const { wallets: solanaWallets, ready: solanaReady } = useSolanaWallets();
   const { createWallet: createSolanaWallet } = useCreateWallet();
 
-  // Privy's createOnLogin for Solana embedded wallets is unreliable in v3.13.x.
-  // Explicitly create the Solana embedded wallet once the user is authenticated
-  // and no Solana wallet is found yet.
+  // Auto-create Solana embedded wallet if none exists after login
   useEffect(() => {
-    if (!ready || !authenticated) return;
-    const hasSolana = wallets.some(
-      (w: any) =>
-        w.chainType === 'solana' ||
-        w.chain === 'solana' ||
-        (() => { try { new PublicKey(w.address); return true; } catch { return false; } })()
-    );
-    if (!hasSolana) {
+    if (!ready || !authenticated || !solanaReady) return;
+    if (solanaWallets.length === 0) {
       createSolanaWallet().catch(() => {
-        // Fails silently — e.g. user already has wallet or dismissed modal
+        // Fails silently (user already has one, or dismissed modal)
       });
     }
-  }, [ready, authenticated, wallets.length]);
+  }, [ready, authenticated, solanaReady, solanaWallets.length]);
 
-  // Find the best Solana wallet available.
-  // Detection order:
-  //   1. Privy embedded Solana wallet (chainType='solana' + walletClientType='privy')
-  //   2. Any wallet where chainType or chain === 'solana'
-  //   3. Any wallet whose address is a valid Solana base58 pubkey
-  //   4. Privy embedded wallet (any chain) — last resort
-  const solanaWallet = useMemo(() => {
-    if (!wallets.length) return null;
-
-    // 1. Privy Solana embedded wallet
-    const embeddedSolana = wallets.find(
-      (w: any) =>
-        (w.chainType === 'solana' || w.chain === 'solana') &&
-        (w.walletClientType === 'privy' || w.type === 'privy')
-    );
-    if (embeddedSolana) return embeddedSolana;
-
-    // 2. Any Solana wallet (external: Phantom, Solflare, etc.)
-    const externalSolana = wallets.find(
-      (w: any) => w.chainType === 'solana' || w.chain === 'solana'
-    );
-    if (externalSolana) return externalSolana;
-
-    // 3. Any wallet whose address parses as a valid Solana pubkey
-    const solanaByAddress = wallets.find((w: any) => {
-      if (!w.address) return false;
-      try { new PublicKey(w.address); return true; } catch { return false; }
-    });
-    if (solanaByAddress) return solanaByAddress;
-
-    // 4. Privy embedded wallet (any chain — Ethereum embedded, last resort)
-    return getEmbeddedConnectedWallet(wallets) ?? null;
-  }, [wallets]);
+  // Pick the first available Solana wallet
+  const solanaWallet = solanaWallets[0] ?? null;
 
   const publicKey = useMemo(() => {
     if (!solanaWallet?.address) return null;
@@ -100,7 +65,7 @@ function WalletInner({ children }: { children: ReactNode }) {
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
     if (user?.email?.address) return user.email.address.split('@')[0];
-    if (user?.google?.name)  return user.google.name.split(' ')[0];
+    if (user?.google?.name)   return user.google.name.split(' ')[0];
     if (user?.twitter?.username) return `@${user.twitter.username}`;
     if (publicKey) {
       const addr = publicKey.toBase58();
@@ -109,22 +74,22 @@ function WalletInner({ children }: { children: ReactNode }) {
     return 'Player';
   }, [ready, authenticated, user, publicKey]);
 
+  // Bridge Standard Wallet signTransaction (Uint8Array) → web3.js Transaction
   const signTransaction = useMemo(() => {
-    if (!solanaWallet) return null;
+    if (!solanaWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<Transaction> => {
-      const signed = await (solanaWallet as any).signTransaction(tx);
-      return signed as Transaction;
+      // Serialize to Uint8Array (Standard Wallet interface)
+      const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+      const result = await solanaWallet.signTransaction({ transaction: serialized });
+      return Transaction.from(result.signedTransaction);
     };
-  }, [solanaWallet]);
+  }, [solanaWallet, publicKey]);
 
   const value: PrivyWallet = useMemo(() => ({
-    wallet: solanaWallet,
+    wallet: solanaWallet as any,
     publicKey,
     signTransaction,
-    // connected: gates navigation — true as soon as user is authenticated.
-    // Wallet creation is async; don't block UI navigation on it.
     connected: authenticated,
-    // walletReady: gates on-chain ops — true only when we have an actual pubkey.
     walletReady: !!publicKey,
     login,
     logout,
@@ -139,7 +104,7 @@ function WalletInner({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Root provider (wraps with PrivyProvider) ──────────────────
+// ── Root provider ─────────────────────────────────────────────
 
 export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
