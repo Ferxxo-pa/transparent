@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, ReactNode } from 'react';
 import {
   PrivyProvider as _PrivyProvider,
   usePrivy,
@@ -8,7 +8,7 @@ import {
   getEmbeddedConnectedWallet,
   type ConnectedWallet,
 } from '@privy-io/react-auth';
-import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import { toSolanaWalletConnectors, useCreateWallet } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { PRIVY_APP_ID } from '../lib/config';
 
@@ -38,6 +38,25 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { login } = useLogin();
   const { logout } = useLogout();
   const { wallets } = useWallets();
+  const { createWallet: createSolanaWallet } = useCreateWallet();
+
+  // Privy's createOnLogin for Solana embedded wallets is unreliable in v3.13.x.
+  // Explicitly create the Solana embedded wallet once the user is authenticated
+  // and no Solana wallet is found yet.
+  useEffect(() => {
+    if (!ready || !authenticated) return;
+    const hasSolana = wallets.some(
+      (w: any) =>
+        w.chainType === 'solana' ||
+        w.chain === 'solana' ||
+        (() => { try { new PublicKey(w.address); return true; } catch { return false; } })()
+    );
+    if (!hasSolana) {
+      createSolanaWallet().catch(() => {
+        // Fails silently — e.g. user already has wallet or dismissed modal
+      });
+    }
+  }, [ready, authenticated, wallets.length]);
 
   // Find the best Solana wallet available.
   // Detection order:
