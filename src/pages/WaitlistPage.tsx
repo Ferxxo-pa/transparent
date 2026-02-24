@@ -53,10 +53,10 @@ export const WaitlistPage: React.FC = () => {
         <div>
           <span className="chip chip-lime" style={{ marginBottom: 16, display: 'inline-block' }}>Coming Soon</span>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>
-            Stay in the loop.
+            The physical game is coming.
           </h1>
           <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.7 }}>
-            New modes, physical cards with NFC, on-chain stakes, and more — drop your email and we'll hit you when it's ready.
+            Real cards. NFC chips. Stakes built in. Join the waitlist and be first to know when it drops.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ export const WaitlistPage: React.FC = () => {
                 whileHover={valid && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
               >
-                {loading ? 'Joining…' : 'Keep me posted →'}
+                {loading ? 'Joining…' : 'Join the waitlist →'}
               </motion.button>
               <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
                 No spam. Unsubscribe anytime.
