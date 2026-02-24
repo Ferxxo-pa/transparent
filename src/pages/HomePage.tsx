@@ -1,15 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { AnimatedBackground } from '../components/AnimatedBackground';
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { connected, login, displayName, logout } = usePrivyWallet();
 
   return (
-    <div className="page fade-in">
+    <div className="page fade-in" style={{ position: 'relative' }}>
+      <AnimatedBackground />
       {/* Nav */}
-      <nav className="navbar">
+      <nav className="navbar" style={{ position: 'relative', zIndex: 2 }}>
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>
           transparent
         </span>
@@ -26,7 +28,7 @@ export const HomePage: React.FC = () => {
       </nav>
 
       {/* Hero */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 32, paddingTop: 16, paddingBottom: 48, width: '100%' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 32, paddingTop: 16, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}>
         <div>
           <div className="display">The crypto<br />party game.</div>
           <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 12, lineHeight: 1.6, fontWeight: 400 }}>

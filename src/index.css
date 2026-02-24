@@ -608,6 +608,67 @@ textarea.textarea::placeholder { color: var(--muted); }
   border: none;
 }
 
+/* ─── Animated Background Blobs ─────────────────────────── */
+.ab-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+}
+
+.ab-purple {
+  width: 560px; height: 560px;
+  background: radial-gradient(circle at 40% 40%, #8B2FFF 0%, #4A0FAA 50%, transparent 75%);
+  top: -140px; left: -140px;
+  opacity: 0.75;
+  animation: blob-a 18s ease-in-out infinite;
+}
+
+.ab-lime {
+  width: 460px; height: 460px;
+  background: radial-gradient(circle at 55% 55%, #C4FF3C 0%, #5AAA00 55%, transparent 78%);
+  bottom: -80px; right: -80px;
+  opacity: 0.55;
+  animation: blob-b 22s ease-in-out infinite;
+}
+
+.ab-green {
+  width: 380px; height: 380px;
+  background: radial-gradient(circle at 50% 50%, #1F8A3A 0%, #0A4A1A 55%, transparent 76%);
+  top: 38%; left: 28%;
+  opacity: 0.45;
+  animation: blob-c 26s ease-in-out infinite;
+}
+
+.ab-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: overlay;
+}
+
+@keyframes blob-a {
+  0%, 100% { transform: translate(0px,   0px)  scale(1.00) rotate(0deg);   }
+  20%       { transform: translate(60px, -50px) scale(1.12) rotate(15deg);  }
+  45%       { transform: translate(30px,  80px) scale(0.92) rotate(-10deg); }
+  70%       { transform: translate(-50px, 40px) scale(1.08) rotate(8deg);   }
+}
+
+@keyframes blob-b {
+  0%, 100% { transform: translate(0px,   0px)  scale(1.00) rotate(0deg);   }
+  25%       { transform: translate(-70px, 30px) scale(1.10) rotate(-12deg); }
+  55%       { transform: translate(40px, -60px) scale(0.90) rotate(18deg);  }
+  80%       { transform: translate(-30px,-30px) scale(1.06) rotate(-6deg);  }
+}
+
+@keyframes blob-c {
+  0%, 100% { transform: translate(0px,    0px)  scale(1.00) rotate(0deg);   }
+  30%       { transform: translate(-40px, 60px) scale(1.14) rotate(20deg);  }
+  60%       { transform: translate(60px, -40px) scale(0.88) rotate(-15deg); }
+}
+
 /* ─── Wallet adapter overrides ───────────────────────────── */
 .wallet-adapter-modal-wrapper {
   background: var(--card) !important;
