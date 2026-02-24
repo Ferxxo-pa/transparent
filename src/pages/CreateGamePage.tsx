@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { WalletSetupGate } from '../components/WalletSetupGate';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 import { QuestionMode } from '../types/game';
 
@@ -44,6 +45,7 @@ export const CreateGamePage: React.FC = () => {
   };
 
   return (
+    <WalletSetupGate>
     <div className="page fade-in">
       <nav className="navbar">
         <motion.button
@@ -231,5 +233,6 @@ export const CreateGamePage: React.FC = () => {
         </motion.button>
       </div>
     </div>
+    </WalletSetupGate>
   );
 };

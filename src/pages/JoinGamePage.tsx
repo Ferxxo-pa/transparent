@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
+import { WalletSetupGate } from '../components/WalletSetupGate';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const JoinGamePage: React.FC = () => {
@@ -27,6 +28,7 @@ export const JoinGamePage: React.FC = () => {
   };
 
   return (
+    <WalletSetupGate>
     <div className="page fade-in">
       <nav className="navbar">
         <motion.button
@@ -109,5 +111,6 @@ export const JoinGamePage: React.FC = () => {
         </motion.button>
       </div>
     </div>
+    </WalletSetupGate>
   );
 };

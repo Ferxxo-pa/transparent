@@ -26,6 +26,7 @@ export interface PrivyWallet {
   walletReady: boolean;  // true when publicKey is available (gates on-chain ops)
   login: () => void;
   logout: () => Promise<void>;
+  setupWallet: () => Promise<void>; // manually trigger Solana wallet creation
   user: ReturnType<typeof usePrivy>['user'];
   displayName: string;
 }
@@ -85,6 +86,10 @@ function WalletInner({ children }: { children: ReactNode }) {
     };
   }, [solanaWallet, publicKey]);
 
+  const setupWallet = async () => {
+    try { await createSolanaWallet(); } catch { /* already exists or dismissed */ }
+  };
+
   const value: PrivyWallet = useMemo(() => ({
     wallet: solanaWallet as any,
     publicKey,
@@ -93,6 +98,7 @@ function WalletInner({ children }: { children: ReactNode }) {
     walletReady: !!publicKey,
     login,
     logout,
+    setupWallet,
     user,
     displayName,
   }), [solanaWallet, publicKey, signTransaction, authenticated, login, logout, user, displayName]);
