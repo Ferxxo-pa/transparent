@@ -6,22 +6,28 @@ import {
   useLogout,
   type ConnectedWallet,
 } from '@privy-io/react-auth';
-import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import {
+  toSolanaWalletConnectors,
+  useWallets as useSolanaWallets,
+  useSignTransaction,
+} from '@privy-io/react-auth/solana';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { PRIVY_APP_ID } from '../lib/config';
 
 // ============================================================
-// Privy handles AUTH (login/identity).
-// Wallet adapter handles WALLET (publicKey, signTransaction).
+// Auth:   Privy (email / Google / Apple / wallet login)
+// Wallet: wallet adapter (Phantom/Solflare) takes priority.
+//         Falls back to Privy embedded Solana wallet for
+//         email/social users who don't have Phantom installed.
 // ============================================================
 
 export interface PrivyWallet {
   wallet: ConnectedWallet | null;
   publicKey: PublicKey | null;
   signTransaction: ((tx: Transaction) => Promise<Transaction>) | null;
-  connected: boolean;    // true when authenticated via Privy
-  walletReady: boolean;  // true when Solana wallet is connected via wallet adapter
+  connected: boolean;
+  walletReady: boolean;
   login: () => void;
   logout: () => Promise<void>;
   setupWallet: () => Promise<void>;
@@ -36,18 +42,45 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { login } = useLogin();
   const { logout } = useLogout();
 
-  // Wallet adapter — source of truth for Solana wallet
-  const { publicKey: adapterPubkey, signTransaction: adapterSign, connected: walletConnected } = useWallet();
+  // ── Privy embedded Solana wallet ──────────────────────────
+  const { wallets: privyWallets } = useSolanaWallets();
+  const { signTransaction: privySignTx } = useSignTransaction();
+  const privyWallet = privyWallets[0] ?? null;
 
-  const publicKey = adapterPubkey ?? null;
+  // ── Wallet adapter (Phantom / Solflare) ───────────────────
+  const {
+    publicKey: adapterPubkey,
+    signTransaction: adapterSignTx,
+    connected: adapterConnected,
+  } = useWallet();
+
+  // Wallet adapter takes priority; Privy embedded is fallback
+  const publicKey = useMemo(() => {
+    if (adapterConnected && adapterPubkey) return adapterPubkey;
+    if (privyWallet?.address) {
+      try { return new PublicKey(privyWallet.address); } catch { return null; }
+    }
+    return null;
+  }, [adapterConnected, adapterPubkey, privyWallet?.address]);
 
   const signTransaction = useMemo(() => {
-    if (!adapterSign || !publicKey) return null;
-    return async (tx: Transaction): Promise<Transaction> => {
-      const signed = await adapterSign(tx);
-      return signed;
-    };
-  }, [adapterSign, publicKey]);
+    // Wallet adapter path
+    if (adapterConnected && adapterSignTx && adapterPubkey) {
+      return async (tx: Transaction): Promise<Transaction> => adapterSignTx(tx);
+    }
+    // Privy embedded wallet path
+    if (privyWallet && publicKey) {
+      return async (tx: Transaction): Promise<Transaction> => {
+        const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
+        const { signedTransaction } = await privySignTx({
+          transaction: serialized,
+          wallet: privyWallet,
+        });
+        return Transaction.from(signedTransaction);
+      };
+    }
+    return null;
+  }, [adapterConnected, adapterSignTx, adapterPubkey, privyWallet, publicKey, privySignTx]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
@@ -61,21 +94,22 @@ function WalletInner({ children }: { children: ReactNode }) {
     return 'Player';
   }, [ready, authenticated, user, publicKey]);
 
-  // setupWallet: open wallet adapter modal (noop — handled by WalletSetupGate UI)
   const setupWallet = async () => {};
+
+  const walletReady = !!(publicKey && signTransaction);
 
   const value: PrivyWallet = useMemo(() => ({
     wallet: null,
     publicKey,
     signTransaction,
     connected: authenticated,
-    walletReady: walletConnected && !!publicKey,
+    walletReady,
     login,
     logout,
     setupWallet,
     user,
     displayName,
-  }), [publicKey, signTransaction, authenticated, walletConnected, login, logout, user, displayName]);
+  }), [publicKey, signTransaction, authenticated, walletReady, login, logout, user, displayName]);
 
   return (
     <PrivyWalletContext.Provider value={value}>
@@ -99,7 +133,8 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         },
         loginMethods: ['email', 'google', 'apple', 'wallet'],
         embeddedWallets: {
-          solana: { createOnLogin: 'off' },
+          // Auto-create embedded Solana wallet for email/social users
+          solana: { createOnLogin: 'users-without-wallets' },
         },
         externalWallets: {
           solana: {
