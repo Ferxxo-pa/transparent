@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, ChevronDown } from 'lucide-react';
+import { Wallet, ChevronDown, AlertCircle } from 'lucide-react';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useWalletBalance } from '../hooks/useWalletBalance';
 import { WalletDrawer } from './WalletDrawer';
 
 /**
- * Fixed wallet pill — always visible in the top-right corner when logged in.
- * Shows: shortened address + SOL balance.
- * Clicking it opens the WalletDrawer.
+ * Fixed wallet pill — always visible in the top-right when logged in.
+ *
+ * States:
+ *  - Wallet ready:    shows  abc…xyz · 0.042 SOL
+ *  - No wallet yet:   shows  "Set up wallet"  (clicks open WalletDrawer/gate)
  */
 export const WalletHeader: React.FC = () => {
-  const { connected, publicKey } = usePrivyWallet();
+  const { connected, publicKey, displayName } = usePrivyWallet();
   const balance = useWalletBalance(publicKey);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  if (!connected || !publicKey) return null;
+  // Only show when logged in
+  if (!connected) return null;
 
-  const addr = publicKey.toBase58();
-  const short = `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+  const hasWallet = !!publicKey;
+  const addr = publicKey?.toBase58() ?? '';
+  const short = addr ? `${addr.slice(0, 4)}…${addr.slice(-4)}` : '';
   const balStr = balance === null ? '…' : `${balance.toFixed(3)} SOL`;
 
   return (
@@ -29,7 +33,7 @@ export const WalletHeader: React.FC = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 320, damping: 28 }}
         whileTap={{ scale: 0.96 }}
-        whileHover={{ borderColor: 'var(--lime-border)' }}
+        whileHover={{ borderColor: hasWallet ? 'var(--lime-border)' : 'var(--lavender-border)' }}
         style={{
           position: 'fixed',
           top: 16,
@@ -40,9 +44,9 @@ export const WalletHeader: React.FC = () => {
           gap: 8,
           height: 38,
           padding: '0 14px 0 10px',
-          background: 'rgba(13,15,11,0.85)',
+          background: 'rgba(13,15,11,0.90)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid var(--border)',
+          border: `1px solid ${hasWallet ? 'var(--border)' : 'rgba(200,174,255,0.25)'}`,
           borderRadius: 'var(--r-pill)',
           cursor: 'pointer',
           color: 'var(--text)',
@@ -52,17 +56,32 @@ export const WalletHeader: React.FC = () => {
           transition: 'border-color 0.2s',
         }}
       >
+        {/* Icon */}
         <div style={{
           width: 22, height: 22, borderRadius: '50%',
-          background: 'rgba(196,255,60,0.15)',
+          background: hasWallet ? 'rgba(196,255,60,0.15)' : 'rgba(200,174,255,0.15)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
         }}>
-          <Wallet size={12} color="var(--lime)" />
+          {hasWallet
+            ? <Wallet size={12} color="var(--lime)" />
+            : <AlertCircle size={12} color="var(--lavender)" />
+          }
         </div>
-        <span style={{ color: 'var(--muted)', fontSize: 12 }}>{short}</span>
-        <span style={{ width: 1, height: 14, background: 'var(--border)' }} />
-        <span style={{ color: 'var(--lime)', fontSize: 12, fontWeight: 700 }}>{balStr}</span>
-        <ChevronDown size={12} color="var(--muted)" style={{ marginLeft: -2 }} />
+
+        {hasWallet ? (
+          <>
+            <span style={{ color: 'var(--muted)', fontSize: 12 }}>{short}</span>
+            <span style={{ width: 1, height: 14, background: 'var(--border)', flexShrink: 0 }} />
+            <span style={{ color: 'var(--lime)', fontSize: 12, fontWeight: 700 }}>{balStr}</span>
+          </>
+        ) : (
+          <span style={{ color: 'var(--lavender)', fontSize: 12 }}>
+            {displayName} · Set up wallet
+          </span>
+        )}
+
+        <ChevronDown size={12} color="var(--muted)" style={{ marginLeft: -2, flexShrink: 0 }} />
       </motion.button>
 
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
