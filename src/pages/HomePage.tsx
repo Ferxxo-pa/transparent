@@ -1,14 +1,24 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { GlassCard } from '../components/GlassCard';
 import transparentLogo from '../assets/trans 3.svg';
+import addIcon from '../assets/Add.svg';
+import starIcon from '../assets/Star.svg';
+import groupIcon from '../assets/Group.svg';
+import moneyIcon from '../assets/money-payments-accounting-bill-money-2--Streamline-Pixel.svg';
+import fireIcon from '../assets/social-rewards-trends-hot-flame--Streamline-Pixel.svg';
+import messageIcon from '../assets/email-mail-chat--Streamline-Pixel.svg';
+import moneyBagIcon from '../assets/business-products-bag-money--Streamline-Pixel.svg';
+import handIcon from '../assets/Group copy.svg';
 
-const STEPS = [
-  { n: 1, icon: '🪑', label: 'Hot Seat' },
-  { n: 2, icon: '💰', label: 'Buy In' },
-  { n: 3, icon: '🔥', label: 'Answer' },
-  { n: 4, icon: '🗳️', label: 'Vote' },
-  { n: 5, icon: '🏆', label: 'Win SOL' },
+const HOW_TO_PLAY = [
+  { n: 1, icon: groupIcon,    label: 'Host or Join' },
+  { n: 2, icon: moneyIcon,    label: 'Buy-In' },
+  { n: 3, icon: fireIcon,     label: 'Hot Seat' },
+  { n: 4, icon: messageIcon,  label: 'Vote' },
+  { n: 5, icon: handIcon,     label: 'Hold or Fold' },
+  { n: 6, icon: moneyBagIcon, label: 'Winner Takes All' },
 ];
 
 export const HomePage: React.FC = () => {
@@ -16,75 +26,76 @@ export const HomePage: React.FC = () => {
   const { connected, login, logout, displayName } = usePrivyWallet();
 
   return (
-    <div className="page">
+    <div className="min-h-screen flex flex-col items-center px-6 py-6 relative">
       {/* Navbar */}
-      <nav className="navbar">
-        <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>
-          Solana Devnet
-        </span>
+      <div className="w-full max-w-2xl flex items-center justify-between mb-8">
+        <span style={{ fontSize: 13, color: 'var(--text-3)', fontWeight: 600 }}>Solana Devnet</span>
         <button
           onClick={connected ? logout : login}
-          className="btn btn-ghost"
-          style={{ width: 'auto' }}
+          className="backdrop-blur-md bg-black/80 text-white px-5 py-2 rounded-full text-sm font-bold hover:bg-black/90 transition-all border border-white/10"
         >
-          {connected ? displayName : 'Connect'}
+          {connected ? displayName : 'Connect Wallet'}
         </button>
-      </nav>
+      </div>
 
-      <div className="page-content animate-in" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 32 }}>
+      <div className="w-full max-w-2xl mx-auto flex flex-col items-center gap-10 animate-in">
 
         {/* Logo */}
-        <div style={{ textAlign: 'center' }}>
-          <img src={transparentLogo} alt="Transparent" style={{ height: 72, width: 'auto' }} />
-          <p style={{ color: 'var(--text-2)', fontSize: 14, marginTop: 8 }}>
+        <div className="text-center">
+          <img src={transparentLogo} alt="Transparent" style={{ height: 80, width: 'auto' }} />
+          <p className="text-sm mt-2" style={{ color: 'var(--text-2)' }}>
             The crypto party game where honesty pays
           </p>
         </div>
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
-          <button className="btn btn-primary" style={{ fontSize: 16, padding: '18px 24px' }} onClick={() => navigate('/create')}>
-            🎮 Create Game
+        {/* Action buttons — glass cards */}
+        <div className="flex gap-6 justify-center flex-wrap w-full">
+          <button
+            onClick={() => navigate('/join')}
+            className="hover:scale-105 transition-all duration-300 w-full max-w-[260px]"
+          >
+            <GlassCard>
+              <div className="flex flex-col items-center justify-center gap-4 py-8 px-6">
+                <img src={addIcon} alt="Join" className="w-16 h-16" />
+                <span className="text-white text-xl font-bold">Join Game</span>
+              </div>
+            </GlassCard>
           </button>
-          <button className="btn btn-secondary" style={{ fontSize: 16, padding: '18px 24px' }} onClick={() => navigate('/join')}>
-            🚪 Join Game
+
+          <button
+            onClick={() => navigate('/create')}
+            className="hover:scale-105 transition-all duration-300 w-full max-w-[260px]"
+          >
+            <GlassCard>
+              <div className="flex flex-col items-center justify-center gap-4 py-8 px-6">
+                <img src={starIcon} alt="Create" className="w-16 h-16" />
+                <span className="text-white text-xl font-bold">Create Game</span>
+              </div>
+            </GlassCard>
           </button>
         </div>
 
-        {/* How it works */}
-        <div style={{ width: '100%' }}>
-          <p className="label" style={{ textAlign: 'center', marginBottom: 16 }}>How it works</p>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-            {STEPS.map((step, i) => (
-              <React.Fragment key={step.n}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flex: 1 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: 12,
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 20
-                  }}>
-                    {step.icon}
-                  </div>
-                  <span style={{ fontSize: 11, color: 'var(--text-2)', fontWeight: 600, textAlign: 'center' }}>
-                    {step.label}
-                  </span>
+        {/* How to play */}
+        <div className="w-full">
+          <p className="text-center text-xs font-bold uppercase tracking-widest mb-6" style={{ color: 'var(--text-3)' }}>
+            How to Play
+          </p>
+          <div className="grid grid-cols-6 gap-3">
+            {HOW_TO_PLAY.map(step => (
+              <div key={step.n} className="flex flex-col items-center gap-2">
+                <div className="w-10 h-10 flex items-center justify-center">
+                  <img src={step.icon} alt={step.label} className="w-full h-full object-contain opacity-80" />
                 </div>
-                {i < STEPS.length - 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 20 }}>
-                    <span style={{ color: 'var(--border-2)', fontSize: 12 }}>→</span>
-                  </div>
-                )}
-              </React.Fragment>
+                <p className="text-center" style={{ fontSize: 10, color: 'var(--text-3)' }}>
+                  {step.n}. {step.label}
+                </p>
+              </div>
             ))}
           </div>
         </div>
 
-        {/* Footer note */}
         <p style={{ fontSize: 12, color: 'var(--text-3)', textAlign: 'center', lineHeight: 1.6 }}>
-          Real SOL. Real stakes. Real honesty.<br />
-          Winner takes the pot.
+          Real SOL. Real stakes. Real honesty.<br />Winner takes the pot.
         </p>
       </div>
     </div>

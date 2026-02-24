@@ -4,6 +4,34 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .glass-effect {
+    backdrop-filter: blur(32px);
+    background: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(217,217,217,0.03) 100%);
+    box-shadow: -87px 214px 94px rgba(145,145,145,0.01),
+                -48px 120px 77px rgba(145,145,145,0.03),
+                -22px 55px 58px rgba(145,145,145,0.04),
+                -6px 12px 32px rgba(145,145,145,0.05),
+                inset 0px -16px 12px rgba(255,255,255,0.25),
+                inset 0px 12px 12px rgba(255,255,255,0.25);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 20px rgba(191,251,79,0.5), 0 0 40px rgba(191,251,79,0.3);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(166,123,236,0.5), 0 0 40px rgba(166,123,236,0.3);
+  }
+
+  .text-gradient {
+    background: linear-gradient(90deg, #BFFB4F 0%, #70AC00 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
 :root {
   --bg: #0C0C0F;
   --surface: #141418;

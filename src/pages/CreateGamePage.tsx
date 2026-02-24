@@ -166,11 +166,11 @@ export const CreateGamePage: React.FC = () => {
 
         <button
           className="btn btn-primary"
-          onClick={handleCreate}
-          disabled={loading}
-          style={{ fontSize: 16, padding: '18px' }}
+          onClick={connected ? handleCreate : undefined}
+          disabled={!connected || loading}
+          style={{ fontSize: 16, padding: '18px', opacity: connected ? 1 : 0.5, cursor: connected ? 'pointer' : 'not-allowed' }}
         >
-          {loading ? 'Creating...' : connected ? 'Create Game →' : 'Connect Wallet to Create'}
+          {loading ? 'Creating...' : connected ? 'Create Game →' : '🔒 Connect Wallet'}
         </button>
       </div>
     </div>

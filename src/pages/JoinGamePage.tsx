@@ -71,11 +71,11 @@ export const JoinGamePage: React.FC = () => {
 
         <button
           className="btn btn-primary"
-          onClick={handleJoin}
-          disabled={loading || (!connected ? false : !isReady)}
-          style={{ fontSize: 16, padding: '18px' }}
+          onClick={connected ? handleJoin : undefined}
+          disabled={!connected || loading}
+          style={{ fontSize: 16, padding: '18px', opacity: connected ? (isReady ? 1 : 0.6) : 0.5, cursor: connected ? (isReady ? 'pointer' : 'default') : 'not-allowed' }}
         >
-          {loading ? 'Joining...' : !connected ? 'Connect Wallet to Join' : isReady ? 'Join Game →' : 'Enter Room Code'}
+          {loading ? 'Joining...' : !connected ? '🔒 Connect Wallet' : isReady ? 'Join Game →' : 'Enter Room Code'}
         </button>
       </div>
     </div>

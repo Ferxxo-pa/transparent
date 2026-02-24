@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useMemo, useCallback, ReactNode } from 'react';
 import { PrivyProvider, usePrivy, useWallets } from '@privy-io/react-auth';
+import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { PRIVY_APP_ID } from '../lib/config';
+
+const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: true });
 
 // ============================================================
 // Privy Wallet Context — Solana-first auth & wallet management
@@ -114,6 +117,9 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
           solana: {
             createOnLogin: 'users-without-wallets',
           },
+        },
+        externalWallets: {
+          solana: { connectors: solanaConnectors },
         },
       }}
     >
