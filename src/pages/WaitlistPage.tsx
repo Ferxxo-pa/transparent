@@ -53,10 +53,10 @@ export const WaitlistPage: React.FC = () => {
         <div>
           <span className="chip chip-lime" style={{ marginBottom: 16, display: 'inline-block' }}>Coming Soon</span>
           <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>
-            The physical game is coming.
+            Get first access to the physical game.
           </h1>
           <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.7 }}>
-            Real cards. NFC chips. Stakes built in. Join the waitlist and be first to know when it drops.
+            We're building a real card deck with NFC chips and on-chain stakes built in. Sign up and you'll be the first to know when it's ready to ship.
           </p>
         </div>
 
