@@ -4,6 +4,7 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 import { QuestionMode } from '../types/game';
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
@@ -21,6 +22,7 @@ export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
   const { displayName, walletReady } = usePrivyWallet();
+  const solPrice = useSolPrice();
 
   const [buyIn,    setBuyIn]    = useState('0');
   const [roomName, setRoomName] = useState('');
@@ -82,24 +84,29 @@ export const CreateGamePage: React.FC = () => {
             <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
             {/* Presets */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-              {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => (
-                <button
-                  key={preset}
-                  onClick={() => setBuyIn(preset)}
-                  style={{
-                    padding: '5px 14px',
-                    borderRadius: 'var(--r-pill)',
-                    border: `1px solid ${buyIn === preset ? 'var(--lime)' : 'var(--border)'}`,
-                    background: buyIn === preset ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                    color: buyIn === preset ? 'var(--lime)' : 'var(--muted)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: 'Space Grotesk',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  {preset === '0' ? 'Free' : `${preset} SOL`}
-                </button>
-              ))}
+              {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => {
+                const usd = preset !== '0' ? solToUsd(parseFloat(preset), solPrice) : '';
+                return (
+                  <button
+                    key={preset}
+                    onClick={() => setBuyIn(preset)}
+                    style={{
+                      padding: '5px 14px',
+                      borderRadius: 'var(--r-pill)',
+                      border: `1px solid ${buyIn === preset ? 'var(--lime)' : 'var(--border)'}`,
+                      background: buyIn === preset ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
+                      color: buyIn === preset ? 'var(--lime)' : 'var(--muted)',
+                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      fontFamily: 'Space Grotesk',
+                      transition: 'all 0.15s',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                    }}
+                  >
+                    <span>{preset === '0' ? 'Free' : `${preset} SOL`}</span>
+                    {usd && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>{usd}</span>}
+                  </button>
+                );
+              })}
             </div>
             <input
               className="input"
@@ -109,7 +116,9 @@ export const CreateGamePage: React.FC = () => {
               placeholder="or enter custom amount"
             />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-              {parseFloat(buyIn) > 0 ? `Each player puts in ${buyIn} SOL · winner takes everything` : 'Free game · no entry fee'}
+              {parseFloat(buyIn) > 0
+                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · winner takes everything`
+                : 'Free game · no entry fee'}
             </p>
           </motion.div>
 
