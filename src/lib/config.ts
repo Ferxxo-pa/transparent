@@ -17,3 +17,6 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 
 /** Supabase anon (public) key */
 export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
+/** Privy app ID */
+export const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || '';
