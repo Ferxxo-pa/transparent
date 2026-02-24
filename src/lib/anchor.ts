@@ -20,6 +20,16 @@ import { SOLANA_RPC } from './config';
 
 export const connection = new Connection(SOLANA_RPC, 'confirmed');
 
+// Timeout wrapper — on-chain calls bail after 5s so they never block the game
+function withTimeout<T>(promise: Promise<T>, ms = 5000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('on-chain timeout')), ms)
+    ),
+  ]);
+}
+
 // ── Wallet Interface ────────────────────────────────────────
 
 export interface WalletAdapter {
@@ -121,7 +131,7 @@ export async function joinGameOnChainWithAmount(
     }),
   );
 
-  return sendAndConfirm(wallet, tx);
+  return withTimeout(sendAndConfirm(wallet, tx), 5000);
 }
 
 /**

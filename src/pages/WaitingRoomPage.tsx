@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Copy, Check } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
@@ -63,7 +64,13 @@ export const WaitingRoomPage: React.FC = () => {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {gameState.players.map((p, i) => (
-              <div key={p.id} className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}>
+              <motion.div
+                key={p.id}
+                className={`player-row ${p.id === publicKey?.toBase58() ? 'me' : ''}`}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ type: 'spring', stiffness: 340, damping: 28, delay: i * 0.07 }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ width: 26, height: 26, borderRadius: 8, background: 'var(--card-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--muted)', flexShrink: 0 }}>
                     {String(i + 1).padStart(2, '0')}
@@ -75,7 +82,7 @@ export const WaitingRoomPage: React.FC = () => {
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lime)' }}>
                   {gameState.buyInAmount} SOL
                 </span>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

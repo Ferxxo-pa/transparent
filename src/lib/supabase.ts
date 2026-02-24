@@ -98,7 +98,7 @@ export async function addPlayerToDB(data: {
 }): Promise<PlayerRow> {
   const { data: player, error } = await supabase
     .from('players')
-    .insert(data)
+    .upsert(data, { onConflict: 'game_id,wallet_address', ignoreDuplicates: false })
     .select()
     .single();
   if (error) throw error;

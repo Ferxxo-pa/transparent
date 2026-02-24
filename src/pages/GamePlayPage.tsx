@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
@@ -170,9 +171,16 @@ export const GamePlayPage: React.FC = () => {
         <HotSeatCard />
 
         {/* The question — center of screen */}
-        <div className="card-pixel corner-accent" style={{ padding: '24px 20px', textAlign: 'center', flex: 0 }}>
+        <motion.div
+          className="card-pixel corner-accent"
+          style={{ padding: '24px 20px', textAlign: 'center', flex: 0 }}
+          key={gameState.currentQuestion}
+          initial={{ opacity: 0, y: 16, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+        >
           <p className="question">{gameState.currentQuestion}</p>
-        </div>
+        </motion.div>
 
         {/* Voting or answering */}
         {isHotSeat ? (
@@ -200,22 +208,30 @@ export const GamePlayPage: React.FC = () => {
 
             {/* Vote buttons — big, thumb-friendly, fill the space */}
             <div className="vote-wrap">
-              <button
+              <motion.button
                 className={`vote-btn vote-honest ${myVote === 'transparent' ? 'voted' : ''}`}
                 onClick={() => castVote('transparent')}
                 disabled={hasVoted}
+                whileTap={{ scale: 0.93 }}
+                whileHover={!hasVoted ? { scale: 1.04, boxShadow: '0 0 30px rgba(196,255,60,0.3)' } : {}}
+                animate={myVote === 'transparent' ? { scale: [1, 1.12, 1], transition: { duration: 0.35 } } : {}}
+                transition={{ type: 'spring', stiffness: 450, damping: 22 }}
               >
                 <span style={{ fontSize: 22 }}>✓</span>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Honest</span>
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 className={`vote-btn vote-fake ${myVote === 'fake' ? 'voted' : ''}`}
                 onClick={() => castVote('fake')}
                 disabled={hasVoted}
+                whileTap={{ scale: 0.93 }}
+                whileHover={!hasVoted ? { scale: 1.04, boxShadow: '0 0 30px rgba(255,82,82,0.3)' } : {}}
+                animate={myVote === 'fake' ? { scale: [1, 1.12, 1], transition: { duration: 0.35 } } : {}}
+                transition={{ type: 'spring', stiffness: 450, damping: 22 }}
               >
                 <span style={{ fontSize: 22 }}>✗</span>
                 <span style={{ fontSize: 14, fontWeight: 700 }}>Lying</span>
-              </button>
+              </motion.button>
             </div>
 
             {/* Vote status */}
