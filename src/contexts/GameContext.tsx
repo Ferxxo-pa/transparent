@@ -45,6 +45,7 @@ interface GameContextType {
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
+  endGameNow: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
@@ -832,6 +833,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [gameState]);
 
+  // ── End Game Now ───────────────────────────────────────
+
+  const endGameNow = useCallback(async () => {
+    const gid = gameState?.gameId;
+    if (gid) {
+      try { await updateGameStatus(gid, { status: 'gameover' }); } catch { /* ignore */ }
+    }
+    setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
+  }, [gameState?.gameId]);
+
   // ── Reset ──────────────────────────────────────────────
 
   const resetGame = useCallback(() => {
@@ -867,6 +878,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         selectWinner,
         distributeWinnings,
         forceAdvanceRound,
+        endGameNow,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,

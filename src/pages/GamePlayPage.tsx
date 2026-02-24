@@ -8,7 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -39,12 +39,14 @@ export const GamePlayPage: React.FC = () => {
   const Nav = () => (
     <nav className="navbar">
       <span className="chip chip-lavender">Round {round} / {total}</span>
-      <button
-        onClick={() => navigate('/gameover')}
-        style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
-      >
-        End Game
-      </button>
+      {isHost && (
+        <button
+          onClick={endGameNow}
+          style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
+        >
+          End Game
+        </button>
+      )}
     </nav>
   );
 
