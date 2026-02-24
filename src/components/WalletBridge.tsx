@@ -1,22 +1,21 @@
 import { useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useGame } from '../contexts/GameContext';
 
 /**
- * Syncs the wallet adapter (Phantom/Solflare) into GameContext.
- * publicKey + signTransaction come from wallet adapter — not Privy.
+ * Syncs the active Privy Solana wallet (embedded or Phantom) into GameContext.
  */
 export function WalletBridge() {
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction } = usePrivyWallet();
   const { setWalletAdapter } = useGame();
 
   useEffect(() => {
-    if (connected && publicKey && signTransaction) {
+    if (publicKey && signTransaction) {
       setWalletAdapter({ publicKey, signTransaction });
     } else {
       setWalletAdapter(null);
     }
-  }, [connected, publicKey, signTransaction, setWalletAdapter]);
+  }, [publicKey, signTransaction, setWalletAdapter]);
 
   return null;
 }
