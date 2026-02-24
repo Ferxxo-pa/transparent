@@ -106,13 +106,16 @@ export const WaitlistPage: React.FC = () => {
               </div>
               <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--lime)', marginBottom: 6 }}>You're on the list 🎉</p>
               <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                We'll hit you when the physical game drops. You'll be first to know.
+                We'll ping you the moment the physical game drops. First to know, first to cop.
               </p>
             </motion.div>
           ) : (
             <motion.div key="form" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Join the waitlist</p>
+                <div>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Get pinged when it drops</p>
+                  <p style={{ fontSize: 12, color: 'var(--muted)' }}>No spam. Just a heads up when the cards are ready.</p>
+                </div>
                 <input
                   className="input"
                   type="text"
@@ -140,11 +143,8 @@ export const WaitlistPage: React.FC = () => {
                 whileHover={valid && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
                 transition={{ type: 'spring', stiffness: 400, damping: 20 }}
               >
-                {loading ? 'Joining…' : 'Join Waitlist →'}
+                {loading ? 'Joining…' : 'Join the waitlist →'}
               </motion.button>
-              <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
-                No spam. Just a heads up when the cards are ready.
-              </p>
             </motion.div>
           )}
         </AnimatePresence>
