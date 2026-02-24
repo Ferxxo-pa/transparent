@@ -91,13 +91,28 @@ export const WaitingRoomPage: React.FC = () => {
       {/* CTA */}
       <div style={{ width: '100%', paddingTop: 16 }}>
         {isHost ? (
-          <button className="btn btn-primary" onClick={async () => { await startGame(); navigate('/game'); }}>
-            Start Game
-          </button>
+          <>
+            <motion.button
+              className="btn btn-primary"
+              onClick={async () => { await startGame(); navigate('/game'); }}
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            >
+              Start Game →
+            </motion.button>
+            <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+              Need at least 2 players
+            </p>
+          </>
         ) : (
-          <div style={{ textAlign: 'center', padding: '18px 0' }}>
-            <p style={{ color: 'var(--muted)', fontSize: 14 }}>Waiting for the host to start…</p>
-          </div>
+          <motion.div
+            style={{ textAlign: 'center', padding: '18px 0', background: 'var(--glass)', backdropFilter: 'blur(10px)', borderRadius: 'var(--r)', border: '1px solid var(--border)' }}
+            animate={{ opacity: [1, 0.6, 1] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <p style={{ color: 'var(--muted)', fontSize: 14 }}>⏳ Waiting for host to start…</p>
+          </motion.div>
         )}
       </div>
     </div>

@@ -49,9 +49,7 @@ function GameRedirect() {
     if (!gameState || location.pathname !== '/') return;
     if (gameState.gameStatus === 'playing') navigate('/game', { replace: true });
     else if (gameState.gameStatus === 'gameover') navigate('/gameover', { replace: true });
-    else if (gameState.gameStatus === 'waiting') {
-      navigate('/created', { replace: true });
-    }
+    else if (gameState.gameStatus === 'waiting') navigate('/waiting', { replace: true });
   }, [gameState, location.pathname, navigate]);
 
   return null;
