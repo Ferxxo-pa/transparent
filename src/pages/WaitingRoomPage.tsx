@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Copy, Check } from 'lucide-react';
 import { GlassCard } from '../components/GlassCard';
 import { GlowButton } from '../components/GlowButton';
 import { useGame } from '../contexts/GameContext';
@@ -10,7 +10,10 @@ import transparentLogo from '../assets/trans 3.svg';
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const { gameState, startGame } = useGame();
-  const { connected, displayName } = usePrivyWallet();
+  const { connected, displayName, publicKey } = usePrivyWallet();
+  const [copied, setCopied] = useState(false);
+
+  const isHost = publicKey?.toBase58() === (gameState as any)?.hostWallet;
 
   useEffect(() => {
     if (gameState?.gameStatus === 'playing') {
@@ -20,6 +23,12 @@ export const WaitingRoomPage: React.FC = () => {
 
   const handleReady = () => {
     startGame();
+  };
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(gameState?.roomCode ?? '');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (!gameState) {
@@ -62,26 +71,46 @@ export const WaitingRoomPage: React.FC = () => {
 
             <div className="w-full text-center">
               <p
-                className="text-white/90 text-3xl text-center mb-4"
-                style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
+                className="text-white/60 text-sm uppercase tracking-widest mb-3"
               >
-                Room Code
-              </p>
-              <p
-                className="text-[#BFFB4F] text-5xl font-bold mb-6"
-                style={{
-                  fontFamily: 'Pixelify Sans, sans-serif',
-                  letterSpacing: '0.3em',
-                }}
-              >
-                {gameState.roomCode}
+                Share this code with your friends
               </p>
 
-              <div className="flex justify-center">
-                <GlowButton onClick={handleReady} variant="purple">
-                  READY
-                </GlowButton>
-              </div>
+              {/* Room code + copy button */}
+              <button
+                onClick={handleCopy}
+                className="flex items-center justify-center gap-4 mx-auto mb-2 group"
+              >
+                <p
+                  className="text-[#BFFB4F] text-5xl font-bold"
+                  style={{
+                    fontFamily: 'Pixelify Sans, sans-serif',
+                    letterSpacing: '0.3em',
+                  }}
+                >
+                  {gameState.roomCode}
+                </p>
+                <span className="text-[#BFFB4F]/60 group-hover:text-[#BFFB4F] transition-colors">
+                  {copied ? <Check size={28} /> : <Copy size={28} />}
+                </span>
+              </button>
+
+              {copied && (
+                <p className="text-[#BFFB4F]/60 text-sm mb-4">Copied!</p>
+              )}
+
+              <p className="text-white/30 text-sm mb-6">
+                {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''} in lobby
+                {!isHost && ' · Waiting for host to start...'}
+              </p>
+
+              {isHost && (
+                <div className="flex justify-center">
+                  <GlowButton onClick={handleReady} variant="purple">
+                    START GAME →
+                  </GlowButton>
+                </div>
+              )}
             </div>
           </div>
         </GlassCard>

@@ -20,14 +20,33 @@ export const GameOverPage: React.FC = () => {
 
   const isHost = publicKey?.toBase58() === (gameState as any).hostWallet;
 
-  // Calculate per-player vote results
+  // Last-round vote summary (for display)
   const transparentVotes = Object.values(gameState.votes).filter((v) => v === 'transparent').length;
   const fakeVotes = Object.values(gameState.votes).filter((v) => v === 'fake').length;
   const totalVotesCast = transparentVotes + fakeVotes;
 
+  // Auto-calculate winner from scores: most transparent votes wins
+  const scores = gameState.scores ?? {};
+  const ranked = gameState.players
+    .filter((p) => scores[p.id])
+    .map((p) => ({
+      player: p,
+      score: scores[p.id],
+      honesty: scores[p.id].transparent / Math.max(scores[p.id].transparent + scores[p.id].fake, 1),
+    }))
+    .sort((a, b) => b.honesty - a.honesty);
+
+  const suggestedWinner = ranked[0]?.player ?? gameState.players[0];
+
+  // Pre-select the suggested winner on first render
+  React.useEffect(() => {
+    if (suggestedWinner && selectedWinners.length === 0) {
+      setSelectedWinners([suggestedWinner.id]);
+    }
+  }, [suggestedWinner?.id]);
+
   const handleToggleWinner = (playerId: string) => {
     if (isConfirmed) return;
-
     setSelectedWinners((prev) =>
       prev.includes(playerId)
         ? prev.filter((id) => id !== playerId)
@@ -123,31 +142,56 @@ export const GameOverPage: React.FC = () => {
       </GlassCard>
 
       <h3
-        className="text-white text-4xl font-bold mb-4"
+        className="text-white text-3xl font-bold mb-2"
         style={{ fontFamily: 'Plus Jakarta Sans, sans-serif' }}
       >
         {isHost ? 'Select Winner & Distribute' : 'Results'}
       </h3>
 
-      <div className="flex flex-wrap justify-center gap-8 mb-12">
+      {isHost && suggestedWinner && !isConfirmed && (
+        <p className="text-white/40 text-sm mb-6">
+          🤖 Auto-suggested: <span className="text-[#BFFB4F]">{suggestedWinner.name}</span> based on vote scores. Tap to change.
+        </p>
+      )}
+
+      <div className="flex flex-wrap justify-center gap-6 mb-10 w-full max-w-2xl">
         {gameState.players.map((player, index) => {
           const isSelected = selectedWinners.includes(player.id);
+          const isSuggested = player.id === suggestedWinner?.id;
           const winnings = isConfirmed && isSelected ? winningsPerPlayer : 0;
+          const playerScore = scores[player.id];
+          const total = playerScore ? playerScore.transparent + playerScore.fake : 0;
+          const honestyPct = total > 0 ? Math.round((playerScore.transparent / total) * 100) : null;
+
           return (
             <div
               key={player.id}
               onClick={() => isHost && handleToggleWinner(player.id)}
-              className={`backdrop-blur-md bg-black/80 px-8 py-6 rounded-3xl transition-all ${
+              className={`backdrop-blur-md bg-black/80 px-6 py-5 rounded-2xl transition-all flex flex-col items-center gap-2 min-w-[140px] ${
                 isHost && !isConfirmed ? 'cursor-pointer hover:bg-black/60' : ''
-              } ${isSelected ? 'ring-2 ring-[#BFFB4F]' : ''}`}
+              } ${isSelected ? 'ring-2 ring-[#BFFB4F] bg-[#BFFB4F]/5' : ''}`}
             >
+              {isSuggested && !isConfirmed && (
+                <span className="text-[#BFFB4F] text-xs font-bold uppercase tracking-widest">🏆 Top Pick</span>
+              )}
               <p
-                className="text-white text-2xl font-bold mb-2"
+                className="text-white text-xl font-bold"
                 style={{ fontFamily: 'Pixelify Sans, sans-serif' }}
               >
                 {player.name || `Player ${index + 1}`}
-                {isConfirmed && isSelected ? `: ${winnings.toFixed(2)} SOL` : ''}
               </p>
+              {playerScore && (
+                <div className="flex gap-3 text-sm">
+                  <span className="text-[#BFFB4F]">✅ {playerScore.transparent}</span>
+                  <span className="text-white/40">❌ {playerScore.fake}</span>
+                </div>
+              )}
+              {honestyPct !== null && (
+                <span className="text-white/30 text-xs">{honestyPct}% honest</span>
+              )}
+              {isConfirmed && isSelected && (
+                <span className="text-[#BFFB4F] font-bold text-sm">+{winnings.toFixed(2)} SOL</span>
+              )}
             </div>
           );
         })}
@@ -157,8 +201,16 @@ export const GameOverPage: React.FC = () => {
       {isHost && !isConfirmed && selectedWinners.length > 0 && (
         <div className="mb-8">
           <GlowButton onClick={handleConfirmDistribution} variant="neon">
-            {loading ? 'Distributing...' : `Distribute ${gameState.currentPot.toFixed(2)} SOL`}
+            {loading ? 'Distributing...' : `🏆 Crown Winner & Distribute ${gameState.currentPot.toFixed(2)} SOL`}
           </GlowButton>
+        </div>
+      )}
+
+      {isConfirmed && (
+        <div className="mb-8 text-center">
+          <p className="text-[#BFFB4F] text-2xl font-bold" style={{ fontFamily: 'Pixelify Sans, sans-serif' }}>
+            🎉 Pot distributed!
+          </p>
         </div>
       )}
 
