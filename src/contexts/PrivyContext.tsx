@@ -84,7 +84,9 @@ function WalletInner({ children }: { children: ReactNode }) {
     wallet: solanaWallet,
     publicKey,
     signTransaction,
-    connected: authenticated && !!publicKey,
+    // Gate on authenticated (not publicKey) — embedded wallet takes a moment
+    // to spin up after login; we don't want to block navigation on that race
+    connected: authenticated,
     login,
     logout,
     user,
@@ -108,7 +110,7 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         appearance: {
           theme: 'dark',
           accentColor: '#C4FF3C',
-          logo: 'https://transparent-five.vercel.app/favicon.png',
+          logo: 'https://transparent-five.vercel.app/logo.svg',
           showWalletLoginFirst: false,
           walletList: ['phantom', 'solflare', 'detected_wallets'],
         },

@@ -1,0 +1,13 @@
+<svg width="400" height="120" viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="120" rx="12" fill="#0D0D0D"/>
+  <text
+    x="200"
+    y="76"
+    font-family="'Space Grotesk', 'Inter', Arial, sans-serif"
+    font-size="48"
+    font-weight="800"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="-2"
+  >transparent</text>
+</svg>
