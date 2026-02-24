@@ -6,17 +6,20 @@
 
 /* ─── Tokens ─────────────────────────────────────────────── */
 :root {
-  --bg:        #0D0D0D;
-  --card:      #161616;
-  --card-2:    #1E1E1E;
-  --border:    #252525;
-  --border-2:  #333333;
+  --bg:        #0C1208;
+  --card:      #131A0F;
+  --card-2:    #1A2414;
+  --border:    #1F2E18;
+  --border-2:  #2A3D20;
   --text:      #F2F2F2;
-  --muted:     #555555;
-  --faint:     #2A2A2A;
+  --muted:     #5A6B52;
+  --faint:     #182112;
   --lime:      #C4FF3C;
   --lime-bg:   rgba(196, 255, 60, 0.08);
   --lime-border:rgba(196, 255, 60, 0.25);
+  --lavender:  #C4A8F0;
+  --lavender-bg:rgba(196, 168, 240, 0.08);
+  --lavender-border:rgba(196, 168, 240, 0.2);
   --red:       #FF4141;
   --red-bg:    rgba(255, 65, 65, 0.08);
   --red-border:rgba(255, 65, 65, 0.25);
@@ -32,12 +35,31 @@ html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: 'Space Grotesk', -apple-system, sans-serif;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 18% 28%, rgba(180, 140, 240, 0.18) 0%, transparent 52%),
+    radial-gradient(ellipse at 78% 72%, rgba(140, 200, 130, 0.07) 0%, transparent 45%),
+    radial-gradient(ellipse at 55% 10%, rgba(196, 168, 240, 0.08) 0%, transparent 38%);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
+
+/* Pixel grain overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.3;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+#root { position: relative; z-index: 1; }
 
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
