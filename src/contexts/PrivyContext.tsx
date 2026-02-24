@@ -21,7 +21,8 @@ export interface PrivyWallet {
   wallet: ConnectedWallet | null;
   publicKey: PublicKey | null;
   signTransaction: ((tx: Transaction) => Promise<Transaction>) | null;
-  connected: boolean;
+  connected: boolean;    // true when authenticated (gates navigation/UI)
+  walletReady: boolean;  // true when publicKey is available (gates on-chain ops)
   login: () => void;
   logout: () => Promise<void>;
   user: ReturnType<typeof usePrivy>['user'];
@@ -38,20 +39,38 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { logout } = useLogout();
   const { wallets } = useWallets();
 
-  // Prefer Solana embedded wallet (chainType='solana' + walletClientType='privy')
-  // Fall back to any external Solana wallet, then first available wallet
+  // Find the best Solana wallet available.
+  // Detection order:
+  //   1. Privy embedded Solana wallet (chainType='solana' + walletClientType='privy')
+  //   2. Any wallet where chainType or chain === 'solana'
+  //   3. Any wallet whose address is a valid Solana base58 pubkey
+  //   4. Privy embedded wallet (any chain) — last resort
   const solanaWallet = useMemo(() => {
     if (!wallets.length) return null;
+
     // 1. Privy Solana embedded wallet
     const embeddedSolana = wallets.find(
-      (w: any) => w.chainType === 'solana' && w.walletClientType === 'privy'
+      (w: any) =>
+        (w.chainType === 'solana' || w.chain === 'solana') &&
+        (w.walletClientType === 'privy' || w.type === 'privy')
     );
     if (embeddedSolana) return embeddedSolana;
-    // 2. Any external Solana wallet (Phantom, Solflare)
-    const externalSolana = wallets.find((w: any) => w.chainType === 'solana');
+
+    // 2. Any Solana wallet (external: Phantom, Solflare, etc.)
+    const externalSolana = wallets.find(
+      (w: any) => w.chainType === 'solana' || w.chain === 'solana'
+    );
     if (externalSolana) return externalSolana;
-    // 3. Fallback: ETH embedded wallet (for testing only)
-    return getEmbeddedConnectedWallet(wallets) ?? wallets[0] ?? null;
+
+    // 3. Any wallet whose address parses as a valid Solana pubkey
+    const solanaByAddress = wallets.find((w: any) => {
+      if (!w.address) return false;
+      try { new PublicKey(w.address); return true; } catch { return false; }
+    });
+    if (solanaByAddress) return solanaByAddress;
+
+    // 4. Privy embedded wallet (any chain — Ethereum embedded, last resort)
+    return getEmbeddedConnectedWallet(wallets) ?? null;
   }, [wallets]);
 
   const publicKey = useMemo(() => {
@@ -74,7 +93,6 @@ function WalletInner({ children }: { children: ReactNode }) {
   const signTransaction = useMemo(() => {
     if (!solanaWallet) return null;
     return async (tx: Transaction): Promise<Transaction> => {
-      // Privy v3 signTransaction accepts a Transaction and returns it signed
       const signed = await (solanaWallet as any).signTransaction(tx);
       return signed as Transaction;
     };
@@ -84,9 +102,11 @@ function WalletInner({ children }: { children: ReactNode }) {
     wallet: solanaWallet,
     publicKey,
     signTransaction,
-    // Gate on authenticated (not publicKey) — embedded wallet takes a moment
-    // to spin up after login; we don't want to block navigation on that race
+    // connected: gates navigation — true as soon as user is authenticated.
+    // Wallet creation is async; don't block UI navigation on it.
     connected: authenticated,
+    // walletReady: gates on-chain ops — true only when we have an actual pubkey.
+    walletReady: !!publicKey,
     login,
     logout,
     user,

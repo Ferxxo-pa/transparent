@@ -3,26 +3,24 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useGame } from '../contexts/GameContext';
 
 /**
- * Bridges the wallet adapter to the GameContext walletRef.
- * Sets walletRef whenever publicKey is available (connected).
- * signTransaction may be undefined on some wallets until first use — that's OK,
- * createGame only needs publicKey; signing is only needed for on-chain transfers.
+ * Bridges Privy wallet to GameContext walletRef.
+ * Uses walletReady (publicKey exists) rather than connected (authenticated)
+ * because GameContext needs an actual PublicKey to operate.
  */
 export function WalletBridge() {
-  const { publicKey, signTransaction, connected } = usePrivyWallet();
+  const { publicKey, signTransaction, walletReady } = usePrivyWallet();
   const { setWalletAdapter } = useGame();
 
   useEffect(() => {
-    if (connected && publicKey) {
+    if (walletReady && publicKey) {
       setWalletAdapter({
         publicKey,
-        // signTransaction may be undefined on first render; use a wrapper that re-resolves
-        signTransaction: signTransaction ?? (async (tx) => { throw new Error('Wallet does not support signTransaction'); }),
+        signTransaction: signTransaction ?? (async () => { throw new Error('Wallet does not support signTransaction'); }),
       });
     } else {
       setWalletAdapter(null);
     }
-  }, [connected, publicKey, signTransaction, setWalletAdapter]);
+  }, [walletReady, publicKey, signTransaction, setWalletAdapter]);
 
   return null;
 }

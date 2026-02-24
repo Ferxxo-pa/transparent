@@ -8,7 +8,7 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { joinGame, loading, error } = useGame();
-  const { displayName } = usePrivyWallet();
+  const { displayName, walletReady } = usePrivyWallet();
   const [code, setCode]         = useState('');
   const [nickname, setNickname] = useState('');
 
@@ -100,12 +100,12 @@ export const JoinGamePage: React.FC = () => {
         <motion.button
           className="btn btn-primary"
           onClick={handleJoin}
-          disabled={!canJoin || loading}
+          disabled={!canJoin || loading || !walletReady}
           whileTap={{ scale: 0.96 }}
           whileHover={canJoin && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         >
-          {loading ? 'Joining…' : canJoin ? 'Join Game →' : 'Enter Room Code'}
+          {!walletReady ? '⏳ Setting up wallet…' : loading ? 'Joining…' : canJoin ? 'Join Game →' : 'Enter Room Code'}
         </motion.button>
       </div>
     </div>

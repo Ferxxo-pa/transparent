@@ -20,7 +20,7 @@ const field = {
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
-  const { displayName } = usePrivyWallet();
+  const { displayName, walletReady } = usePrivyWallet();
 
   const [buyIn,    setBuyIn]    = useState('0');
   const [roomName, setRoomName] = useState('');
@@ -192,12 +192,12 @@ export const CreateGamePage: React.FC = () => {
         <motion.button
           className="btn btn-primary"
           onClick={handleCreate}
-          disabled={loading}
+          disabled={loading || !walletReady}
           whileTap={{ scale: 0.96 }}
           whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
           transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         >
-          {loading ? 'Creating…' : 'Create Game →'}
+          {!walletReady ? '⏳ Setting up wallet…' : loading ? 'Creating…' : 'Create Game →'}
         </motion.button>
       </div>
     </div>
