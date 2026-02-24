@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import {
   PrivyProvider as _PrivyProvider,
   usePrivy,
@@ -6,62 +6,48 @@ import {
   useLogout,
   type ConnectedWallet,
 } from '@privy-io/react-auth';
-import {
-  toSolanaWalletConnectors,
-  useCreateWallet,
-  useWallets as useSolanaWallets,
-} from '@privy-io/react-auth/solana';
+import { toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey, Transaction } from '@solana/web3.js';
 import { PRIVY_APP_ID } from '../lib/config';
 
 // ============================================================
-// Privy v3 Context — embedded wallets + social login
+// Privy handles AUTH (login/identity).
+// Wallet adapter handles WALLET (publicKey, signTransaction).
 // ============================================================
 
 export interface PrivyWallet {
   wallet: ConnectedWallet | null;
   publicKey: PublicKey | null;
   signTransaction: ((tx: Transaction) => Promise<Transaction>) | null;
-  connected: boolean;    // true when authenticated (gates navigation/UI)
-  walletReady: boolean;  // true when publicKey is available (gates on-chain ops)
+  connected: boolean;    // true when authenticated via Privy
+  walletReady: boolean;  // true when Solana wallet is connected via wallet adapter
   login: () => void;
   logout: () => Promise<void>;
-  setupWallet: () => Promise<void>; // manually trigger Solana wallet creation
+  setupWallet: () => Promise<void>;
   user: ReturnType<typeof usePrivy>['user'];
   displayName: string;
 }
 
 const PrivyWalletContext = createContext<PrivyWallet | undefined>(undefined);
 
-// ── Inner component (has access to Privy hooks) ───────────────
-
 function WalletInner({ children }: { children: ReactNode }) {
   const { user, authenticated, ready } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
 
-  // Use the Solana-specific useWallets — only returns actual Solana wallets
-  // (embedded Solana + external Phantom/Solflare), NOT Ethereum wallets
-  const { wallets: solanaWallets, ready: solanaReady } = useSolanaWallets();
-  const { createWallet: createSolanaWallet } = useCreateWallet();
+  // Wallet adapter — source of truth for Solana wallet
+  const { publicKey: adapterPubkey, signTransaction: adapterSign, connected: walletConnected } = useWallet();
 
-  // Auto-create Solana embedded wallet if none exists after login
-  useEffect(() => {
-    if (!ready || !authenticated || !solanaReady) return;
-    if (solanaWallets.length === 0) {
-      createSolanaWallet().catch(() => {
-        // Fails silently (user already has one, or dismissed modal)
-      });
-    }
-  }, [ready, authenticated, solanaReady, solanaWallets.length]);
+  const publicKey = adapterPubkey ?? null;
 
-  // Pick the first available Solana wallet
-  const solanaWallet = solanaWallets[0] ?? null;
-
-  const publicKey = useMemo(() => {
-    if (!solanaWallet?.address) return null;
-    try { return new PublicKey(solanaWallet.address); } catch { return null; }
-  }, [solanaWallet?.address]);
+  const signTransaction = useMemo(() => {
+    if (!adapterSign || !publicKey) return null;
+    return async (tx: Transaction): Promise<Transaction> => {
+      const signed = await adapterSign(tx);
+      return signed;
+    };
+  }, [adapterSign, publicKey]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
@@ -75,33 +61,21 @@ function WalletInner({ children }: { children: ReactNode }) {
     return 'Player';
   }, [ready, authenticated, user, publicKey]);
 
-  // Bridge Standard Wallet signTransaction (Uint8Array) → web3.js Transaction
-  const signTransaction = useMemo(() => {
-    if (!solanaWallet || !publicKey) return null;
-    return async (tx: Transaction): Promise<Transaction> => {
-      // Serialize to Uint8Array (Standard Wallet interface)
-      const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-      const result = await solanaWallet.signTransaction({ transaction: serialized });
-      return Transaction.from(result.signedTransaction);
-    };
-  }, [solanaWallet, publicKey]);
-
-  const setupWallet = async () => {
-    try { await createSolanaWallet(); } catch { /* already exists or dismissed */ }
-  };
+  // setupWallet: open wallet adapter modal (noop — handled by WalletSetupGate UI)
+  const setupWallet = async () => {};
 
   const value: PrivyWallet = useMemo(() => ({
-    wallet: solanaWallet as any,
+    wallet: null,
     publicKey,
     signTransaction,
     connected: authenticated,
-    walletReady: !!publicKey,
+    walletReady: walletConnected && !!publicKey,
     login,
     logout,
     setupWallet,
     user,
     displayName,
-  }), [solanaWallet, publicKey, signTransaction, authenticated, login, logout, user, displayName]);
+  }), [publicKey, signTransaction, authenticated, walletConnected, login, logout, user, displayName]);
 
   return (
     <PrivyWalletContext.Provider value={value}>
@@ -109,8 +83,6 @@ function WalletInner({ children }: { children: ReactNode }) {
     </PrivyWalletContext.Provider>
   );
 }
-
-// ── Root provider ─────────────────────────────────────────────
 
 export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   return (
@@ -127,13 +99,11 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         },
         loginMethods: ['email', 'google', 'apple', 'wallet'],
         embeddedWallets: {
-          solana: {
-            createOnLogin: 'all-users',
-          },
+          solana: { createOnLogin: 'off' },
         },
         externalWallets: {
           solana: {
-            connectors: toSolanaWalletConnectors({ shouldAutoConnect: true }),
+            connectors: toSolanaWalletConnectors({ shouldAutoConnect: false }),
           },
         },
       }}

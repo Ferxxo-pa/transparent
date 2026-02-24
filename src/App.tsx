@@ -1,6 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { clusterApiUrl } from '@solana/web3.js';
 import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
@@ -79,16 +83,23 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
+  const wallets  = useMemo(() => [new PhantomWalletAdapter(), new SolflareWalletAdapter()], []);
+
   return (
-    <PrivyWalletProvider>
-      <GameProvider>
-        <WalletBridge />
-        <Router>
-          <Background />
-          <AnimatedRoutes />
-        </Router>
-      </GameProvider>
-    </PrivyWalletProvider>
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <PrivyWalletProvider>
+          <GameProvider>
+            <WalletBridge />
+            <Router>
+              <Background />
+              <AnimatedRoutes />
+            </Router>
+          </GameProvider>
+        </PrivyWalletProvider>
+      </WalletProvider>
+    </ConnectionProvider>
   );
 }
 
