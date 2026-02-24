@@ -188,7 +188,18 @@ export const GamePlayPage: React.FC = () => {
             <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
               Answer out loud. Others are voting on whether you're being honest.
             </p>
-            {votesIn > 0 && (
+            {total === 1 ? (
+              // Single-player: no one else to vote, host advances manually
+              <motion.button
+                className="btn btn-secondary"
+                style={{ marginTop: 16 }}
+                onClick={forceAdvanceRound}
+                whileTap={{ scale: 0.96 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+              >
+                Next →
+              </motion.button>
+            ) : votesIn > 0 && (
               <div style={{ marginTop: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
                   <span style={{ color: 'var(--muted)' }}>Votes in</span>

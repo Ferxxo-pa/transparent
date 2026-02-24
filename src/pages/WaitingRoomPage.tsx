@@ -102,7 +102,7 @@ export const WaitingRoomPage: React.FC = () => {
               Start Game →
             </motion.button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-              Need at least 2 players
+              Start with any number of players
             </p>
           </>
         ) : (

@@ -437,8 +437,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const startGame = useCallback(async () => {
     if (!gameState) return;
 
-    if (gameState.players.length < 2) {
-      setError('Need at least 2 players to start');
+    if (gameState.players.length < 1) {
+      setError('Need at least 1 player to start');
       return;
     }
 
