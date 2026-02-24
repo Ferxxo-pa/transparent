@@ -487,6 +487,11 @@ textarea.textarea::placeholder { color: var(--muted); }
 .lb-row.selectable:hover { border-color: var(--border-2); }
 
 /* ─── Animations ─────────────────────────────────────────── */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }

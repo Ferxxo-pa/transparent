@@ -9,6 +9,7 @@ import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
 import { WalletBridge } from './components/WalletBridge';
+import { WalletHeader } from './components/WalletHeader';
 import { Background } from './components/Background';
 import { HomePage } from './pages/HomePage';
 import { JoinGamePage } from './pages/JoinGamePage';
@@ -64,20 +65,22 @@ function AnimatedRoutes() {
   const location = useLocation();
   return (
     <>
-    <GameRedirect />
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        <Route path="/"        element={<PageWrap><HomePage /></PageWrap>} />
-        <Route path="/join"    element={<PageWrap><JoinGamePage /></PageWrap>} />
-        <Route path="/create"  element={<PageWrap><CreateGamePage /></PageWrap>} />
-        <Route path="/created" element={<PageWrap><GameCreatedPage /></PageWrap>} />
-        <Route path="/waiting" element={<PageWrap><WaitingRoomPage /></PageWrap>} />
-        <Route path="/game"    element={<PageWrap><GamePlayPage /></PageWrap>} />
-        <Route path="/gameover"element={<PageWrap><GameOverPage /></PageWrap>} />
-        <Route path="/waitlist" element={<PageWrap><WaitlistPage /></PageWrap>} />
-        <Route path="/login"   element={<PageWrap><HomePage /></PageWrap>} />
-      </Routes>
-    </AnimatePresence>
+      <GameRedirect />
+      {/* Global wallet pill — top-right on every page */}
+      <WalletHeader />
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/"         element={<PageWrap><HomePage /></PageWrap>} />
+          <Route path="/join"     element={<PageWrap><JoinGamePage /></PageWrap>} />
+          <Route path="/create"   element={<PageWrap><CreateGamePage /></PageWrap>} />
+          <Route path="/created"  element={<PageWrap><GameCreatedPage /></PageWrap>} />
+          <Route path="/waiting"  element={<PageWrap><WaitingRoomPage /></PageWrap>} />
+          <Route path="/game"     element={<PageWrap><GamePlayPage /></PageWrap>} />
+          <Route path="/gameover" element={<PageWrap><GameOverPage /></PageWrap>} />
+          <Route path="/waitlist" element={<PageWrap><WaitlistPage /></PageWrap>} />
+          <Route path="/login"    element={<PageWrap><HomePage /></PageWrap>} />
+        </Routes>
+      </AnimatePresence>
     </>
   );
 }
