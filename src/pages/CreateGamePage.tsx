@@ -80,12 +80,33 @@ export const CreateGamePage: React.FC = () => {
           {/* Buy-in */}
           <motion.div variants={field}>
             <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
+            {/* Presets */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+              {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => (
+                <button
+                  key={preset}
+                  onClick={() => setBuyIn(preset)}
+                  style={{
+                    padding: '5px 14px',
+                    borderRadius: 'var(--r-pill)',
+                    border: `1px solid ${buyIn === preset ? 'var(--lime)' : 'var(--border)'}`,
+                    background: buyIn === preset ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
+                    color: buyIn === preset ? 'var(--lime)' : 'var(--muted)',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: 'Space Grotesk',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {preset === '0' ? 'Free' : `${preset} SOL`}
+                </button>
+              ))}
+            </div>
             <input
               className="input"
               type="number" min="0" step="0.01"
               value={buyIn}
               onChange={e => setBuyIn(e.target.value)}
-              placeholder="0 for free game"
+              placeholder="or enter custom amount"
             />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
               {parseFloat(buyIn) > 0 ? `Each player puts in ${buyIn} SOL · winner takes everything` : 'Free game · no entry fee'}
