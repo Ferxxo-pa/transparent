@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -28,24 +29,34 @@ export const JoinGamePage: React.FC = () => {
   return (
     <div className="page fade-in">
       <nav className="navbar">
-        <button
+        <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
+          whileTap={{ scale: 0.95 }}
         >
           <ArrowLeft size={15} /> Back
-        </button>
+        </motion.button>
         <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>{displayName}</span>
       </nav>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1, justifyContent: 'center', paddingBottom: 80 }}>
+      <motion.div
+        style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1, justifyContent: 'center', paddingBottom: 80 }}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+      >
         <div>
           <div className="heading">Join a room</div>
           <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>Enter the code from the host</p>
         </div>
 
         {/* Code input — hero element */}
-        <div>
-          <p className="label" style={{ marginBottom: 10 }}>Room Code</p>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.94 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 320, damping: 24, delay: 0.1 }}
+        >
+          <p className="label-cipher" style={{ marginBottom: 10 }}>Room Code</p>
           <input
             className="input-code"
             value={code}
@@ -55,11 +66,15 @@ export const JoinGamePage: React.FC = () => {
             inputMode="numeric"
             autoFocus
           />
-        </div>
+        </motion.div>
 
         {/* Nickname */}
-        <div>
-          <p className="label" style={{ marginBottom: 8 }}>Your Name</p>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 26, delay: 0.18 }}
+        >
+          <p className="label-cipher" style={{ marginBottom: 8 }}>Your Name</p>
           <input
             className="input"
             type="text"
@@ -68,24 +83,30 @@ export const JoinGamePage: React.FC = () => {
             placeholder="What should people call you?"
             maxLength={18}
           />
-        </div>
+        </motion.div>
 
         {error && (
-          <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13 }}>
-            {error}
-          </div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+            style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13 }}
+          >
+            ⚠️ {error}
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Sticky CTA */}
       <div style={{ width: '100%', paddingTop: 8 }}>
-        <button
+        <motion.button
           className="btn btn-primary"
           onClick={handleJoin}
           disabled={!canJoin || loading}
+          whileTap={{ scale: 0.96 }}
+          whileHover={canJoin && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
+          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
         >
-          {loading ? 'Joining…' : canJoin ? 'Join Game' : 'Enter Room Code'}
-        </button>
+          {loading ? 'Joining…' : canJoin ? 'Join Game →' : 'Enter Room Code'}
+        </motion.button>
       </div>
     </div>
   );
