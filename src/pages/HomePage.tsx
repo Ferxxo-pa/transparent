@@ -22,7 +22,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
     }}>
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '28px 0 0' }}>
-        <img src="/logo.svg" alt="Transparent" style={{ height: 36, objectFit: 'contain' }} />
+        <img src="/logo-glass.svg" alt="Transparent" style={{ height: 40, objectFit: 'contain' }} />
         {/* Wallet pill handled by WalletHeader (global overlay) */}
       </div>
 
