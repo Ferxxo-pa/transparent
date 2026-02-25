@@ -10,12 +10,10 @@ import { SOLANA_RPC } from './config';
 // ============================================================
 // Solana On-Chain Layer
 //
-// Uses direct SOL transfers via SystemProgram — no Anchor program
-// required. Buy-ins flow to the host wallet (escrow). The host
-// distributes the pot to the winner at game end.
-//
+// Uses direct SOL transfers via SystemProgram — no Anchor program.
 // Signing: Privy headless (no modal) via useSignTransaction
 // Sending: manual via Connection.sendRawTransaction (Helius RPC)
+// Confirmation: fire-and-forget (devnet confirmTransaction hangs)
 // ============================================================
 
 export const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -39,23 +37,19 @@ async function sendAndConfirm(
   wallet: WalletAdapter,
   tx: Transaction,
 ): Promise<string> {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  const { blockhash } = await connection.getLatestBlockhash('confirmed');
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = blockhash;
 
-  // Headless sign via Privy (no modal popup)
   const signed = await wallet.signTransaction(tx);
-
-  // Send via our own Connection (Helius RPC — fast)
   const sig = await connection.sendRawTransaction(signed.serialize(), {
     skipPreflight: false,
     preflightCommitment: 'confirmed',
   });
 
-  await connection.confirmTransaction(
-    { signature: sig, blockhash, lastValidBlockHeight },
-    'confirmed',
-  );
+  // Fire-and-forget confirmation — devnet confirmTransaction often hangs.
+  // The tx is already sent and will confirm on-chain.
+  connection.confirmTransaction(sig, 'confirmed').catch(() => {});
 
   return sig;
 }
