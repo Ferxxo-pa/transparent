@@ -1,10 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
-import { clusterApiUrl } from '@solana/web3.js';
 import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
@@ -20,25 +16,17 @@ import { GamePlayPage } from './pages/GamePlayPage';
 import { GameOverPage } from './pages/GameOverPage';
 import { WaitlistPage } from './pages/WaitlistPage';
 
-// ── Page transition wrapper ────────────────────────────────
 export const pageVariants = {
   initial: { opacity: 0, y: 28, scale: 0.97 },
   in:      { opacity: 1, y: 0,  scale: 1    },
   out:     { opacity: 0, y: -20, scale: 0.97 },
 };
 
-export const pageTransition = {
-  type: 'spring',
-  stiffness: 320,
-  damping: 30,
-};
+export const pageTransition = { type: 'spring', stiffness: 320, damping: 30 };
 
 export const PageWrap = ({ children }: { children: React.ReactNode }) => (
   <motion.div
-    variants={pageVariants}
-    initial="initial"
-    animate="in"
-    exit="out"
+    variants={pageVariants} initial="initial" animate="in" exit="out"
     transition={pageTransition}
     style={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
   >
@@ -66,7 +54,6 @@ function AnimatedRoutes() {
   return (
     <>
       <GameRedirect />
-      {/* Global wallet pill — top-right on every page */}
       <WalletHeader />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
@@ -86,28 +73,16 @@ function AnimatedRoutes() {
 }
 
 function App() {
-  const endpoint = useMemo(() => clusterApiUrl('devnet'), []);
-  const wallets = useMemo(() => [
-    new PhantomWalletAdapter(),
-    new SolflareWalletAdapter(),
-  ], []);
-
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <PrivyWalletProvider>
-            <GameProvider>
-              <WalletBridge />
-              <Router>
-                <Background />
-                <AnimatedRoutes />
-              </Router>
-            </GameProvider>
-          </PrivyWalletProvider>
-        </WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <PrivyWalletProvider>
+      <GameProvider>
+        <WalletBridge />
+        <Router>
+          <Background />
+          <AnimatedRoutes />
+        </Router>
+      </GameProvider>
+    </PrivyWalletProvider>
   );
 }
 

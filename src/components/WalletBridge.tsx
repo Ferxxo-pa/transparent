@@ -3,19 +3,20 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useGame } from '../contexts/GameContext';
 
 /**
- * Syncs the active Privy Solana wallet (embedded or Phantom) into GameContext.
+ * Syncs Privy wallet state into GameContext.
+ * No wallet adapter — pure Privy.
  */
 export function WalletBridge() {
   const { publicKey, signTransaction } = usePrivyWallet();
-  const { setWalletAdapter } = useGame();
+  const { setWallet } = useGame();
 
   useEffect(() => {
     if (publicKey && signTransaction) {
-      setWalletAdapter({ publicKey, signTransaction });
+      setWallet({ publicKey, signTransaction });
     } else {
-      setWalletAdapter(null);
+      setWallet(null);
     }
-  }, [publicKey, signTransaction, setWalletAdapter]);
+  }, [publicKey, signTransaction, setWallet]);
 
   return null;
 }
