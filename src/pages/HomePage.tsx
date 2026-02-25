@@ -182,9 +182,11 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
-      {/* Logo — same row as wallet pill */}
-      <div style={{ width: '100%', paddingTop: 2 }}>
+      {/* Logo + spacer for wallet pill row */}
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 38, marginBottom: 12 }}>
         <img src="/logo-glass.svg" alt="Transparent" style={{ height: 38, objectFit: 'contain' }} />
+        {/* Right side reserved for wallet pill (absolute positioned) */}
+        <div style={{ width: 200 }} />
       </div>
 
       <motion.div
