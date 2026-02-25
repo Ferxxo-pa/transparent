@@ -32,8 +32,11 @@ export const WaitlistPage: React.FC = () => {
   };
 
   return (
-    <div className="page fade-in" style={{ maxWidth: 480 }}>
-      <nav className="navbar">
+    <div className="page fade-in">
+      {/* Spacer for wallet pill row */}
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
+
+      <div style={{ width: '100%', marginBottom: 8 }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
@@ -41,7 +44,7 @@ export const WaitlistPage: React.FC = () => {
         >
           <ArrowLeft size={15} /> Back
         </motion.button>
-      </nav>
+      </div>
 
       <motion.div
         style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1 }}

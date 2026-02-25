@@ -59,7 +59,10 @@ export const GameOverPage: React.FC = () => {
 
   return (
     <div className="page fade-in">
-      <nav className="navbar">
+      {/* Spacer for wallet pill row */}
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
+
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em' }}>
           {confirmed ? '🎉 Game Over' : 'Game Over'}
         </span>
@@ -70,7 +73,7 @@ export const GameOverPage: React.FC = () => {
         >
           New Game
         </button>
-      </nav>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 

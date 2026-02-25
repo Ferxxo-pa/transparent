@@ -98,7 +98,7 @@ body::before {
 /* Mobile: center the narrow page column */
 @media (max-width: 1023px) {
   body { display: flex; justify-content: center; }
-  .page { width: min(480px, 100%); padding: 0 20px 48px; }
+  .page { width: min(480px, 100%); padding: 0 20px 48px; padding-top: 0; }
 }
 
 /* ─── Navbar ─────────────────────────────────────────────── */
@@ -107,14 +107,8 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 0 12px;
+  padding: 4px 0 0;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(to bottom, rgba(8,12,6,0.7) 0%, transparent 100%);
-  backdrop-filter: var(--blur-sm);
-  -webkit-backdrop-filter: var(--blur-sm);
 }
 
 /* ─── Cards ──────────────────────────────────────────────── */

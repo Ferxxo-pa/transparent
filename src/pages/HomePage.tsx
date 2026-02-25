@@ -20,10 +20,8 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
       padding: '0 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
       position: 'relative', zIndex: 1,
     }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '28px 0 0' }}>
-        <img src="/logo-glass.svg" alt="Transparent" style={{ height: 72, objectFit: 'contain' }} />
-      </div>
+      {/* Top spacer */}
+      <div style={{ padding: '28px 0 0' }} />
 
       {/* Main grid */}
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', paddingTop: 40 }}>

@@ -37,17 +37,21 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Shared Navbar ──────────────────────────────────────────
   const Nav = () => (
-    <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
-      <span className="chip chip-lavender">Round {round} / {total}</span>
-      {isHost && (
-        <button
-          onClick={endGameNow}
-          style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
-        >
-          End Game
-        </button>
-      )}
-    </nav>
+    <>
+      {/* Spacer for wallet pill row */}
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+        <span className="chip chip-lavender">Round {round} / {total}</span>
+        {isHost && (
+          <button
+            onClick={endGameNow}
+            style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500 }}
+          >
+            End Game
+          </button>
+        )}
+      </div>
+    </>
   );
 
   // ── Hot Seat Banner ────────────────────────────────────────

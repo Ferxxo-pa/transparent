@@ -59,11 +59,12 @@ export const WaitingRoomPage: React.FC = () => {
 
   return (
     <div className="page fade-in">
-      <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
-        <span className="chip chip-lime blink">● Waiting</span>
-      </nav>
+      {/* Spacer for wallet pill row */}
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
 
-      <div style={{ height: 12 }} />
+      <div style={{ width: '100%', marginBottom: 8 }}>
+        <span className="chip chip-lime blink">● Waiting</span>
+      </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 
