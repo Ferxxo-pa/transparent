@@ -13,7 +13,9 @@ export const GamePlayPage: React.FC = () => {
 
   const myWallet = publicKey?.toBase58() ?? '';
   const isHost   = myWallet === (gameState as any)?.hostWallet;
+  const isHotSeat = myWallet === gameState?.currentPlayerInHotSeat;
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [autoAdvanced, setAutoAdvanced] = useState<number | null>(null);
 
   useEffect(() => {
     if (gameState?.gameStatus === 'gameover') navigate('/gameover');
@@ -27,23 +29,21 @@ export const GamePlayPage: React.FC = () => {
   }, [gameState?.gameStatus, pollGameState]);
 
   // Auto-advance when host detects all votes are in
-  const [autoAdvanced, setAutoAdvanced] = useState<number | null>(null);
   useEffect(() => {
     if (!gameState || !isHost || gameState.gameStatus !== 'playing') return;
     const currentRound = gameState.currentRound ?? 0;
-    if (autoAdvanced === currentRound) return; // already advanced this round
+    if (autoAdvanced === currentRound) return;
     const hotSeatWallet = gameState.currentPlayerInHotSeat;
     const eligible = gameState.players.filter(p => p.id !== hotSeatWallet).length;
     const needed = Math.max(eligible, 1);
-    if (gameState.voteCount >= needed && needed > 0 && !isHotSeat) {
-      // Small delay so vote results are visible before advancing
+    if (gameState.voteCount >= needed && needed > 0) {
       const timer = setTimeout(() => {
         setAutoAdvanced(currentRound);
         forceAdvanceRound();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [gameState?.voteCount, gameState?.currentRound, isHost, isHotSeat, autoAdvanced, forceAdvanceRound]);
+  }, [gameState?.voteCount, gameState?.currentRound, isHost, autoAdvanced, forceAdvanceRound]);
 
   const advance = useCallback(() => {
     if (isHost) advanceHotTakePhase();
@@ -53,7 +53,6 @@ export const GamePlayPage: React.FC = () => {
 
   const player     = gameState.players.find(p => p.id === gameState.currentPlayerInHotSeat);
   const hasVoted   = !!gameState.votes[myWallet];
-  const isHotSeat  = myWallet === gameState.currentPlayerInHotSeat;
   const isHotTake  = gameState.questionMode === 'hot-take';
   const phase      = gameState.gamePhase;
   const round      = (gameState.currentRound ?? 0) + 1;
