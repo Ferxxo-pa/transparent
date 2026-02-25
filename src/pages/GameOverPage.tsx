@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -54,16 +54,10 @@ export const GameOverPage: React.FC = () => {
   return (
     <div className="page fade-in">
       {/* Top row */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
         <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em' }}>
           {confirmed ? '🎉 Game Over' : 'Game Over'}
         </span>
-        <button
-          onClick={() => { resetGame(); navigate('/'); }}
-          style={{ display: 'flex', alignItems: 'center', height: 32, padding: '0 14px', background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', cursor: 'pointer', color: 'var(--muted)', fontSize: 12, fontFamily: 'Space Grotesk', fontWeight: 600 }}
-        >
-          New Game
-        </button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
@@ -207,35 +201,30 @@ export const GameOverPage: React.FC = () => {
       </div>
 
       {/* CTA */}
-      <div style={{ width: '100%', paddingTop: 16, paddingBottom: 8 }}>
-        <AnimatePresence mode="wait">
-          {isHost && !confirmed ? (
-            <motion.button
-              key="distribute"
-              className="btn btn-primary"
-              onClick={distribute}
-              disabled={distributing || !activeWinner}
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              whileTap={{ scale: 0.96 }}
-              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
-            >
-              {distributing ? 'Sending…' : gameState.buyInAmount > 0
-                ? `Send ${gameState.currentPot.toFixed(2)} SOL → ${winnerPlayer?.name ?? 'Winner'}`
-                : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
-              }
-            </motion.button>
-          ) : (
-            <motion.button
-              key="again"
-              className="btn btn-secondary"
-              onClick={() => { resetGame(); navigate('/'); }}
-              initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-              whileTap={{ scale: 0.96 }}
-            >
-              Play Again
-            </motion.button>
-          )}
-        </AnimatePresence>
+      <div style={{ width: '100%', paddingTop: 16, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {isHost && !confirmed && (
+          <motion.button
+            className="btn btn-primary"
+            onClick={distribute}
+            disabled={distributing || !activeWinner}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+          >
+            {distributing ? 'Sending…' : gameState.buyInAmount > 0
+              ? `Send ${gameState.currentPot.toFixed(2)} SOL → ${winnerPlayer?.name ?? 'Winner'}`
+              : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
+            }
+          </motion.button>
+        )}
+        <motion.button
+          className="btn btn-secondary"
+          onClick={() => { resetGame(); navigate('/'); }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          whileTap={{ scale: 0.96 }}
+        >
+          Return Home
+        </motion.button>
       </div>
     </div>
   );

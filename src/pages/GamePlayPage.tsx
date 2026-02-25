@@ -37,16 +37,8 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Top bar ────────────────────────────────────────────────
   const TopBar = () => (
-    <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
+    <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
       <span className="chip chip-lavender" style={{ fontSize: 11 }}>Round {round}/{total}</span>
-      {isHost && (
-        <button
-          onClick={endGameNow}
-          style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 600 }}
-        >
-          End Game
-        </button>
-      )}
     </div>
   );
 
@@ -278,6 +270,15 @@ export const GamePlayPage: React.FC = () => {
         )}
 
         <Scores />
+
+        {isHost && (
+          <button
+            onClick={endGameNow}
+            style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500, padding: '12px 0', alignSelf: 'center' }}
+          >
+            End Game
+          </button>
+        )}
       </div>
     </div>
   );

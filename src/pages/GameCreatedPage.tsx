@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Copy, Check, Users } from 'lucide-react';
+import { Copy, Check } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -49,12 +49,8 @@ export const GameCreatedPage: React.FC = () => {
   return (
     <div className="page fade-in">
       {/* Top row: status + player count */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
         <span className="chip chip-lime blink" style={{ fontSize: 11 }}>● Lobby</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)', fontSize: 12, fontWeight: 600 }}>
-          <Users size={13} />
-          {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''}
-        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
