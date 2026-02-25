@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, TrendingUp, Coins } from 'lucide-react';
+import { Copy, Check, TrendingUp, Coins, RefreshCw } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -10,7 +10,7 @@ const LAMPORTS = 1_000_000_000;
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame } = useGame();
+  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame, refreshPlayers } = useGame();
   const { publicKey, displayName } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
 
@@ -26,6 +26,13 @@ export const WaitingRoomPage: React.FC = () => {
   useEffect(() => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
   }, [gameState?.gameStatus, navigate]);
+
+  // Auto-refresh players every 5s as fallback for Realtime
+  useEffect(() => {
+    if (!gameState || gameState.gameStatus !== 'waiting') return;
+    const interval = setInterval(() => { refreshPlayers(); }, 5000);
+    return () => clearInterval(interval);
+  }, [gameState?.gameStatus, refreshPlayers]);
 
   if (!gameState) { navigate('/'); return null; }
 
@@ -90,8 +97,14 @@ export const WaitingRoomPage: React.FC = () => {
 
         {/* Players */}
         <div>
-          <div className="section-header" style={{ marginBottom: 10 }}>
+          <div className="section-header" style={{ marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <p className="label-cipher">Players</p>
+            <button
+              onClick={refreshPlayers}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'Space Grotesk' }}
+            >
+              <RefreshCw size={12} /> Refresh
+            </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {gameState.players.map((p, i) => {

@@ -55,6 +55,7 @@ interface GameContextType {
   forceAdvanceRound: () => Promise<void>;
   endGameNow: () => Promise<void>;
   leaveGame: () => Promise<void>;
+  refreshPlayers: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
@@ -867,6 +868,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
   }, [gameState?.gameId]);
 
+  // ── Refresh Players (manual fallback if realtime fails) ──
+
+  const refreshPlayers = useCallback(async () => {
+    const gameId = gameIdRef.current;
+    if (!gameId) return;
+    try {
+      const players = await getPlayersForGame(gameId);
+      console.log('[Manual refresh] players:', players.length);
+      setGameState(prev => {
+        if (!prev) return prev;
+        const hostWallet = prev.hostWallet ?? '';
+        const mapped = playerRowsToPlayers(players, hostWallet);
+        return { ...prev, players: mapped, currentPot: mapped.length * prev.buyInAmount, totalVotes: mapped.length };
+      });
+    } catch (err) {
+      console.error('refreshPlayers error:', err);
+    }
+  }, []);
+
   // ── Leave Game (remove player from DB + reset local) ────
 
   const leaveGame = useCallback(async () => {
@@ -1024,6 +1044,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         forceAdvanceRound,
         endGameNow,
         leaveGame,
+        refreshPlayers,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,
