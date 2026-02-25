@@ -55,7 +55,7 @@ export const CreateGamePage: React.FC = () => {
         >
           <ArrowLeft size={15} /> Back
         </motion.button>
-        <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}>{displayName}</span>
+        {/* Handled by WalletHeader */}
       </nav>
 
       <motion.div

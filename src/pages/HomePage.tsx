@@ -25,21 +25,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
         <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em' }}>
           transparent
         </span>
-        {connected && (
-          <motion.button
-            className="btn-ghost"
-            onClick={logout}
-            whileTap={btnTap}
-            style={{
-              display: 'flex', alignItems: 'center', height: 36, padding: '0 16px',
-              background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-pill)', fontSize: 13, fontWeight: 600,
-              cursor: 'pointer', fontFamily: 'Space Grotesk',
-            }}
-          >
-            {displayName}
-          </motion.button>
-        )}
+        {/* Wallet pill handled by WalletHeader (global overlay) */}
       </div>
 
       {/* Main grid */}
@@ -199,19 +185,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
-      {connected && (
-        <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', padding: '16px 0 0', position: 'relative', zIndex: 2 }}>
-          <motion.button
-            className="btn-ghost"
-            onClick={logout}
-            whileTap={btnTap}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            style={{ display: 'flex', alignItems: 'center', height: 34, padding: '0 14px', background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk' }}
-          >
-            {displayName}
-          </motion.button>
-        </div>
-      )}
+      {/* Wallet pill handled by WalletHeader (global overlay) */}
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
