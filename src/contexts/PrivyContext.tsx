@@ -124,12 +124,9 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         appearance: {
           theme: 'dark',
           accentColor: '#C4FF3C',
-          logo: 'https://transparent-five.vercel.app/logo-glass.svg',
           showWalletLoginFirst: false,
-          walletChainType: 'solana-only',
-          walletList: ['phantom', 'solflare', 'detected_wallets'],
         },
-        loginMethods: ['email', 'google', 'apple', 'wallet'],
+        loginMethods: ['email', 'google', 'apple'],
         embeddedWallets: {
           solana: {
             createOnLogin: 'all-users',
