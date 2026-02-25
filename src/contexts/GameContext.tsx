@@ -868,6 +868,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     gameIdRef.current = null;
     setGameState(null);
     setError(null);
+    setLoading(false);
   }, []);
 
   // ── Prediction Market ────────────────────────────────────
