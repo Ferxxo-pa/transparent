@@ -136,10 +136,15 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         },
         solanaClusters: [
           {
-            name: SOLANA_NETWORK,
+            name: 'devnet',
+            rpcUrl: SOLANA_RPC,
+          },
+          {
+            name: 'mainnet-beta',
             rpcUrl: SOLANA_RPC,
           },
         ],
+        defaultChain: 'solana:devnet' as any,
 
       }}
     >
