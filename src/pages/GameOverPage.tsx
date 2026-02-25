@@ -124,7 +124,7 @@ export const GameOverPage: React.FC = () => {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <p className="label-cipher">
-              {isHonestTalkers ? 'Honest Talkers' : isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
+              {isHonestTalkers ? 'Split Pot' : isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
             </p>
             {isHost && !confirmed && ranked[0] && (
               <span style={{ fontSize: 10, color: 'var(--muted)' }}>
