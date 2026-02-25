@@ -7,7 +7,6 @@ import {
 } from '@privy-io/react-auth';
 import {
   useWallets as useSolanaWallets,
-  useSignTransaction,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
@@ -20,8 +19,9 @@ import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 // Email/Google/Apple users → embedded Solana wallet (auto)
 // Phantom/Solflare users  → connected via Privy's wallet login
 //
-// Signing: useSignTransaction with showWalletUIs: false (headless)
-// Sending: manual via @solana/web3.js Connection (fast Helius RPC)
+// Signing: Use wallet.signTransaction() directly on the
+// ConnectedStandardSolanaWallet object — bypasses the React hook
+// and its UI modal. We then send manually via Connection.
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -49,7 +49,6 @@ function WalletInner({ children }: { children: ReactNode }) {
 
   // All Solana wallets managed by Privy (embedded + connected external)
   const { wallets } = useSolanaWallets();
-  const { signTransaction: privySign } = useSignTransaction();
 
   // Pick the best wallet: prefer embedded (always available), fallback to external
   const activeWallet = useMemo(() => {
@@ -69,7 +68,7 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Headless sign — no Privy modal, just sign and return
+  // Direct sign via wallet object — no React hook, no modal
   const signTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<Transaction> => {
@@ -77,15 +76,17 @@ function WalletInner({ children }: { children: ReactNode }) {
         requireAllSignatures: false,
         verifySignatures: false,
       });
-      const { signedTransaction } = await privySign({
+
+      // Use the wallet's signTransaction method directly
+      // This bypasses useSignTransaction hook and its UI modal
+      const result = await activeWallet.signTransaction({
         transaction: serialized,
-        wallet: activeWallet,
         chain: 'solana:devnet',
-        
       });
-      return Transaction.from(signedTransaction);
+
+      return Transaction.from(result.signedTransaction);
     };
-  }, [activeWallet, publicKey, privySign]);
+  }, [activeWallet, publicKey]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
