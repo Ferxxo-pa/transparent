@@ -31,7 +31,7 @@ export const JoinGamePage: React.FC = () => {
     <WalletSetupGate>
     <div className="page fade-in">
       {/* Top spacing */}
-      <div style={{ width: '100%', paddingTop: 48, marginBottom: 8 }}>
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 8 }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}

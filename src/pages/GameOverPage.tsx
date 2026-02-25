@@ -54,7 +54,7 @@ export const GameOverPage: React.FC = () => {
   return (
     <div className="page fade-in">
       {/* Top row */}
-      <div style={{ width: '100%', paddingTop: 48, marginBottom: 12 }}>
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
         <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.02em' }}>
           {confirmed ? '🎉 Game Over' : 'Game Over'}
         </span>

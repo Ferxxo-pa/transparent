@@ -60,7 +60,7 @@ export const WaitingRoomPage: React.FC = () => {
   return (
     <div className="page fade-in">
       {/* Top row */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 48, marginBottom: 12 }}>
+      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
         <span className="chip chip-lime blink" style={{ fontSize: 11 }}>● Waiting</span>
         <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
           {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''}

@@ -38,7 +38,7 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Top bar ────────────────────────────────────────────────
   const TopBar = () => (
-    <div style={{ width: '100%', paddingTop: 48, marginBottom: 12 }}>
+    <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
       <span className="chip chip-lavender" style={{ fontSize: 11 }}>Round {round}/{total}</span>
     </div>
   );
