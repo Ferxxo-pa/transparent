@@ -7,7 +7,7 @@
 export const SOLANA_NETWORK = 'devnet' as const;
 
 /** RPC endpoint for Solana */
-export const SOLANA_RPC = 'https://api.devnet.solana.com';
+export const SOLANA_RPC = import.meta.env.VITE_SOLANA_RPC || 'https://api.devnet.solana.com';
 
 /** Anchor program ID (deployed on devnet) */
 export const PROGRAM_ID = '656vXmoQ3oYXdghy1PoVQ2NSzduwWW5XVfjJMqQ1fF44';
