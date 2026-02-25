@@ -37,7 +37,7 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Shared Navbar ──────────────────────────────────────────
   const Nav = () => (
-    <nav className="navbar" style={{ marginBottom: 8 }}>
+    <nav className="navbar">
       <span className="chip chip-lavender">Round {round} / {total}</span>
       {isHost && (
         <button

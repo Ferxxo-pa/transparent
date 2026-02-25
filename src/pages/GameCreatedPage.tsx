@@ -47,7 +47,7 @@ export const GameCreatedPage: React.FC = () => {
 
   return (
     <div className="page fade-in">
-      <nav className="navbar" style={{ marginBottom: 8 }}>
+      <nav className="navbar">
         <span className="chip chip-lime blink">● Lobby</span>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>
           {gameState.players.length} joined

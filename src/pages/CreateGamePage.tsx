@@ -47,7 +47,7 @@ export const CreateGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      <nav className="navbar" style={{ marginBottom: 8 }}>
+      <nav className="navbar">
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
