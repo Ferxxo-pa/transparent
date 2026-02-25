@@ -183,7 +183,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
       {/* Spacer for wallet pill row */}
-      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 16 }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
