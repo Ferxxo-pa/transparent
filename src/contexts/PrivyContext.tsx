@@ -8,7 +8,6 @@ import {
 import {
   useWallets as useSolanaWallets,
   useSignTransaction,
-  toSolanaWalletConnectors,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
@@ -136,11 +135,7 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
             createOnLogin: 'all-users',
           },
         },
-        externalWallets: {
-          solana: {
-            connectors: toSolanaWalletConnectors(),
-          },
-        },
+
       }}
     >
       <WalletInner>{children}</WalletInner>
