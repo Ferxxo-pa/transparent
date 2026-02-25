@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion } from '../types/game';
+import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode } from '../types/game';
 import {
   createGameInDB,
   getGameByRoomCode,
@@ -42,7 +42,7 @@ interface GameContextType {
   error: string | null;
   predictions: PredictionRow[];
   predictionPot: number; // total lamports in prediction pot
-  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string) => Promise<boolean>;
+  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode) => Promise<boolean>;
   joinGame: (roomCode: string, playerName?: string) => Promise<boolean>;
   startGame: () => Promise<void>;
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
@@ -254,7 +254,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Create Game ────────────────────────────────────────
 
   const createGame = useCallback(
-    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string) => {
+    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all') => {
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
@@ -284,6 +284,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           buy_in_lamports: buyInLamports,
           question_mode: questionMode,
           custom_questions: questionMode === 'custom' ? (customQuestions ?? null) : null,
+          payout_mode: payoutMode,
         });
 
         // 3. Host does NOT join as a player (Kahoot model: host = screen/controller)
@@ -317,6 +318,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           gameId: game.id,
           hostWallet: wallet.publicKey.toBase58(),
           questionMode,
+          payoutMode,
           customQuestions: questionMode === 'custom' ? customQuestions : undefined,
           submittedQuestions: [],
           questionVotes: {},
@@ -428,6 +430,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           gameId: game.id,
           hostWallet: game.host_wallet,
           questionMode: qMode,
+          payoutMode: (game.payout_mode as PayoutMode) || 'winner-takes-all',
           customQuestions: customQs,
           submittedQuestions: [],
           questionVotes: {},

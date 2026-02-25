@@ -6,12 +6,17 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
-import { QuestionMode } from '../types/game';
+import { QuestionMode, PayoutMode } from '../types/game';
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
   { id: 'classic',  label: 'Classic',   sub: 'Curated questions from the vault',   emoji: '🎲' },
   { id: 'hot-take', label: 'Hot Take',  sub: 'Players write, crowd picks best one', emoji: '🔥' },
   { id: 'custom',   label: 'Custom',    sub: 'You write every question',            emoji: '✍️' },
+];
+
+const PAYOUT_MODES: { id: PayoutMode; label: string; sub: string; emoji: string }[] = [
+  { id: 'winner-takes-all', label: 'Winner Takes All', sub: 'Most honest player wins the entire pot', emoji: '🏆' },
+  { id: 'honest-talkers',   label: 'Honest Talkers',   sub: 'Pot splits evenly among everyone who answered', emoji: '🤝' },
 ];
 
 const field = {
@@ -25,11 +30,11 @@ export const CreateGamePage: React.FC = () => {
   const { displayName, walletReady } = usePrivyWallet();
   const solPrice = useSolPrice();
 
-  const [buyIn,    setBuyIn]    = useState('0');
-  const [roomName, setRoomName] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [mode,     setMode]     = useState<QuestionMode>('classic');
-  const [customQs, setCustomQs] = useState<string[]>(['', '']);
+  const [buyIn,      setBuyIn]      = useState('0');
+  const [roomName,   setRoomName]   = useState('');
+  const [mode,       setMode]       = useState<QuestionMode>('classic');
+  const [payoutMode, setPayoutMode] = useState<PayoutMode>('winner-takes-all');
+  const [customQs,   setCustomQs]   = useState<string[]>(['', '']);
 
   const handleCreate = async () => {
     const filtered = mode === 'custom' ? customQs.filter(q => q.trim()) : undefined;
@@ -39,7 +44,8 @@ export const CreateGamePage: React.FC = () => {
       roomName.trim() || 'Game Room',
       mode,
       filtered,
-      nickname.trim() || undefined,
+      undefined, // no host name
+      payoutMode,
     );
     if (ok) navigate('/waiting');
   };
@@ -69,16 +75,10 @@ export const CreateGamePage: React.FC = () => {
         </motion.div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Room name + nickname */}
-          <motion.div variants={field} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div>
-              <p className="label-cipher" style={{ marginBottom: 8 }}>Room Name</p>
-              <input className="input" type="text" value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="Squad Night" maxLength={24} />
-            </div>
-            <div>
-              <p className="label-cipher" style={{ marginBottom: 8 }}>Your Name</p>
-              <input className="input" type="text" value={nickname} onChange={e => setNickname(e.target.value)} placeholder="Nickname" maxLength={18} />
-            </div>
+          {/* Room name */}
+          <motion.div variants={field}>
+            <p className="label-cipher" style={{ marginBottom: 8 }}>Room Name</p>
+            <input className="input" type="text" value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="Squad Night" maxLength={24} />
           </motion.div>
 
           {/* Buy-in */}
@@ -119,7 +119,7 @@ export const CreateGamePage: React.FC = () => {
             />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
               {parseFloat(buyIn) > 0
-                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · winner takes everything`
+                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · ${payoutMode === 'honest-talkers' ? 'pot splits among answerers' : 'winner takes everything'}`
                 : 'Free game · no entry fee'}
             </p>
           </motion.div>
@@ -150,6 +150,36 @@ export const CreateGamePage: React.FC = () => {
                 transition={{ duration: 0.15 }}
               >
                 {MODES.find(m => m.id === mode)?.sub}
+              </motion.p>
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Payout Mode */}
+          <motion.div variants={field}>
+            <p className="label-cipher" style={{ marginBottom: 10 }}>Payout Mode</p>
+            <div className="mode-pills">
+              {PAYOUT_MODES.map(m => (
+                <motion.button
+                  key={m.id}
+                  className={`mode-pill ${payoutMode === m.id ? 'active' : ''}`}
+                  onClick={() => setPayoutMode(m.id)}
+                  whileTap={{ scale: 0.95 }}
+                  layout
+                >
+                  {m.emoji} {m.label}
+                </motion.button>
+              ))}
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={payoutMode}
+                style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15 }}
+              >
+                {PAYOUT_MODES.find(m => m.id === payoutMode)?.sub}
               </motion.p>
             </AnimatePresence>
           </motion.div>
@@ -206,6 +236,7 @@ export const CreateGamePage: React.FC = () => {
               {parseFloat(buyIn) > 0 ? `${buyIn} SOL` : 'Free'} game
             </span>
             <span className="chip chip-lavender">{MODES.find(m => m.id === mode)?.label} mode</span>
+            <span className="chip chip-muted">{PAYOUT_MODES.find(m => m.id === payoutMode)?.emoji} {PAYOUT_MODES.find(m => m.id === payoutMode)?.label}</span>
           </motion.div>
 
           {error && (

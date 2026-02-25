@@ -20,15 +20,21 @@ export const GameOverPage: React.FC = () => {
 
   const isHost = publicKey?.toBase58() === (gameState as any).hostWallet;
   const scores = gameState.scores ?? {};
+  const isHonestTalkers = gameState.payoutMode === 'honest-talkers';
 
   const ranked = gameState.players
     .map(p => {
       const s = scores[p.id];
       const t = s ? s.transparent + s.fake : 0;
       const honesty = t > 0 ? s.transparent / t : 0;
-      return { p, s, honesty, t };
+      // For honest-talkers: "answered" means they were in hot seat and got votes
+      const answered = s ? s.rounds > 0 : false;
+      return { p, s, honesty, t, answered };
     })
     .sort((a, b) => b.honesty - a.honesty);
+
+  const answerers = ranked.filter(r => r.answered);
+  const splitAmount = answerers.length > 0 ? gameState.currentPot / answerers.length : 0;
 
   const activeWinner = selected ?? ranked[0]?.p.id ?? null;
   const winnerPlayer = gameState.players.find(p => p.id === activeWinner);
@@ -76,16 +82,28 @@ export const GameOverPage: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 22 }}
         >
-          {confirmed && winnerPlayer ? (
-            <>
-              <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Winner</p>
-              <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {winnerPlayer.name}
-              </p>
-              <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
-                +{gameState.currentPot.toFixed(2)} SOL
-              </p>
-            </>
+          {confirmed ? (
+            isHonestTalkers ? (
+              <>
+                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Split</p>
+                <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                  {answerers.length} honest talkers
+                </p>
+                <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
+                  {splitAmount.toFixed(3)} SOL each
+                </p>
+              </>
+            ) : (
+              <>
+                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Winner</p>
+                <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+                  {winnerPlayer?.name}
+                </p>
+                <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
+                  +{gameState.currentPot.toFixed(2)} SOL
+                </p>
+              </>
+            )
           ) : (
             <>
               <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Total Pot</p>
@@ -93,6 +111,11 @@ export const GameOverPage: React.FC = () => {
                 {gameState.currentPot.toFixed(2)}
                 <span style={{ fontSize: 18, color: 'var(--muted)', fontWeight: 600, marginLeft: 6 }}>SOL</span>
               </p>
+              {isHonestTalkers && answerers.length > 0 && (
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
+                  Split among {answerers.length} player{answerers.length > 1 ? 's' : ''} · {splitAmount.toFixed(3)} SOL each
+                </p>
+              )}
             </>
           )}
         </motion.div>
@@ -101,7 +124,7 @@ export const GameOverPage: React.FC = () => {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <p className="label-cipher">
-              {isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
+              {isHonestTalkers ? 'Honest Talkers' : isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
             </p>
             {isHost && !confirmed && ranked[0] && (
               <span style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -111,23 +134,24 @@ export const GameOverPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ranked.map(({ p, s, honesty }, i) => {
-              const isWinner = p.id === activeWinner;
+            {ranked.map(({ p, s, honesty, answered }, i) => {
+              const isWinner = isHonestTalkers ? answered : p.id === activeWinner;
+              const canSelect = isHost && !confirmed && !isHonestTalkers;
               return (
                 <motion.div
                   key={p.id}
-                  onClick={() => isHost && !confirmed && setSelected(p.id)}
+                  onClick={() => canSelect && setSelected(p.id)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '12px 14px', borderRadius: 'var(--r-sm)',
                     background: isWinner ? 'rgba(196,255,60,0.06)' : 'var(--glass)',
                     border: `1px solid ${isWinner ? 'var(--lime-border)' : 'var(--border)'}`,
-                    cursor: isHost && !confirmed ? 'pointer' : 'default',
+                    cursor: canSelect ? 'pointer' : 'default',
                   }}
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  whileTap={isHost && !confirmed ? { scale: 0.98 } : {}}
+                  whileTap={canSelect ? { scale: 0.98 } : {}}
                 >
                   <span style={{ fontWeight: 800, fontSize: 16, color: i === 0 ? 'var(--lime)' : 'var(--muted)', width: 20, flexShrink: 0 }}>
                     {i + 1}
@@ -135,8 +159,9 @@ export const GameOverPage: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
-                      {i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
-                      {isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
+                      {isHonestTalkers && answered && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Answered ✓</span>}
+                      {!isHonestTalkers && i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
+                      {!isHonestTalkers && isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
                     </div>
                     {s ? (
                       <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 11, color: 'var(--muted)' }}>
@@ -150,7 +175,7 @@ export const GameOverPage: React.FC = () => {
                   </div>
                   {confirmed && isWinner && (
                     <span style={{ fontWeight: 800, fontSize: 13, color: 'var(--lime)', whiteSpace: 'nowrap' }}>
-                      +{gameState.currentPot.toFixed(2)} SOL
+                      +{isHonestTalkers ? splitAmount.toFixed(3) : gameState.currentPot.toFixed(2)} SOL
                     </span>
                   )}
                 </motion.div>
@@ -209,14 +234,18 @@ export const GameOverPage: React.FC = () => {
           <motion.button
             className="btn btn-primary"
             onClick={distribute}
-            disabled={distributing || !activeWinner}
+            disabled={distributing || (!isHonestTalkers && !activeWinner)}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
           >
-            {distributing ? 'Sending…' : gameState.buyInAmount > 0
-              ? `Send ${gameState.currentPot.toFixed(2)} SOL → ${winnerPlayer?.name ?? 'Winner'}`
-              : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
+            {distributing ? 'Sending…' : isHonestTalkers
+              ? gameState.buyInAmount > 0
+                ? `Split ${gameState.currentPot.toFixed(2)} SOL among ${answerers.length} players`
+                : `End Game 🤝`
+              : gameState.buyInAmount > 0
+                ? `Send ${gameState.currentPot.toFixed(2)} SOL → ${winnerPlayer?.name ?? 'Winner'}`
+                : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
             }
           </motion.button>
         )}

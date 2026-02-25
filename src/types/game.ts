@@ -8,6 +8,8 @@ export interface Player {
 
 export type QuestionMode = 'classic' | 'custom' | 'hot-take';
 
+export type PayoutMode = 'winner-takes-all' | 'honest-talkers';
+
 export type GamePhase =
   | 'submitting-questions'
   | 'voting-question'
@@ -46,6 +48,8 @@ export interface GameState {
   hostWallet?: string;
   /** Question mode for this game */
   questionMode: QuestionMode;
+  /** Payout mode */
+  payoutMode: PayoutMode;
   /** Custom questions (for custom mode, set by host at creation) */
   customQuestions?: string[];
   /** Questions submitted by players (hot-take mode) */
