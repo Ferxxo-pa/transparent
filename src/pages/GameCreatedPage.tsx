@@ -50,11 +50,8 @@ export const GameCreatedPage: React.FC = () => {
       {/* Spacer for wallet pill row */}
       <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
 
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+      <div style={{ width: '100%', marginBottom: 8 }}>
         <span className="chip chip-lime blink">● Lobby</span>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-          {gameState.players.length} joined
-        </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
