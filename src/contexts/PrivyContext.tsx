@@ -10,7 +10,7 @@ import {
   useSignTransaction,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
-import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
+import { PRIVY_APP_ID, SOLANA_RPC, SOLANA_NETWORK } from '../lib/config';
 
 // ============================================================
 // PURE PRIVY — no wallet adapter
@@ -134,6 +134,12 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
             createOnLogin: 'all-users',
           },
         },
+        solanaClusters: [
+          {
+            name: SOLANA_NETWORK,
+            rpcUrl: SOLANA_RPC,
+          },
+        ],
 
       }}
     >
