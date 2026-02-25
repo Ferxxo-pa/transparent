@@ -81,7 +81,7 @@ function WalletInner({ children }: { children: ReactNode }) {
         transaction: serialized,
         wallet: activeWallet,
         chain: 'solana:devnet',
-        options: { uiOptions: { showWalletUIs: false } },
+        
       });
       return Transaction.from(signedTransaction);
     };
