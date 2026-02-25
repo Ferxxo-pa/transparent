@@ -42,7 +42,7 @@ interface GameContextType {
   error: string | null;
   predictions: PredictionRow[];
   predictionPot: number; // total lamports in prediction pot
-  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode) => Promise<boolean>;
+  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number) => Promise<boolean>;
   joinGame: (roomCode: string, playerName?: string) => Promise<boolean>;
   startGame: () => Promise<void>;
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
@@ -254,7 +254,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Create Game ────────────────────────────────────────
 
   const createGame = useCallback(
-    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all') => {
+    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0) => {
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
@@ -285,6 +285,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           question_mode: questionMode,
           custom_questions: questionMode === 'custom' ? (customQuestions ?? null) : null,
           payout_mode: payoutMode,
+          num_questions: numQuestions > 0 ? numQuestions : null,
         });
 
         // 3. Host does NOT join as a player (Kahoot model: host = screen/controller)
@@ -319,6 +320,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           hostWallet: wallet.publicKey.toBase58(),
           questionMode,
           payoutMode,
+          numQuestions: numQuestions > 0 ? numQuestions : 0,
           customQuestions: questionMode === 'custom' ? customQuestions : undefined,
           submittedQuestions: [],
           questionVotes: {},
@@ -431,6 +433,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           hostWallet: game.host_wallet,
           questionMode: qMode,
           payoutMode: (game.payout_mode as PayoutMode) || 'winner-takes-all',
+          numQuestions: game.num_questions ?? 0,
           customQuestions: customQs,
           submittedQuestions: [],
           questionVotes: {},
@@ -583,15 +586,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           // Scores are calculated in onVotesChange for all clients
           // Advance to next player or end game
           const currentIdx = gameState.players.findIndex((p) => p.id === hotSeatWallet);
-          const nextIdx = currentIdx + 1;
+          const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+          const nextRoundNum = round + 1;
 
-          if (nextIdx >= gameState.players.length) {
-            // All players have had a turn — game over
+          if (nextRoundNum >= totalRounds) {
+            // All rounds done — game over
             await updateGameStatus(gid, { status: 'gameover' });
             setGameState((prev) => (prev ? { ...prev, gameStatus: 'gameover' } : null));
           } else {
-            // Next player's turn
-            const nextPlayer = gameState.players[nextIdx];
+            // Next player's turn (cycle through players)
+            const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+            const nextPlayer = gameState.players[nextPlayerIdx];
             const nextRound = round + 1;
             const questionPool =
               gameState.questionMode === 'custom' && gameState.customQuestions?.length
@@ -730,12 +735,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const currentIdx = gameState.players.findIndex(
           (p) => p.id === gameState.currentPlayerInHotSeat,
         );
-        const nextIdx = (currentIdx + 1) % gameState.players.length;
-        const nextPlayer = gameState.players[nextIdx]?.id ?? null;
+        const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+        const nextPlayer = gameState.players[nextPlayerIdx]?.id ?? null;
         const nextRound = (gameState.currentRound ?? 0) + 1;
+        const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
-        if (nextIdx === 0) {
-          // All players have been in hot seat — game over
+        if (nextRound >= totalRounds) {
+          // All rounds done — game over
           await updateGameStatus(gid, { status: 'gameover' });
           setGameState((prev) => (prev ? { ...prev, gameStatus: 'gameover' } : null));
         } else {
@@ -823,14 +829,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!gid) return;
     const hotSeatWallet = gameState.currentPlayerInHotSeat;
     const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
-    const nextIdx = currentIdx + 1;
+    const nextRoundNum = (gameState.currentRound ?? 0) + 1;
+    const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
     try {
-      if (nextIdx >= gameState.players.length) {
+      if (nextRoundNum >= totalRounds) {
         await updateGameStatus(gid, { status: 'gameover' });
         setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
       } else {
-        const nextPlayer = gameState.players[nextIdx];
+        const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+        const nextPlayer = gameState.players[nextPlayerIdx];
         const nextRound = (gameState.currentRound ?? 0) + 1;
         const questionPool = gameState.questionMode === 'custom' && gameState.customQuestions?.length
           ? gameState.customQuestions : QUESTIONS;

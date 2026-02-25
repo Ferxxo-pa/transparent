@@ -23,6 +23,7 @@ export interface GameRow {
   game_phase: string | null;
   current_round: number;
   payout_mode: string | null;
+  num_questions: number | null;
   created_at: string;
 }
 
@@ -75,6 +76,7 @@ export async function createGameInDB(data: {
   question_mode?: string;
   custom_questions?: string[] | null;
   payout_mode?: string;
+  num_questions?: number | null;
 }): Promise<GameRow> {
   const { data: game, error } = await supabase
     .from('games')

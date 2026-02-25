@@ -56,7 +56,7 @@ export const GamePlayPage: React.FC = () => {
   const isHotTake  = gameState.questionMode === 'hot-take';
   const phase      = gameState.gamePhase;
   const round      = (gameState.currentRound ?? 0) + 1;
-  const total      = gameState.players.length;
+  const total      = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
   const votesIn    = gameState.voteCount;
   // All players except hot seat player vote (host is NOT a player)
   const voterCount = Math.max(total - 1, 1);

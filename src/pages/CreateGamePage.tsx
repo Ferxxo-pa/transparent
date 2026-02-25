@@ -34,6 +34,7 @@ export const CreateGamePage: React.FC = () => {
   const [roomName,   setRoomName]   = useState('');
   const [mode,       setMode]       = useState<QuestionMode>('classic');
   const [payoutMode, setPayoutMode] = useState<PayoutMode>('honest-talkers');
+  const [numQs,      setNumQs]      = useState(0); // 0 = one per player
   const [customQs,   setCustomQs]   = useState<string[]>(['', '']);
 
   const handleCreate = async () => {
@@ -46,6 +47,7 @@ export const CreateGamePage: React.FC = () => {
       filtered,
       undefined, // no host name
       payoutMode,
+      numQs,
     );
     if (ok) navigate('/waiting');
   };
@@ -182,6 +184,34 @@ export const CreateGamePage: React.FC = () => {
                 {PAYOUT_MODES.find(m => m.id === payoutMode)?.sub}
               </motion.p>
             </AnimatePresence>
+          </motion.div>
+
+          {/* Number of questions */}
+          <motion.div variants={field}>
+            <p className="label-cipher" style={{ marginBottom: 8 }}>How many questions?</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[0, 3, 5, 7, 10, 15].map(n => (
+                <button
+                  key={n}
+                  onClick={() => setNumQs(n)}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: 'var(--r-pill)',
+                    border: `1px solid ${numQs === n ? 'var(--lime)' : 'var(--border)'}`,
+                    background: numQs === n ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
+                    color: numQs === n ? 'var(--lime)' : 'var(--muted)',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    fontFamily: 'Space Grotesk',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {n === 0 ? '1 per player' : n}
+                </button>
+              ))}
+            </div>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+              {numQs === 0 ? 'Each player gets one turn in the hot seat' : `${numQs} rounds — hot seat cycles through players`}
+            </p>
           </motion.div>
 
           {/* Custom questions */}

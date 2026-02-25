@@ -50,6 +50,8 @@ export interface GameState {
   questionMode: QuestionMode;
   /** Payout mode */
   payoutMode: PayoutMode;
+  /** Number of questions/rounds (0 = one per player) */
+  numQuestions: number;
   /** Custom questions (for custom mode, set by host at creation) */
   customQuestions?: string[];
   /** Questions submitted by players (hot-take mode) */
