@@ -868,7 +868,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
   }, [gameState?.gameId]);
 
-  // ── Refresh Players (manual fallback if realtime fails) ──
+  // ── Refresh Players + Game (manual fallback if realtime fails) ──
 
   const refreshPlayers = useCallback(async () => {
     const gameId = gameIdRef.current;
@@ -876,11 +876,28 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const players = await getPlayersForGame(gameId);
       console.log('[Manual refresh] players:', players.length);
+
+      // Also refresh game status so joiners detect when host starts
+      const game = await supabase.from('games').select('*').eq('id', gameId).single();
+
       setGameState(prev => {
         if (!prev) return prev;
         const hostWallet = prev.hostWallet ?? '';
         const mapped = playerRowsToPlayers(players, hostWallet);
-        return { ...prev, players: mapped, currentPot: mapped.length * prev.buyInAmount, totalVotes: mapped.length };
+        const gameData = game.data;
+        return {
+          ...prev,
+          players: mapped,
+          currentPot: mapped.length * prev.buyInAmount,
+          totalVotes: mapped.length,
+          // Sync game status from DB
+          ...(gameData ? {
+            gameStatus: gameData.status,
+            currentPlayerInHotSeat: gameData.current_hot_seat_player,
+            gamePhase: gameData.game_phase as GamePhase || prev.gamePhase,
+            currentRound: gameData.current_round ?? prev.currentRound,
+          } : {}),
+        };
       });
     } catch (err) {
       console.error('refreshPlayers error:', err);

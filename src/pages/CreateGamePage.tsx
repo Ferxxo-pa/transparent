@@ -41,7 +41,7 @@ export const CreateGamePage: React.FC = () => {
       filtered,
       nickname.trim() || undefined,
     );
-    if (ok) navigate('/created');
+    if (ok) navigate('/waiting');
   };
 
   return (
