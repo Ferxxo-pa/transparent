@@ -4,20 +4,19 @@ import { useGame } from '../contexts/GameContext';
 
 /**
  * Syncs Privy wallet state into GameContext.
- * Passes signAndSendTransaction so anchor.ts can use Privy's
- * built-in sign+send flow (avoids modal hanging on sign-only).
+ * Privy signs headlessly (no modal) — we send manually via Helius RPC.
  */
 export function WalletBridge() {
-  const { publicKey, signTransaction, signAndSendTransaction } = usePrivyWallet();
+  const { publicKey, signTransaction } = usePrivyWallet();
   const { setWalletAdapter } = useGame();
 
   useEffect(() => {
     if (publicKey && signTransaction) {
-      setWalletAdapter({ publicKey, signTransaction, signAndSendTransaction: signAndSendTransaction ?? undefined });
+      setWalletAdapter({ publicKey, signTransaction });
     } else {
       setWalletAdapter(null);
     }
-  }, [publicKey, signTransaction, signAndSendTransaction, setWalletAdapter]);
+  }, [publicKey, signTransaction, setWalletAdapter]);
 
   return null;
 }
