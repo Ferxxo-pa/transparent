@@ -7,22 +7,21 @@ import {
 } from '@privy-io/react-auth';
 import {
   useWallets as useSolanaWallets,
-  useSignTransaction,
+  useSignAndSendTransaction,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 
-const wssUrl = SOLANA_RPC.replace('https', 'wss');
-
 // ============================================================
-// PURE PRIVY
+// Privy v3 Solana Integration
 //
-// Strategy: useSignTransaction with uiOptions.showWalletUIs = false
-// to sign headlessly, then manually send via our Helius Connection.
-// If headless fails, fall back to normal sign (shows modal).
+// Official API: useSignAndSendTransaction from @privy-io/react-auth/solana
+// Expects Uint8Array (wire-encoded transaction), NOT Transaction objects.
+// Privy signs + sends via its configured RPC in one call.
 // ============================================================
 
+const wssUrl = SOLANA_RPC.replace('https', 'wss');
 const connection = new Connection(SOLANA_RPC, 'confirmed');
 
 export interface PrivyWallet {
@@ -47,10 +46,11 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { logout } = useLogout();
 
   const { wallets } = useSolanaWallets();
-  const { signTransaction: privySign } = useSignTransaction();
+  const { signAndSendTransaction } = useSignAndSendTransaction();
 
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
+    // Prefer the Privy embedded wallet
     return wallets.find(w => w.walletClientType === 'privy')
       ?? wallets[0];
   }, [wallets]);
@@ -66,60 +66,38 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Sign headlessly via useSignTransaction, then send manually via our Connection
+  // Bridge: takes web3.js Transaction, serializes to Uint8Array, calls Privy signAndSendTransaction
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
+      // Ensure tx has blockhash and fee payer
+      if (!tx.recentBlockhash) {
+        const { blockhash } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+      }
+      if (!tx.feePayer) {
+        tx.feePayer = publicKey;
+      }
+
+      // Serialize to Uint8Array (wire format) — this is what Privy v3 expects
       const serialized = tx.serialize({
         requireAllSignatures: false,
         verifySignatures: false,
       });
 
-      console.log('[PrivyWallet] Signing transaction headlessly...');
+      console.log('[PrivyWallet] Calling signAndSendTransaction with', serialized.length, 'bytes');
 
-      // Try headless first (no UI), fall back to normal (with UI)
-      let signedTransaction: Uint8Array;
-      try {
-        const result = await privySign({
-          transaction: serialized,
-          wallet: activeWallet,
-          chain: 'solana:devnet',
-          options: { uiOptions: { showWalletUIs: false } },
-        } as any);
-        signedTransaction = result.signedTransaction;
-        console.log('[PrivyWallet] Headless sign succeeded');
-      } catch (headlessErr) {
-        console.warn('[PrivyWallet] Headless sign failed, trying with UI:', headlessErr);
-        const result = await privySign({
-          transaction: serialized,
-          wallet: activeWallet,
-          chain: 'solana:devnet',
-        });
-        signedTransaction = result.signedTransaction;
-        console.log('[PrivyWallet] UI sign succeeded');
-      }
-
-      const signedTx = Transaction.from(signedTransaction);
-
-      console.log('[PrivyWallet] Sending via Helius RPC...');
-      const sig = await connection.sendRawTransaction(signedTx.serialize(), {
-        skipPreflight: false,
-        preflightCommitment: 'confirmed',
+      const result = await signAndSendTransaction({
+        transaction: serialized,
+        wallet: activeWallet,
       });
 
-      console.log('[PrivyWallet] Tx sent:', sig);
-
-      // Confirm
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-      await connection.confirmTransaction(
-        { signature: sig, blockhash, lastValidBlockHeight },
-        'confirmed',
-      );
-
-      console.log('[PrivyWallet] Tx confirmed:', sig);
+      const sig = result.signature;
+      console.log('[PrivyWallet] Transaction sent, signature:', sig);
+      // Confirmation handled by caller (anchor.ts buildAndSend)
       return sig;
     };
-  }, [activeWallet, publicKey, privySign]);
+  }, [activeWallet, publicKey, signAndSendTransaction]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
