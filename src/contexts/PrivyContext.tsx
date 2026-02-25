@@ -8,7 +8,7 @@ import {
 import {
   useWallets as useSolanaWallets,
 } from '@privy-io/react-auth/solana';
-import { PublicKey, Transaction, Connection } from '@solana/web3.js';
+import { PublicKey, Transaction, Connection, SendOptions } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 
@@ -17,9 +17,12 @@ const wssUrl = SOLANA_RPC.replace('https', 'wss');
 // ============================================================
 // PURE PRIVY
 //
-// Uses wallet provider.request({ method: 'signAndSendTransaction' })
-// which accepts a Connection object — our Helius devnet RPC.
-// This bypasses Privy's internal RPC config lookup entirely.
+// ConnectedStandardSolanaWallet has:
+//   - signTransaction(input): signs tx, returns signed bytes
+//   - signAndSendTransaction is available as a standard wallet feature
+//
+// We use the wallet-standard features directly via the standardWallet
+// property, which gives us access to solana:signAndSendTransaction.
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -27,7 +30,6 @@ const connection = new Connection(SOLANA_RPC, 'confirmed');
 export interface PrivyWallet {
   publicKey: PublicKey | null;
   address: string | null;
-  /** Signs and sends a transaction via wallet provider, returns signature */
   sendTransaction: ((tx: Transaction) => Promise<string>) | null;
   connected: boolean;
   walletReady: boolean;
@@ -65,28 +67,84 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Sign + send via wallet provider RPC with our Connection
+  // Sign + Send using the wallet-standard signAndSendTransaction feature
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
-      // Get the Solana provider from the wallet
-      const provider = await (activeWallet as any).getProvider();
-      
-      // Use provider.request to call signAndSendTransaction
-      // passing our Connection so it uses Helius RPC
-      const result = await provider.request({
-        method: 'signAndSendTransaction',
-        params: {
-          transaction: tx,
-          connection: connection,
+      const wallet = activeWallet as any;
+
+      // Try multiple approaches in order of preference:
+
+      // Approach 1: wallet-standard signAndSendTransaction via standardWallet
+      if (wallet.standardWallet?.features?.['solana:signAndSendTransaction']) {
+        const feature = wallet.standardWallet.features['solana:signAndSendTransaction'];
+        const serialized = tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        });
+        const account = wallet.standardWallet.accounts[0];
+        const result = await feature.signAndSendTransaction({
+          transaction: serialized,
+          account,
+          chain: 'solana:devnet',
           options: {
-            skipPreflight: false,
             preflightCommitment: 'confirmed',
           },
-        },
-      });
-      
-      return result.signature;
+        });
+        // result.signature is a Uint8Array — convert to base58
+        const sig = Buffer.from(result.signature).toString('base64');
+        // Actually we need base58, let's use bs58 encoding
+        const bs58Chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        const bytes = result.signature;
+        let num = BigInt(0);
+        for (const b of bytes) num = num * 256n + BigInt(b);
+        let encoded = '';
+        while (num > 0n) {
+          encoded = bs58Chars[Number(num % 58n)] + encoded;
+          num = num / 58n;
+        }
+        for (const b of bytes) {
+          if (b === 0) encoded = '1' + encoded;
+          else break;
+        }
+        return encoded;
+      }
+
+      // Approach 2: signTransaction then manual send via our Connection
+      if (wallet.signTransaction) {
+        const serialized = tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        });
+        const result = await wallet.signTransaction({
+          transaction: serialized,
+          chain: 'solana:devnet',
+        });
+        const signedTx = Transaction.from(result.signedTransaction);
+        const sig = await connection.sendRawTransaction(signedTx.serialize(), {
+          skipPreflight: false,
+          preflightCommitment: 'confirmed',
+        });
+        return sig;
+      }
+
+      // Approach 3: getProvider (EVM-style, but some Privy versions support it)
+      if (wallet.getProvider) {
+        const provider = await wallet.getProvider();
+        if (provider?.request) {
+          const result = await provider.request({
+            method: 'signAndSendTransaction',
+            params: {
+              transaction: tx,
+              connection: connection,
+              options: { skipPreflight: false, preflightCommitment: 'confirmed' },
+            },
+          });
+          return result.signature;
+        }
+      }
+
+      throw new Error('No supported signing method found on wallet');
     };
   }, [activeWallet, publicKey]);
 

@@ -377,8 +377,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (buyInLamports > 0 && wallet.publicKey.toBase58() !== game.host_wallet) {
             await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
           }
-        } catch (chainErr) {
-          console.warn('On-chain buy-in failed:', chainErr);
+        } catch (chainErr: any) {
+          console.error('On-chain buy-in failed:', chainErr);
+          // Log details for debugging
+          console.error('Buy-in details:', {
+            host: game.host_wallet,
+            player: wallet.publicKey.toBase58(),
+            lamports: game.buy_in_lamports,
+            error: chainErr?.message,
+          });
           // Non-fatal during dev — game continues in Supabase
         }
 
