@@ -1,6 +1,6 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
@@ -13,6 +13,7 @@ export const GamePlayPage: React.FC = () => {
 
   const myWallet = publicKey?.toBase58() ?? '';
   const isHost   = myWallet === (gameState as any)?.hostWallet;
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
 
   useEffect(() => {
     if (gameState?.gameStatus === 'gameover') navigate('/gameover');
@@ -273,13 +274,49 @@ export const GamePlayPage: React.FC = () => {
 
         {isHost && (
           <button
-            onClick={endGameNow}
+            onClick={() => setShowEndConfirm(true)}
             style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500, padding: '12px 0', alignSelf: 'center' }}
           >
             End Game
           </button>
         )}
       </div>
+
+      {/* End Game confirmation */}
+      <AnimatePresence>
+        {showEndConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', padding: 20 }}
+            onClick={() => setShowEndConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '28px 24px', maxWidth: 320, width: '100%', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 16 }}
+            >
+              <div>
+                <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>End this game?</p>
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>This will end the game for all players and move to the results screen.</p>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setShowEndConfirm(false)}
+                  style={{ flex: 1, height: 44, borderRadius: 'var(--r-pill)', background: 'var(--glass)', border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setShowEndConfirm(false); endGameNow(); }}
+                  style={{ flex: 1, height: 44, borderRadius: 'var(--r-pill)', background: 'rgba(255,82,82,0.15)', border: '1px solid var(--red-border)', color: 'var(--red)', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'Space Grotesk' }}
+                >
+                  End Game
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
