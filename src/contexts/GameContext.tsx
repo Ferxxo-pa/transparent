@@ -193,8 +193,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               newScores = {
                 ...newScores,
                 [hotSeatWallet]: {
-                  transparent: transparentVotes,
-                  fake: fakeVotes,
+                  transparent: existing.transparent + transparentVotes,
+                  fake: existing.fake + fakeVotes,
                   rounds: (existing.rounds ?? 0) + 1,
                 },
               };
@@ -254,7 +254,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
-        return;
+        return false;
       }
 
       setLoading(true);
@@ -349,7 +349,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
-        return;
+        return false;
       }
 
       setLoading(true);
@@ -361,13 +361,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!game) {
           setError('Game not found');
           setLoading(false);
-          return;
+          return false;
         }
 
         if (game.status !== 'waiting') {
           setError('Game already started');
           setLoading(false);
-          return;
+          return false;
         }
 
         // 2. Send buy-in SOL to host wallet on-chain
@@ -888,16 +888,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setError(null);
 
       // On-chain: send prediction SOL to the game host as escrow
-      // (in production this would go to the game PDA)
       if (wallet && amountLamports > 0) {
-        const { gameState: gs } = { gameState: await (async () => {
-          // get host wallet from current game state
-          return gameState;
-        })() };
-        const hostWallet = gs?.hostWallet;
+        const hostWallet = gameState?.hostWallet;
         if (hostWallet && hostWallet !== wallet.publicKey.toBase58()) {
-          const { joinGameOnChainWithAmount } = await import('../lib/anchor');
-          await joinGameOnChainWithAmount(wallet, new PublicKey(hostWallet), amountLamports).catch(() => {});
+          try {
+            await joinGameOnChainWithAmount(wallet, new PublicKey(hostWallet), amountLamports);
+          } catch { /* non-fatal — prediction still recorded in DB */ }
         }
       }
 

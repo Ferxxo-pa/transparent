@@ -201,8 +201,8 @@ export const GameOverPage: React.FC = () => {
       </div>
 
       {/* CTA */}
-      <div style={{ width: '100%', paddingTop: 16, paddingBottom: 8 }}>
-        {isHost && !confirmed ? (
+      <div style={{ width: '100%', paddingTop: 16, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {isHost && !confirmed && (
           <motion.button
             className="btn btn-primary"
             onClick={distribute}
@@ -216,16 +216,15 @@ export const GameOverPage: React.FC = () => {
               : `Crown ${winnerPlayer?.name ?? 'Winner'} 👑`
             }
           </motion.button>
-        ) : (
-          <motion.button
-            className="btn btn-primary"
-            onClick={() => { resetGame(); navigate('/'); }}
-            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Return Home
-          </motion.button>
         )}
+        <motion.button
+          className={isHost && !confirmed ? 'btn btn-secondary' : 'btn btn-primary'}
+          onClick={() => { resetGame(); navigate('/'); }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          whileTap={{ scale: 0.96 }}
+        >
+          Return Home
+        </motion.button>
       </div>
     </div>
   );
