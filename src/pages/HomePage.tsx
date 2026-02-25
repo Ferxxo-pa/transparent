@@ -182,7 +182,10 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
-      {/* Wallet pill handled by WalletHeader (global overlay) */}
+      {/* Logo — same row as wallet pill */}
+      <div style={{ width: '100%', paddingTop: 2 }}>
+        <img src="/logo-glass.svg" alt="Transparent" style={{ height: 38, objectFit: 'contain' }} />
+      </div>
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}

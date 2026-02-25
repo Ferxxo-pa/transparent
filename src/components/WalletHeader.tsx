@@ -26,7 +26,7 @@ export const WalletHeader: React.FC = () => {
         whileTap={{ scale: 0.96 }}
         whileHover={{ borderColor: 'var(--lime-border)' }}
         style={{
-          position: 'fixed', top: 12, right: 16, zIndex: 500,
+          position: 'absolute', top: 12, right: 16, zIndex: 500,
           display: 'flex', alignItems: 'center', gap: 8,
           height: 38, padding: '0 14px 0 10px',
           background: 'rgba(13,15,11,0.90)',
