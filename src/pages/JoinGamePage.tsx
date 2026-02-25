@@ -30,10 +30,8 @@ export const JoinGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      {/* Spacer for wallet pill row */}
-      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
-
-      <div style={{ width: '100%', marginBottom: 8 }}>
+      {/* Top spacing */}
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 8 }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}

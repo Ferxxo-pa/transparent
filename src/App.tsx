@@ -28,7 +28,7 @@ export const PageWrap = ({ children }: { children: React.ReactNode }) => (
   <motion.div
     variants={pageVariants} initial="initial" animate="in" exit="out"
     transition={pageTransition}
-    style={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+    style={{ width: '100%', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'stretch' }}
   >
     {children}
   </motion.div>

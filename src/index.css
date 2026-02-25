@@ -76,13 +76,15 @@ body::before {
 .page {
   min-height: 100vh;
   min-height: 100dvh;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
 
-  padding: 0 16px 32px;
+  padding: 0 20px 32px;
   max-width: 480px;
   margin: 0 auto;
+  overflow-x: hidden;
 }
 
 /* On desktop, center everything like a phone UI */
@@ -95,10 +97,9 @@ body::before {
   .mobile-only  { display: none; }
 }
 
-/* Mobile: center the narrow page column */
+/* Mobile: full-width page with consistent padding */
 @media (max-width: 1023px) {
-  body { display: flex; justify-content: center; }
-  .page { width: 100%; max-width: 100%; padding: 0 16px 48px; padding-top: 0; }
+  .page { width: 100%; max-width: 480px; padding: 0 20px 48px; overflow-x: hidden; }
 }
 
 /* ─── Navbar ─────────────────────────────────────────────── */

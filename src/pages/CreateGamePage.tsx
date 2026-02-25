@@ -47,10 +47,8 @@ export const CreateGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      {/* Spacer for wallet pill row */}
-      <div style={{ width: '100%', minHeight: 38, marginBottom: 28 }} />
-
-      <div style={{ width: '100%', marginBottom: 8 }}>
+      {/* Top spacing */}
+      <div style={{ width: '100%', paddingTop: 16, marginBottom: 8 }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
@@ -87,7 +85,7 @@ export const CreateGamePage: React.FC = () => {
           <motion.div variants={field}>
             <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
             {/* Presets */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', paddingBottom: 4 }}>
               {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => {
                 const usd = preset !== '0' ? solToUsd(parseFloat(preset), solPrice) : '';
                 return (
