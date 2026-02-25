@@ -27,10 +27,8 @@ export const WalletHeader: React.FC = () => {
         style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 500,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px',
-          background: 'rgba(13,15,11,0.85)',
-          backdropFilter: 'blur(16px)',
-          borderBottom: '1px solid var(--border)',
+          padding: '14px 20px',
+          background: 'transparent',
         }}
       >
         {/* Logo */}
