@@ -20,21 +20,13 @@ import { SOLANA_RPC } from './config';
 
 export const connection = new Connection(SOLANA_RPC, 'confirmed');
 
-// Timeout wrapper — on-chain calls bail after 5s so they never block the game
-function withTimeout<T>(promise: Promise<T>, ms = 5000): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('on-chain timeout')), ms)
-    ),
-  ]);
-}
-
 // ── Wallet Interface ────────────────────────────────────────
 
 export interface WalletAdapter {
   publicKey: PublicKey;
   signTransaction: (tx: Transaction) => Promise<Transaction>;
+  /** If provided, Privy handles sign + send + confirm in one step */
+  signAndSendTransaction?: (tx: Transaction) => Promise<string>;
 }
 
 // ── PDA derivation kept for interface compat (not used) ────
@@ -46,6 +38,11 @@ export function deriveGamePDA(hostPubkey: PublicKey, _roomName: string): [Public
 
 // ── Helpers ─────────────────────────────────────────────────
 
+/**
+ * Prepare a transaction with blockhash and fee payer, then either:
+ * 1. Use signAndSendTransaction (Privy handles everything) — preferred
+ * 2. Fall back to signTransaction + manual sendRawTransaction
+ */
 async function sendAndConfirm(
   wallet: WalletAdapter,
   tx: Transaction,
@@ -54,6 +51,18 @@ async function sendAndConfirm(
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = blockhash;
 
+  // Preferred: let Privy sign + send + confirm in one modal flow
+  if (wallet.signAndSendTransaction) {
+    const sig = await wallet.signAndSendTransaction(tx);
+    // Wait for confirmation
+    await connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      'confirmed',
+    );
+    return sig;
+  }
+
+  // Fallback: sign-only then manual send
   const signed = await wallet.signTransaction(tx);
   const sig = await connection.sendRawTransaction(signed.serialize(), {
     skipPreflight: false,
@@ -91,16 +100,8 @@ export async function joinGameOnChain(
   wallet: WalletAdapter,
   hostOrGamePDA: PublicKey,
 ): Promise<string> {
-  // hostOrGamePDA here is actually the host's public key (escrow)
-  // We read buyIn from the game state — caller passes the lamports via PDA
-  // For now we pull from a global config; GameContext passes the host pubkey as gamePDA
   const escrowPubkey = hostOrGamePDA;
 
-  // Build a minimal transfer — GameContext will call this with the correct
-  // lamport amount via the public key that was passed in.
-  // NOTE: the lamports are NOT in scope here — the caller (GameContext) should
-  // pass them. For now we read from the connection.
-  // This will be called with correct lamports by the updated GameContext below.
   const tx = new Transaction().add(
     SystemProgram.transfer({
       fromPubkey: wallet.publicKey,
@@ -131,7 +132,7 @@ export async function joinGameOnChainWithAmount(
     }),
   );
 
-  return withTimeout(sendAndConfirm(wallet, tx), 5000);
+  return sendAndConfirm(wallet, tx);
 }
 
 /**
