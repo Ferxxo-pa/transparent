@@ -22,6 +22,7 @@ import {
   VoteRow,
   QuestionSubmissionRow,
   PredictionRow,
+  supabase,
 } from '../lib/supabase';
 import {
   createGameOnChain,
@@ -53,6 +54,7 @@ interface GameContextType {
   distributePredictions: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
   endGameNow: () => Promise<void>;
+  leaveGame: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
@@ -865,6 +867,33 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
   }, [gameState?.gameId]);
 
+  // ── Leave Game (remove player from DB + reset local) ────
+
+  const leaveGame = useCallback(async () => {
+    const wallet = walletRef.current;
+    const gameId = gameIdRef.current;
+    if (wallet && gameId) {
+      try {
+        await supabase
+          .from('players')
+          .delete()
+          .eq('game_id', gameId)
+          .eq('wallet_address', wallet.publicKey.toBase58());
+      } catch (err) {
+        console.warn('Failed to remove player from DB:', err);
+      }
+    }
+    // Then reset local state
+    if (channelRef.current) {
+      unsubscribeFromGame(channelRef.current);
+      channelRef.current = null;
+    }
+    gameIdRef.current = null;
+    setGameState(null);
+    setError(null);
+    setLoading(false);
+  }, []);
+
   // ── Reset ──────────────────────────────────────────────
 
   const resetGame = useCallback(() => {
@@ -994,6 +1023,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         distributePredictions,
         forceAdvanceRound,
         endGameNow,
+        leaveGame,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,

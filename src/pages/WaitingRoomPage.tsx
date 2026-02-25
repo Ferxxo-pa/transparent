@@ -10,7 +10,7 @@ const LAMPORTS = 1_000_000_000;
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction } = useGame();
+  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame } = useGame();
   const { publicKey, displayName } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
 
@@ -346,6 +346,19 @@ export const WaitingRoomPage: React.FC = () => {
             <p style={{ color: 'var(--muted)', fontSize: 14 }}>⏳ Waiting for host to start…</p>
           </motion.div>
         )}
+
+        {/* Leave lobby */}
+        <button
+          onClick={async () => { await leaveGame(); navigate('/'); }}
+          style={{
+            marginTop: 12, background: 'none', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-pill)', padding: '10px 20px', cursor: 'pointer',
+            color: 'var(--muted)', fontSize: 13, fontWeight: 600,
+            fontFamily: 'Space Grotesk', width: '100%',
+          }}
+        >
+          Leave Lobby
+        </button>
       </div>
     </div>
   );
