@@ -9,7 +9,6 @@ import {
   useWallets as useSolanaWallets,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
-import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 
 // ============================================================
@@ -140,18 +139,10 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
             createOnLogin: 'all-users',
           },
         },
-        solana: {
-          rpcs: {
-            'solana:mainnet': {
-              rpc: createSolanaRpc(SOLANA_RPC),
-              rpcSubscriptions: createSolanaRpcSubscriptions(SOLANA_RPC.replace('https', 'wss')),
-            },
-            'solana:devnet': {
-              rpc: createSolanaRpc(SOLANA_RPC),
-              rpcSubscriptions: createSolanaRpcSubscriptions(SOLANA_RPC.replace('https', 'wss')),
-            },
-          },
-        },
+        solanaClusters: [
+          { name: 'devnet', rpcUrl: SOLANA_RPC },
+          { name: 'mainnet-beta', rpcUrl: SOLANA_RPC },
+        ],
       }}
     >
       <WalletInner>{children}</WalletInner>
