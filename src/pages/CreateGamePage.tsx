@@ -47,7 +47,7 @@ export const CreateGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      <nav className="navbar">
+      <nav className="navbar" style={{ marginBottom: 8 }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
@@ -55,7 +55,6 @@ export const CreateGamePage: React.FC = () => {
         >
           <ArrowLeft size={15} /> Back
         </motion.button>
-        {/* Handled by WalletHeader */}
       </nav>
 
       <motion.div
@@ -85,7 +84,7 @@ export const CreateGamePage: React.FC = () => {
           <motion.div variants={field}>
             <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
             {/* Presets */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', paddingBottom: 4 }}>
               {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => {
                 const usd = preset !== '0' ? solToUsd(parseFloat(preset), solPrice) : '';
                 return (
@@ -101,7 +100,7 @@ export const CreateGamePage: React.FC = () => {
                       fontSize: 13, fontWeight: 600, cursor: 'pointer',
                       fontFamily: 'Space Grotesk',
                       transition: 'all 0.15s',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0,
                     }}
                   >
                     <span>{preset === '0' ? 'Free' : `${preset} SOL`}</span>

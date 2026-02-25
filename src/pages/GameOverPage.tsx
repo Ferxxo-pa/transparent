@@ -59,7 +59,7 @@ export const GameOverPage: React.FC = () => {
 
   return (
     <div className="page fade-in">
-      <nav className="navbar">
+      <nav className="navbar" style={{ marginBottom: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em' }}>
           {confirmed ? '🎉 Game Over' : 'Game Over'}
         </span>

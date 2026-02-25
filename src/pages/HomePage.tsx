@@ -36,9 +36,11 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
           style={{ display: 'flex', flexDirection: 'column', gap: 40 }}
         >
           <div>
-            <img src="/logo-glass.svg" alt="Transparent" style={{ height: 'clamp(60px, 8vw, 90px)', objectFit: 'contain', alignSelf: 'flex-start' }} />
+            <div className="display" style={{ fontSize: 'clamp(48px, 5vw, 72px)', lineHeight: 1.05 }}>
+              The party game<br />with real stakes.
+            </div>
             <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 16, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
-              The party game with real stakes.
+              Everyone puts in cash. Answer honestly. Most transparent player takes the pot.
             </p>
           </div>
 
@@ -189,9 +191,9 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
         style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 0, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
-          <img src="/logo-glass.svg" alt="Transparent" style={{ height: 56, objectFit: 'contain', alignSelf: 'flex-start' }} />
+          <div className="display">The party game<br />with real stakes.</div>
           <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 12, lineHeight: 1.6, fontWeight: 400 }}>
-            The party game with real stakes.
+            Everyone puts in cash. Answer honestly. Most transparent player takes the pot.
           </p>
         </motion.div>
 
