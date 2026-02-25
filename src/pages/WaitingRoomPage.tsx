@@ -339,15 +339,15 @@ export const WaitingRoomPage: React.FC = () => {
             <motion.button
               className="btn btn-primary"
               onClick={async () => { await startGame(); navigate('/game'); }}
-              disabled={loading}
+              disabled={loading || gameState.players.length < 2}
               whileTap={{ scale: 0.96 }}
-              whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
+              whileHover={!loading && gameState.players.length >= 2 ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
             >
-              {loading ? 'Starting…' : 'Start Game →'}
+              {loading ? 'Starting…' : gameState.players.length < 2 ? `Waiting for players (${gameState.players.length}/2+)` : 'Start Game →'}
             </motion.button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-              Start with any number of players
+              {gameState.players.length < 2 ? 'Need at least 2 players to start' : `${gameState.players.length} players ready`}
             </p>
           </>
         ) : (

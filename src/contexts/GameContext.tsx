@@ -286,17 +286,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           custom_questions: questionMode === 'custom' ? (customQuestions ?? null) : null,
         });
 
-        // 3. Add host as first player
-        const hostAddr = wallet.publicKey.toBase58();
-        const hostDisplayName = playerName?.trim() || `${hostAddr.slice(0, 4)}...${hostAddr.slice(-4)}`;
-        await addPlayerToDB({
-          game_id: game.id,
-          wallet_address: hostAddr,
-          display_name: hostDisplayName,
-          has_paid: true,
-        });
+        // 3. Host does NOT join as a player (Kahoot model: host = screen/controller)
+        // Players join separately via room code
 
-        // 4. Fetch initial players
+        // 4. Fetch initial players (will be empty)
         const players = await getPlayersForGame(game.id);
 
         // 5. Determine first question
@@ -313,13 +306,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           roomName: roomName || 'Game Room',
           buyInAmount: buyIn,
           players: playerRowsToPlayers(players, wallet.publicKey.toBase58()),
-          currentPot: buyIn,
+          currentPot: 0,
           gameStatus: 'waiting',
           currentQuestion: firstQuestion,
           currentPlayerInHotSeat: null,
           votes: {},
           voteCount: 0,
-          totalVotes: 1,
+          totalVotes: 0,
           winner: null,
           gameId: game.id,
           hostWallet: wallet.publicKey.toBase58(),

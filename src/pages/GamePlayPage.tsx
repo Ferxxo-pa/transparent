@@ -59,6 +59,7 @@ export const GamePlayPage: React.FC = () => {
   const round      = (gameState.currentRound ?? 0) + 1;
   const total      = gameState.players.length;
   const votesIn    = gameState.voteCount;
+  // All players except hot seat player vote (host is NOT a player)
   const voterCount = Math.max(total - 1, 1);
   const myVote     = gameState.votes[myWallet];
 
@@ -211,33 +212,81 @@ export const GamePlayPage: React.FC = () => {
           <p className="question">{gameState.currentQuestion}</p>
         </motion.div>
 
-        {/* Voting or answering */}
-        {isHotSeat ? (
+        {/* === HOST VIEW (Kahoot-style: spectator + controller) === */}
+        {isHost ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {/* Live vote progress */}
+            <div style={{ background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r)', padding: '18px', textAlign: 'center' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 10 }}>Live Votes</p>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 12 }}>
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--lime)' }}>
+                    {Object.values(gameState.votes).filter(v => v === 'transparent').length}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>✓ Honest</p>
+                </div>
+                <div style={{ width: 1, background: 'var(--border)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--red, #ff5252)' }}>
+                    {Object.values(gameState.votes).filter(v => v === 'fake').length}
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>✗ Lying</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
+                <span style={{ color: 'var(--muted)' }}>Votes in</span>
+                <span style={{ color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
+              </div>
+              <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / Math.max(voterCount, 1)) * 100}%` }} /></div>
+            </div>
+
+            {/* Host controls */}
+            {votesIn >= voterCount && voterCount > 0 && (
+              <motion.button
+                className="btn btn-primary"
+                onClick={forceAdvanceRound}
+                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                Next Round →
+              </motion.button>
+            )}
+            {votesIn > 0 && votesIn < voterCount && (
+              <motion.button
+                className="btn btn-ghost" style={{ width: '100%', height: 38, fontSize: 12 }}
+                onClick={forceAdvanceRound}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                whileTap={{ scale: 0.96 }}
+              >
+                Force next ({votesIn}/{voterCount})
+              </motion.button>
+            )}
+
+            <Scores />
+
+            <button
+              onClick={() => setShowEndConfirm(true)}
+              style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500, padding: '12px 0', alignSelf: 'center' }}
+            >
+              End Game
+            </button>
+          </div>
+        ) : isHotSeat ? (
+          /* === HOT SEAT PLAYER VIEW === */
           <div style={{ background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r)', textAlign: 'center', padding: '18px' }}>
             <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
               Answer out loud. Others are voting on whether you're being honest.
             </p>
-            {/* Always show vote progress */}
             <div style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
                 <span style={{ color: 'var(--muted)' }}>Votes in</span>
                 <span style={{ color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
               </div>
-              <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} /></div>
+              <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / Math.max(voterCount, 1)) * 100}%` }} /></div>
             </div>
-            {/* Skip/advance button for hot seat player */}
-            {(total === 1 || (isHost && votesIn >= voterCount)) && (
-              <motion.button
-                className="btn btn-secondary"
-                style={{ marginTop: 10 }}
-                onClick={forceAdvanceRound}
-                whileTap={{ scale: 0.96 }}
-              >
-                {votesIn >= voterCount ? 'Next Round →' : 'Skip →'}
-              </motion.button>
-            )}
           </div>
         ) : (
+          /* === VOTER VIEW === */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <p className="label-cipher" style={{ textAlign: 'center' }}>
               Is {player?.name} being honest?
@@ -274,38 +323,10 @@ export const GamePlayPage: React.FC = () => {
               </span>
               <span style={{ fontSize: 11, color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
             </div>
-            {votesIn > 0 && (
-              <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} /></div>
-            )}
+            <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / Math.max(voterCount, 1)) * 100}%` }} /></div>
+
+            <Scores />
           </div>
-        )}
-
-        {isHotTake && phase === 'voting-honesty' && isHost && (
-          <motion.button className="btn btn-secondary" onClick={advance} initial={{ opacity: 0 }} animate={{ opacity: 1 }} whileTap={{ scale: 0.96 }}>
-            Next Round →
-          </motion.button>
-        )}
-
-        {!isHotSeat && !isHotTake && isHost && votesIn > 0 && (
-          <motion.button
-            className="btn btn-ghost" style={{ width: '100%', height: 38, fontSize: 12 }}
-            onClick={forceAdvanceRound}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Force next ({votesIn}/{voterCount})
-          </motion.button>
-        )}
-
-        <Scores />
-
-        {isHost && (
-          <button
-            onClick={() => setShowEndConfirm(true)}
-            style={{ fontSize: 12, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500, padding: '12px 0', alignSelf: 'center' }}
-          >
-            End Game
-          </button>
         )}
       </div>
 
