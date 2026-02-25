@@ -10,51 +10,42 @@ import { SOLANA_RPC } from './config';
 // ============================================================
 // Solana On-Chain Layer
 //
-// Uses direct SOL transfers via SystemProgram — no Anchor program.
-// Signing: Privy headless (no modal) via useSignTransaction
-// Sending: manual via Connection.sendRawTransaction (Helius RPC)
-// Confirmation: fire-and-forget (devnet confirmTransaction hangs)
+// Per Privy docs: wallet.sendTransaction(tx, connection)
+// Signs AND sends in one call using our Helius RPC Connection.
+// No separate signTransaction step needed.
 // ============================================================
 
 export const connection = new Connection(SOLANA_RPC, 'confirmed');
 
-// ── Wallet Interface ────────────────────────────────────────
-
 export interface WalletAdapter {
   publicKey: PublicKey;
-  signTransaction: (tx: Transaction) => Promise<Transaction>;
+  /** Signs and sends tx via Privy wallet, returns signature */
+  sendTransaction: (tx: Transaction) => Promise<string>;
 }
-
-// ── PDA derivation kept for interface compat (not used) ────
 
 export function deriveGamePDA(hostPubkey: PublicKey, _roomName: string): [PublicKey, number] {
   return [hostPubkey, 255];
 }
 
-// ── Helpers ─────────────────────────────────────────────────
-
-async function sendAndConfirm(
+async function buildAndSend(
   wallet: WalletAdapter,
   tx: Transaction,
 ): Promise<string> {
-  const { blockhash } = await connection.getLatestBlockhash('confirmed');
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = blockhash;
 
-  const signed = await wallet.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: 'confirmed',
-  });
+  // Privy wallet.sendTransaction signs + sends using our Connection
+  const sig = await wallet.sendTransaction(tx);
 
-  // Fire-and-forget confirmation — devnet confirmTransaction often hangs.
-  // The tx is already sent and will confirm on-chain.
-  connection.confirmTransaction(sig, 'confirmed').catch(() => {});
+  // Wait for confirmation
+  await connection.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    'confirmed',
+  );
 
   return sig;
 }
-
-// ── On-Chain Functions ──────────────────────────────────────
 
 export async function createGameOnChain(
   _wallet: WalletAdapter,
@@ -75,7 +66,7 @@ export async function joinGameOnChain(
       lamports: 0,
     }),
   );
-  return sendAndConfirm(wallet, tx);
+  return buildAndSend(wallet, tx);
 }
 
 export async function joinGameOnChainWithAmount(
@@ -93,7 +84,7 @@ export async function joinGameOnChainWithAmount(
     }),
   );
 
-  return sendAndConfirm(wallet, tx);
+  return buildAndSend(wallet, tx);
 }
 
 export async function distributeOnChain(
@@ -122,7 +113,7 @@ export async function distributeOnChain(
     }),
   );
 
-  return sendAndConfirm(wallet, tx);
+  return buildAndSend(wallet, tx);
 }
 
 export { LAMPORTS_PER_SOL };

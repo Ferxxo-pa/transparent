@@ -7,7 +7,6 @@ import {
 } from '@privy-io/react-auth';
 import {
   useWallets as useSolanaWallets,
-  useSignTransaction,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
@@ -16,14 +15,15 @@ import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 const wssUrl = SOLANA_RPC.replace('https', 'wss');
 
 // ============================================================
-// PURE PRIVY — no wallet adapter
+// PURE PRIVY
 //
-// Login → wallet auto-created or connected via Privy modal.
-// Email/Google/Apple users → embedded Solana wallet (auto)
-// Phantom/Solflare users  → connected via Privy's wallet login
+// Per Privy docs for custom SVM / devnet:
+//   wallet.sendTransaction(tx, connection)
+// This sends the tx using OUR Connection (Helius RPC), bypassing
+// Privy's internal RPC lookup that causes the "Loading..." hang.
 //
-// Signing: useSignTransaction hook (shows Privy confirm modal)
-// Sending: manual via @solana/web3.js Connection (Helius RPC)
+// We expose sendTransaction as our signing interface — it signs
+// AND sends in one call, returning the tx signature.
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -31,7 +31,8 @@ const connection = new Connection(SOLANA_RPC, 'confirmed');
 export interface PrivyWallet {
   publicKey: PublicKey | null;
   address: string | null;
-  signTransaction: ((tx: Transaction) => Promise<Transaction>) | null;
+  /** Signs and sends a transaction via wallet.sendTransaction(tx, connection). Returns signature. */
+  sendTransaction: ((tx: Transaction) => Promise<string>) | null;
   connected: boolean;
   walletReady: boolean;
   walletType: 'embedded' | 'external' | null;
@@ -50,7 +51,6 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { logout } = useLogout();
 
   const { wallets } = useSolanaWallets();
-  const { signTransaction: privySign } = useSignTransaction();
 
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
@@ -69,21 +69,15 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  const signTransaction = useMemo(() => {
+  // Use wallet.sendTransaction(tx, connection) per Privy docs
+  // This bypasses Privy's internal RPC config and uses our Helius RPC
+  const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
-    return async (tx: Transaction): Promise<Transaction> => {
-      const serialized = tx.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
-      });
-      const { signedTransaction } = await privySign({
-        transaction: serialized,
-        wallet: activeWallet,
-        chain: 'solana:devnet',
-      });
-      return Transaction.from(signedTransaction);
+    return async (tx: Transaction): Promise<string> => {
+      const sig = await activeWallet.sendTransaction!(tx, connection);
+      return sig;
     };
-  }, [activeWallet, publicKey, privySign]);
+  }, [activeWallet, publicKey]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
@@ -101,16 +95,16 @@ function WalletInner({ children }: { children: ReactNode }) {
   const value: PrivyWallet = useMemo(() => ({
     publicKey,
     address: activeWallet?.address ?? null,
-    signTransaction,
+    sendTransaction,
     connected: authenticated,
-    walletReady: !!publicKey && !!signTransaction,
+    walletReady: !!publicKey && !!sendTransaction,
     walletType,
     login,
     logout,
     user,
     displayName,
     connection,
-  }), [publicKey, activeWallet?.address, signTransaction, authenticated, walletType, login, logout, user, displayName]);
+  }), [publicKey, activeWallet?.address, sendTransaction, authenticated, walletType, login, logout, user, displayName]);
 
   return (
     <PrivyWalletContext.Provider value={value}>
@@ -137,10 +131,6 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
             createOnLogin: 'all-users',
           },
         },
-        solanaClusters: [
-          { name: 'devnet', rpcUrl: SOLANA_RPC },
-          { name: 'mainnet-beta', rpcUrl: SOLANA_RPC },
-        ],
         solana: {
           rpcs: {
             'solana:devnet': {
