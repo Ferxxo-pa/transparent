@@ -17,13 +17,9 @@ const wssUrl = SOLANA_RPC.replace('https', 'wss');
 // ============================================================
 // PURE PRIVY
 //
-// Per Privy docs for custom SVM / devnet:
-//   wallet.sendTransaction(tx, connection)
-// This sends the tx using OUR Connection (Helius RPC), bypassing
-// Privy's internal RPC lookup that causes the "Loading..." hang.
-//
-// We expose sendTransaction as our signing interface — it signs
-// AND sends in one call, returning the tx signature.
+// Uses wallet provider.request({ method: 'signAndSendTransaction' })
+// which accepts a Connection object — our Helius devnet RPC.
+// This bypasses Privy's internal RPC config lookup entirely.
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -31,7 +27,7 @@ const connection = new Connection(SOLANA_RPC, 'confirmed');
 export interface PrivyWallet {
   publicKey: PublicKey | null;
   address: string | null;
-  /** Signs and sends a transaction via wallet.sendTransaction(tx, connection). Returns signature. */
+  /** Signs and sends a transaction via wallet provider, returns signature */
   sendTransaction: ((tx: Transaction) => Promise<string>) | null;
   connected: boolean;
   walletReady: boolean;
@@ -69,13 +65,28 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Use wallet.sendTransaction(tx, connection) per Privy docs
-  // This bypasses Privy's internal RPC config and uses our Helius RPC
+  // Sign + send via wallet provider RPC with our Connection
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
-      const sig = await activeWallet.sendTransaction!(tx, connection);
-      return sig;
+      // Get the Solana provider from the wallet
+      const provider = await (activeWallet as any).getProvider();
+      
+      // Use provider.request to call signAndSendTransaction
+      // passing our Connection so it uses Helius RPC
+      const result = await provider.request({
+        method: 'signAndSendTransaction',
+        params: {
+          transaction: tx,
+          connection: connection,
+          options: {
+            skipPreflight: false,
+            preflightCommitment: 'confirmed',
+          },
+        },
+      });
+      
+      return result.signature;
     };
   }, [activeWallet, publicKey]);
 
