@@ -37,10 +37,10 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
         >
           <div>
             <div className="display" style={{ fontSize: 'clamp(48px, 5vw, 72px)', lineHeight: 1.05 }}>
-              The party game<br />with real stakes.
+              Transparent
             </div>
             <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 16, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
-              Everyone puts in cash. Answer honestly. Most transparent player takes the pot.
+              The party game with real stakes.
             </p>
           </div>
 
@@ -182,12 +182,8 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
-      {/* Logo + spacer for wallet pill row */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 38, marginBottom: 12 }}>
-        <img src="/logo-glass.svg" alt="Transparent" style={{ height: 38, objectFit: 'contain' }} />
-        {/* Right side reserved for wallet pill (absolute positioned) */}
-        <div style={{ width: 200 }} />
-      </div>
+      {/* Spacer for wallet pill row */}
+      <div style={{ width: '100%', minHeight: 38, marginBottom: 12 }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -195,9 +191,9 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
         style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 0, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
-          <div className="display">The party game<br />with real stakes.</div>
+          <div className="display">Transparent</div>
           <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 12, lineHeight: 1.6, fontWeight: 400 }}>
-            Everyone puts in cash. Answer honestly. Most transparent player takes the pot.
+            The party game with real stakes.
           </p>
         </motion.div>
 
