@@ -49,7 +49,7 @@ export const GameCreatedPage: React.FC = () => {
   return (
     <div className="page fade-in">
       {/* Top row: status + player count */}
-      <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
+      <div style={{ width: '100%', paddingTop: 48, marginBottom: 12 }}>
         <span className="chip chip-lime blink" style={{ fontSize: 11 }}>● Lobby</span>
       </div>
 

@@ -180,8 +180,8 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
-      {/* Top spacing */}
-      <div style={{ width: '100%', minHeight: 16, marginBottom: 20 }} />
+      {/* Top spacing — clear wallet pill */}
+      <div style={{ width: '100%', minHeight: 48, marginBottom: 12 }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
