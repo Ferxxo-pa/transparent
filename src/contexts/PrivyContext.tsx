@@ -7,8 +7,9 @@ import {
 } from '@privy-io/react-auth';
 import {
   useWallets as useSolanaWallets,
+  useSignTransaction,
 } from '@privy-io/react-auth/solana';
-import { PublicKey, Transaction, Connection, SendOptions } from '@solana/web3.js';
+import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
 import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 
@@ -17,12 +18,9 @@ const wssUrl = SOLANA_RPC.replace('https', 'wss');
 // ============================================================
 // PURE PRIVY
 //
-// ConnectedStandardSolanaWallet has:
-//   - signTransaction(input): signs tx, returns signed bytes
-//   - signAndSendTransaction is available as a standard wallet feature
-//
-// We use the wallet-standard features directly via the standardWallet
-// property, which gives us access to solana:signAndSendTransaction.
+// Strategy: useSignTransaction with uiOptions.showWalletUIs = false
+// to sign headlessly, then manually send via our Helius Connection.
+// If headless fails, fall back to normal sign (shows modal).
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -49,6 +47,7 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { logout } = useLogout();
 
   const { wallets } = useSolanaWallets();
+  const { signTransaction: privySign } = useSignTransaction();
 
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
@@ -67,86 +66,60 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Sign + Send using the wallet-standard signAndSendTransaction feature
+  // Sign headlessly via useSignTransaction, then send manually via our Connection
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
-      const wallet = activeWallet as any;
+      const serialized = tx.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      });
 
-      // Try multiple approaches in order of preference:
+      console.log('[PrivyWallet] Signing transaction headlessly...');
 
-      // Approach 1: wallet-standard signAndSendTransaction via standardWallet
-      if (wallet.standardWallet?.features?.['solana:signAndSendTransaction']) {
-        const feature = wallet.standardWallet.features['solana:signAndSendTransaction'];
-        const serialized = tx.serialize({
-          requireAllSignatures: false,
-          verifySignatures: false,
-        });
-        const account = wallet.standardWallet.accounts[0];
-        const result = await feature.signAndSendTransaction({
+      // Try headless first (no UI), fall back to normal (with UI)
+      let signedTransaction: Uint8Array;
+      try {
+        const result = await privySign({
           transaction: serialized,
-          account,
+          wallet: activeWallet,
           chain: 'solana:devnet',
-          options: {
-            preflightCommitment: 'confirmed',
-          },
-        });
-        // result.signature is a Uint8Array — convert to base58
-        const sig = Buffer.from(result.signature).toString('base64');
-        // Actually we need base58, let's use bs58 encoding
-        const bs58Chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-        const bytes = result.signature;
-        let num = BigInt(0);
-        for (const b of bytes) num = num * 256n + BigInt(b);
-        let encoded = '';
-        while (num > 0n) {
-          encoded = bs58Chars[Number(num % 58n)] + encoded;
-          num = num / 58n;
-        }
-        for (const b of bytes) {
-          if (b === 0) encoded = '1' + encoded;
-          else break;
-        }
-        return encoded;
-      }
-
-      // Approach 2: signTransaction then manual send via our Connection
-      if (wallet.signTransaction) {
-        const serialized = tx.serialize({
-          requireAllSignatures: false,
-          verifySignatures: false,
-        });
-        const result = await wallet.signTransaction({
+          options: { uiOptions: { showWalletUIs: false } },
+        } as any);
+        signedTransaction = result.signedTransaction;
+        console.log('[PrivyWallet] Headless sign succeeded');
+      } catch (headlessErr) {
+        console.warn('[PrivyWallet] Headless sign failed, trying with UI:', headlessErr);
+        const result = await privySign({
           transaction: serialized,
+          wallet: activeWallet,
           chain: 'solana:devnet',
         });
-        const signedTx = Transaction.from(result.signedTransaction);
-        const sig = await connection.sendRawTransaction(signedTx.serialize(), {
-          skipPreflight: false,
-          preflightCommitment: 'confirmed',
-        });
-        return sig;
+        signedTransaction = result.signedTransaction;
+        console.log('[PrivyWallet] UI sign succeeded');
       }
 
-      // Approach 3: getProvider (EVM-style, but some Privy versions support it)
-      if (wallet.getProvider) {
-        const provider = await wallet.getProvider();
-        if (provider?.request) {
-          const result = await provider.request({
-            method: 'signAndSendTransaction',
-            params: {
-              transaction: tx,
-              connection: connection,
-              options: { skipPreflight: false, preflightCommitment: 'confirmed' },
-            },
-          });
-          return result.signature;
-        }
-      }
+      const signedTx = Transaction.from(signedTransaction);
 
-      throw new Error('No supported signing method found on wallet');
+      console.log('[PrivyWallet] Sending via Helius RPC...');
+      const sig = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: false,
+        preflightCommitment: 'confirmed',
+      });
+
+      console.log('[PrivyWallet] Tx sent:', sig);
+
+      // Confirm
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        'confirmed',
+      );
+
+      console.log('[PrivyWallet] Tx confirmed:', sig);
+      return sig;
     };
-  }, [activeWallet, publicKey]);
+  }, [activeWallet, publicKey, privySign]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
