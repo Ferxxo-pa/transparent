@@ -56,6 +56,7 @@ interface GameContextType {
   endGameNow: () => Promise<void>;
   leaveGame: () => Promise<void>;
   refreshPlayers: () => Promise<void>;
+  pollGameState: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
@@ -904,6 +905,118 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  // ── Poll Game State (master fallback for dead Realtime) ──
+
+  const pollGameState = useCallback(async () => {
+    const gameId = gameIdRef.current;
+    if (!gameId) return;
+    try {
+      // Fetch game, players, and votes for current round in parallel
+      const [gameRes, playersRes] = await Promise.all([
+        supabase.from('games').select('*').eq('id', gameId).single(),
+        getPlayersForGame(gameId),
+      ]);
+
+      const game = gameRes.data;
+      if (!game) return;
+
+      // Fetch votes — current round during play, ALL rounds on game over
+      const currentRound = game.current_round ?? 0;
+      let votesRes: VoteRow[];
+      let allVotes: VoteRow[] | null = null;
+      if (game.status === 'gameover') {
+        const { data } = await supabase.from('votes').select('*').eq('game_id', gameId).order('round', { ascending: true });
+        allVotes = (data ?? []) as VoteRow[];
+        votesRes = allVotes.filter(v => v.round === currentRound);
+      } else {
+        votesRes = await getVotesForRound(gameId, currentRound);
+      }
+
+      setGameState(prev => {
+        if (!prev) return prev;
+        const hostWallet = prev.hostWallet ?? '';
+        const mapped = playerRowsToPlayers(playersRes, hostWallet);
+
+        // Determine question
+        let currentQuestion = prev.currentQuestion;
+        if (prev.questionMode === 'classic') {
+          currentQuestion = QUESTIONS[game.current_question_index] || QUESTIONS[0];
+        } else if (prev.questionMode === 'custom' && prev.customQuestions) {
+          currentQuestion = prev.customQuestions[game.current_question_index] || prev.customQuestions[0] || '';
+        }
+
+        // Build vote map
+        const voteMap: Record<string, 'transparent' | 'fake'> = {};
+        votesRes.forEach((v: VoteRow) => { voteMap[v.voter_wallet] = v.vote; });
+
+        // Calculate scores
+        const roundChanged = currentRound !== (prev.currentRound ?? 0);
+        let newScores = prev.scores ?? {};
+
+        if (game.status === 'gameover' && allVotes && allVotes.length > 0) {
+          // Rebuild ALL scores from all rounds
+          newScores = {};
+          const rounds = [...new Set(allVotes.map(v => v.round))].sort((a, b) => a - b);
+          for (const round of rounds) {
+            // Hot seat player = players[round % numPlayers]
+            const hotSeatIdx = round % mapped.length;
+            const hotSeatWallet = mapped[hotSeatIdx]?.id;
+            if (!hotSeatWallet) continue;
+            const roundVotes = allVotes.filter(v => v.round === round);
+            const t = roundVotes.filter(v => v.vote === 'transparent').length;
+            const f = roundVotes.filter(v => v.vote === 'fake').length;
+            const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+            newScores[hotSeatWallet] = {
+              transparent: existing.transparent + t,
+              fake: existing.fake + f,
+              rounds: existing.rounds + 1,
+            };
+          }
+        } else {
+          // During gameplay: score current round if all votes in
+          const hotSeatWallet = game.current_hot_seat_player;
+          const eligibleVoters = mapped.filter(p => p.id !== hotSeatWallet).length;
+          const votesNeeded = Math.max(eligibleVoters, 1);
+          if (votesRes.length >= votesNeeded && hotSeatWallet) {
+            const existingRounds = newScores[hotSeatWallet]?.rounds ?? 0;
+            if (existingRounds < currentRound + 1) {
+              const transparentVotes = votesRes.filter((v: VoteRow) => v.vote === 'transparent').length;
+              const fakeVotes = votesRes.filter((v: VoteRow) => v.vote === 'fake').length;
+              const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+              newScores = {
+                ...newScores,
+                [hotSeatWallet]: {
+                  transparent: existing.transparent + transparentVotes,
+                  fake: existing.fake + fakeVotes,
+                  rounds: currentRound + 1,
+                },
+              };
+            }
+          }
+        }
+
+        return {
+          ...prev,
+          gameStatus: game.status,
+          currentQuestion,
+          currentPlayerInHotSeat: game.current_hot_seat_player,
+          gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
+          currentRound,
+          players: mapped,
+          currentPot: mapped.length * prev.buyInAmount,
+          totalVotes: mapped.length,
+          scores: newScores,
+          // Clear votes on round change, otherwise update
+          ...(roundChanged ? { votes: {}, voteCount: 0 } : { votes: voteMap, voteCount: votesRes.length }),
+        };
+      });
+
+
+    } catch (err) {
+      console.error('[pollGameState] error:', err);
+    }
+  }, []);
+
   // ── Leave Game (remove player from DB + reset local) ────
 
   const leaveGame = useCallback(async () => {
@@ -1062,6 +1175,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         endGameNow,
         leaveGame,
         refreshPlayers,
+        pollGameState,
         resetGame,
         simulateAutoPlay,
         setWalletAdapter,

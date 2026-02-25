@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
@@ -6,12 +6,15 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const GameOverPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, resetGame, distributeWinnings, distributePredictions, predictions, predictionPot } = useGame();
+  const { gameState, resetGame, distributeWinnings, distributePredictions, predictions, predictionPot, pollGameState } = useGame();
   const { publicKey } = usePrivyWallet();
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [distributing, setDistributing] = useState(false);
   const [distErr, setDistErr] = useState<string | null>(null);
+
+  // Fetch final state on mount
+  useEffect(() => { pollGameState(); }, [pollGameState]);
 
   if (!gameState) { navigate('/'); return null; }
 
@@ -132,7 +135,7 @@ export const GameOverPage: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
-                      {i === 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
+                      {i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
                       {isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
                     </div>
                     {s ? (

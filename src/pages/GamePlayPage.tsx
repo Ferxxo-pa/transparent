@@ -8,7 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -18,6 +18,32 @@ export const GamePlayPage: React.FC = () => {
   useEffect(() => {
     if (gameState?.gameStatus === 'gameover') navigate('/gameover');
   }, [gameState?.gameStatus, navigate]);
+
+  // Poll every 3s as Realtime fallback
+  useEffect(() => {
+    if (!gameState || gameState.gameStatus !== 'playing') return;
+    const interval = setInterval(() => { pollGameState(); }, 3000);
+    return () => clearInterval(interval);
+  }, [gameState?.gameStatus, pollGameState]);
+
+  // Auto-advance when host detects all votes are in
+  const [autoAdvanced, setAutoAdvanced] = useState<number | null>(null);
+  useEffect(() => {
+    if (!gameState || !isHost || gameState.gameStatus !== 'playing') return;
+    const currentRound = gameState.currentRound ?? 0;
+    if (autoAdvanced === currentRound) return; // already advanced this round
+    const hotSeatWallet = gameState.currentPlayerInHotSeat;
+    const eligible = gameState.players.filter(p => p.id !== hotSeatWallet).length;
+    const needed = Math.max(eligible, 1);
+    if (gameState.voteCount >= needed && needed > 0 && !isHotSeat) {
+      // Small delay so vote results are visible before advancing
+      const timer = setTimeout(() => {
+        setAutoAdvanced(currentRound);
+        forceAdvanceRound();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState?.voteCount, gameState?.currentRound, isHost, isHotSeat, autoAdvanced, forceAdvanceRound]);
 
   const advance = useCallback(() => {
     if (isHost) advanceHotTakePhase();
@@ -191,23 +217,24 @@ export const GamePlayPage: React.FC = () => {
             <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
               Answer out loud. Others are voting on whether you're being honest.
             </p>
-            {total === 1 ? (
+            {/* Always show vote progress */}
+            <div style={{ marginTop: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
+                <span style={{ color: 'var(--muted)' }}>Votes in</span>
+                <span style={{ color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
+              </div>
+              <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} /></div>
+            </div>
+            {/* Skip/advance button for hot seat player */}
+            {(total === 1 || (isHost && votesIn >= voterCount)) && (
               <motion.button
                 className="btn btn-secondary"
-                style={{ marginTop: 14 }}
+                style={{ marginTop: 10 }}
                 onClick={forceAdvanceRound}
                 whileTap={{ scale: 0.96 }}
               >
-                Next →
+                {votesIn >= voterCount ? 'Next Round →' : 'Skip →'}
               </motion.button>
-            ) : votesIn > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>
-                  <span style={{ color: 'var(--muted)' }}>Votes in</span>
-                  <span style={{ color: 'var(--muted)' }}>{votesIn}/{voterCount}</span>
-                </div>
-                <div className="progress"><div className="progress-bar" style={{ width: `${(votesIn / voterCount) * 100}%` }} /></div>
-              </div>
             )}
           </div>
         ) : (
