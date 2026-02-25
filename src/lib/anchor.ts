@@ -10,11 +10,12 @@ import { SOLANA_RPC } from './config';
 // ============================================================
 // Solana On-Chain Layer
 //
-// Uses direct SOL transfers via SystemProgram — no Anchor program.
-// Buy-ins flow to the host wallet (escrow). Host distributes pot
-// to winner at game end.
+// Uses direct SOL transfers via SystemProgram — no Anchor program
+// required. Buy-ins flow to the host wallet (escrow). The host
+// distributes the pot to the winner at game end.
 //
-// Privy signs headlessly (no modal). We send via Helius RPC.
+// Signing: Privy headless (no modal) via useSignTransaction
+// Sending: manual via Connection.sendRawTransaction (Helius RPC)
 // ============================================================
 
 export const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -42,7 +43,10 @@ async function sendAndConfirm(
   tx.feePayer = wallet.publicKey;
   tx.recentBlockhash = blockhash;
 
+  // Headless sign via Privy (no modal popup)
   const signed = await wallet.signTransaction(tx);
+
+  // Send via our own Connection (Helius RPC — fast)
   const sig = await connection.sendRawTransaction(signed.serialize(), {
     skipPreflight: false,
     preflightCommitment: 'confirmed',

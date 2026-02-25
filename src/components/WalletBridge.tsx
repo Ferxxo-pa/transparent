@@ -4,7 +4,6 @@ import { useGame } from '../contexts/GameContext';
 
 /**
  * Syncs Privy wallet state into GameContext.
- * Privy signs headlessly (no modal) — we send manually via Helius RPC.
  */
 export function WalletBridge() {
   const { publicKey, signTransaction } = usePrivyWallet();

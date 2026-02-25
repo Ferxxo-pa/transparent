@@ -16,9 +16,12 @@ import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
 // ============================================================
 // PURE PRIVY — no wallet adapter
 //
-// Signing: useSignTransaction in HEADLESS mode (no modal)
-// Sending: manual via connection.sendRawTransaction + Helius RPC
-// This avoids Privy's modal hanging on embedded wallet flows.
+// Login → wallet auto-created or connected via Privy modal.
+// Email/Google/Apple users → embedded Solana wallet (auto)
+// Phantom/Solflare users  → connected via Privy's wallet login
+//
+// Signing: useSignTransaction with showWalletUIs: false (headless)
+// Sending: manual via @solana/web3.js Connection (fast Helius RPC)
 // ============================================================
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
@@ -44,9 +47,11 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { login } = useLogin();
   const { logout } = useLogout();
 
+  // All Solana wallets managed by Privy (embedded + connected external)
   const { wallets } = useSolanaWallets();
   const { signTransaction: privySign } = useSignTransaction();
 
+  // Pick the best wallet: prefer embedded (always available), fallback to external
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
     return wallets.find(w => w.walletClientType === 'privy')
@@ -64,7 +69,7 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
-  // Headless sign — no Privy modal, signs silently
+  // Headless sign — no Privy modal, just sign and return
   const signTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<Transaction> => {
@@ -75,6 +80,7 @@ function WalletInner({ children }: { children: ReactNode }) {
       const { signedTransaction } = await privySign({
         transaction: serialized,
         wallet: activeWallet,
+        chain: 'solana:devnet',
         options: { uiOptions: { showWalletUIs: false } },
       });
       return Transaction.from(signedTransaction);
@@ -132,7 +138,6 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
           solana: {
             createOnLogin: 'all-users',
           },
-          showWalletUIs: false,
         },
         solana: {
           rpcs: {
