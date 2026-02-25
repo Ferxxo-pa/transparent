@@ -184,7 +184,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 32, paddingTop: 12, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 8, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
           <div className="display">The party game<br />with real stakes.</div>
