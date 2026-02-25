@@ -59,12 +59,11 @@ export const WaitingRoomPage: React.FC = () => {
 
   return (
     <div className="page fade-in">
-      <nav className="navbar">
+      <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
         <span className="chip chip-lime blink">● Waiting</span>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-          {gameState.players.length} joined · {pot} SOL pot
-        </span>
       </nav>
+
+      <div style={{ height: 12 }} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>
 

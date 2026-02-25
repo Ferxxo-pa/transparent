@@ -47,7 +47,7 @@ export const CreateGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      <nav className="navbar">
+      <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
@@ -57,8 +57,10 @@ export const CreateGamePage: React.FC = () => {
         </motion.button>
       </nav>
 
+      <div style={{ height: 16 }} />
+
       <motion.div
-        style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%', flex: 1 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}
         initial="initial" animate="animate"
         variants={{ animate: { transition: { staggerChildren: 0.07 } } }}
       >
@@ -219,7 +221,7 @@ export const CreateGamePage: React.FC = () => {
       </motion.div>
 
       {/* Sticky CTA */}
-      <div style={{ width: '100%', paddingTop: 20 }}>
+      <div style={{ width: '100%', paddingTop: 10 }}>
         <motion.button
           className="btn btn-primary"
           onClick={handleCreate}

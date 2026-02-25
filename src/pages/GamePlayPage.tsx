@@ -37,7 +37,7 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Shared Navbar ──────────────────────────────────────────
   const Nav = () => (
-    <nav className="navbar">
+    <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
       <span className="chip chip-lavender">Round {round} / {total}</span>
       {isHost && (
         <button
@@ -167,7 +167,7 @@ export const GamePlayPage: React.FC = () => {
   return (
     <div className="page fade-in">
       <Nav />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1, justifyContent: 'center' }}>
 
         {/* Hot seat */}
         <HotSeatCard />

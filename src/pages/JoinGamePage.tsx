@@ -30,7 +30,7 @@ export const JoinGamePage: React.FC = () => {
   return (
     <WalletSetupGate>
     <div className="page fade-in">
-      <nav className="navbar">
+      <nav className="navbar" style={{ minHeight: 38, display: 'flex', alignItems: 'center' }}>
         <motion.button
           onClick={() => navigate('/')}
           style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
@@ -38,11 +38,12 @@ export const JoinGamePage: React.FC = () => {
         >
           <ArrowLeft size={15} /> Back
         </motion.button>
-        {/* Handled by WalletHeader */}
       </nav>
 
+      <div style={{ height: 16 }} />
+
       <motion.div
-        style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1, justifyContent: 'center', paddingBottom: 80 }}
+        style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1, paddingBottom: 80 }}
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 280, damping: 26 }}
