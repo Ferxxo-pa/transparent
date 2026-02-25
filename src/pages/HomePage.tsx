@@ -17,7 +17,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      padding: '64px 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
+      padding: '72px 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
       position: 'relative', zIndex: 1,
     }}>
       {/* Header handled by WalletHeader component */}
