@@ -17,14 +17,10 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      padding: '0 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
+      padding: '64px 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
       position: 'relative', zIndex: 1,
     }}>
-      {/* Top bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '28px 0 0' }}>
-        <img src="/logo-glass.svg" alt="Transparent" style={{ height: 72, objectFit: 'contain' }} />
-        {/* Wallet pill handled by WalletHeader (global overlay) */}
-      </div>
+      {/* Header handled by WalletHeader component */}
 
       {/* Main grid */}
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', paddingTop: 40 }}>
@@ -188,7 +184,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.4 }}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 32, paddingTop: connected ? 12 : 40, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 32, paddingTop: 12, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
           <div className="display">The party game<br />with real stakes.</div>
