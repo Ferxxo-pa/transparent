@@ -138,7 +138,7 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
         },
         externalWallets: {
           solana: {
-            connectors: toSolanaWalletConnectors({ shouldAutoConnect: true }),
+            connectors: toSolanaWalletConnectors(),
           },
         },
       }}
