@@ -29,6 +29,10 @@ export const WaitingRoomPage: React.FC = () => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
   }, [gameState?.gameStatus, navigate]);
 
+  // Guard: if gameState was cleared (e.g. after leaving), render nothing
+  // This prevents crashes during AnimatePresence exit animations
+  if (!gameState) return null;
+
   // Auto-refresh players every 5s as fallback for Realtime
   useEffect(() => {
     if (!gameState || gameState.gameStatus !== 'waiting') return;
@@ -76,9 +80,8 @@ export const WaitingRoomPage: React.FC = () => {
   };
 
   const handleLeave = async () => {
+    await leaveGame();
     navigate('/', { replace: true });
-    // Clean up after navigation to avoid context errors during exit animation
-    setTimeout(() => leaveGame(), 100);
   };
 
   return (
