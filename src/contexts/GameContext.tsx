@@ -57,6 +57,9 @@ interface GameContextType {
   endGameNow: () => Promise<void>;
   readyUp: () => Promise<void>;
   leaveGame: () => Promise<void>;
+  requestLeave: () => void;
+  leaveRequests: string[];
+  approveLeave: (playerWallet: string) => Promise<void>;
   refreshPlayers: () => Promise<void>;
   pollGameState: () => Promise<void>;
   resetGame: () => void;
@@ -103,6 +106,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
 
   const walletRef = useRef<WalletAdapter | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -238,6 +242,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setPredictions(newPredictions);
         },
       );
+
+      // Listen for leave requests via broadcast
+      channel.on('broadcast', { event: 'leave_request' }, (payload: any) => {
+        const wallet = payload?.payload?.wallet;
+        const name = payload?.payload?.name;
+        if (wallet) {
+          setLeaveRequests(prev => prev.includes(wallet) ? prev : [...prev, wallet]);
+          console.log(`[Broadcast] Leave request from ${name} (${wallet})`);
+        }
+      });
 
       channelRef.current = channel;
     },
@@ -1106,6 +1120,54 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(false);
   }, []);
 
+  // ── Leave Request (player asks host for refund) ─────────
+
+  const requestLeave = useCallback(() => {
+    const channel = channelRef.current;
+    const wallet = walletRef.current;
+    const gs = gameStateRef.current;
+    if (!channel || !wallet || !gs) return;
+    const playerName = gs.players.find(p => p.id === wallet.publicKey.toBase58())?.name ?? 'Player';
+    channel.send({
+      type: 'broadcast',
+      event: 'leave_request',
+      payload: { wallet: wallet.publicKey.toBase58(), name: playerName },
+    });
+  }, []);
+
+  const approveLeave = useCallback(async (playerWallet: string) => {
+    const wallet = walletRef.current;
+    const gameId = gameIdRef.current;
+    const gs = gameStateRef.current;
+    if (!wallet || !gameId || !gs) return;
+
+    // Refund the player's buy-in
+    if (gs.buyInAmount > 0) {
+      try {
+        const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
+        const playerPubkey = new PublicKey(playerWallet);
+        await distributeOnChain(wallet, playerPubkey, playerPubkey, lamports);
+        console.log(`[approveLeave] Refunded ${gs.buyInAmount} SOL to ${playerWallet.slice(0, 8)}`);
+      } catch (err) {
+        console.warn('[approveLeave] Refund failed:', err);
+      }
+    }
+
+    // Remove player from DB
+    try {
+      await supabase
+        .from('players')
+        .delete()
+        .eq('game_id', gameId)
+        .eq('wallet_address', playerWallet);
+    } catch (err) {
+      console.warn('[approveLeave] Remove failed:', err);
+    }
+
+    // Remove from leave requests
+    setLeaveRequests(prev => prev.filter(w => w !== playerWallet));
+  }, []);
+
   // ── Reset ──────────────────────────────────────────────
 
   const resetGame = useCallback(() => {
@@ -1245,6 +1307,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         endGameNow,
         readyUp,
         leaveGame,
+        requestLeave,
+        leaveRequests,
+        approveLeave,
         refreshPlayers,
         pollGameState,
         resetGame,

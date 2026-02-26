@@ -4,16 +4,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, TrendingUp, Coins, RefreshCw } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 
 const PREDICTION_PRESETS = [0.01, 0.05, 0.1, 0.25, 0.5, 1];
 const LAMPORTS = 1_000_000_000;
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame, readyUp, refreshPlayers } = useGame();
+  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame, requestLeave, leaveRequests, approveLeave, readyUp, refreshPlayers } = useGame();
   const { publicKey, displayName } = usePrivyWallet();
+  const solPrice = useSolPrice();
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
+  const [playerWantsLeave, setPlayerWantsLeave] = useState(false);
   const [readying, setReadying] = useState(false);
 
   // Prediction state
@@ -103,6 +107,26 @@ export const WaitingRoomPage: React.FC = () => {
   };
 
   const handleLeave = async () => {
+    const meReady = gameState.players.find(p => p.id === myWallet)?.isReady;
+    const hasBuyIn = gameState.buyInAmount > 0;
+
+    if (isHost) {
+      // Host leaving — handled by leaveGame (cancels game)
+      await leaveGame();
+      navigate('/', { replace: true });
+    } else if (meReady && hasBuyIn) {
+      // Readied player with buy-in: request leave (host needs to refund)
+      requestLeave();
+      setPlayerWantsLeave(true);
+    } else {
+      // Not readied or free game: leave directly
+      await leaveGame();
+      navigate('/', { replace: true });
+    }
+  };
+
+  const handleForceLeave = async () => {
+    // Player forces leave without refund
     await leaveGame();
     navigate('/', { replace: true });
   };
@@ -168,6 +192,92 @@ export const WaitingRoomPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Player waiting for refund overlay */}
+      {playerWantsLeave && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+            style={{
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 'var(--r)', padding: 24, maxWidth: 340, width: '100%',
+              textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14,
+            }}
+          >
+            <div style={{ fontSize: 36 }}>🙋</div>
+            <p style={{ fontSize: 16, fontWeight: 700 }}>Leave Request Sent</p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+              The host has been notified. They need to refund your {gameState.buyInAmount} SOL before you can leave.
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--lavender)' }}>⏳ Waiting for host to approve…</p>
+            <button
+              onClick={handleForceLeave}
+              style={{
+                padding: '10px 0', borderRadius: 'var(--r-sm)',
+                background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.3)',
+                color: '#ff4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'Space Grotesk',
+              }}
+            >
+              Leave without refund
+            </button>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Host: leave request notifications */}
+      {isHost && leaveRequests.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          style={{
+            position: 'fixed', top: 70, left: 16, right: 16, zIndex: 90,
+            display: 'flex', flexDirection: 'column', gap: 8,
+          }}
+        >
+          {leaveRequests.map(wallet => {
+            const player = gameState.players.find(p => p.id === wallet);
+            return (
+              <motion.div
+                key={wallet}
+                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                style={{
+                  background: 'var(--card)', border: '1px solid rgba(255,180,60,0.4)',
+                  borderRadius: 'var(--r-sm)', padding: '12px 16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
+                    🙋 {player?.name ?? wallet.slice(0, 8)} wants to leave
+                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>
+                    Refund {gameState.buyInAmount} SOL to let them go
+                  </p>
+                </div>
+                <button
+                  onClick={() => approveLeave(wallet)}
+                  style={{
+                    padding: '8px 14px', borderRadius: 'var(--r-pill)',
+                    background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)',
+                    color: 'var(--lime)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    fontFamily: 'Space Grotesk', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Refund & Remove
+                </button>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
 
       {/* Top row */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
@@ -425,22 +535,27 @@ export const WaitingRoomPage: React.FC = () => {
                             <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bet amount</p>
                             {/* Horizontal scrolling presets */}
                             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 8, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-                              {PREDICTION_PRESETS.map(preset => (
-                                <button
-                                  key={preset}
-                                  onClick={() => { setBetAmount(preset); setCustomBet(''); }}
-                                  style={{
-                                    padding: '8px 16px', borderRadius: 'var(--r-pill)',
-                                    border: `1px solid ${betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--border)'}`,
-                                    background: betAmount === preset && !customBet ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
-                                    color: betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--muted)',
-                                    fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk',
-                                    whiteSpace: 'nowrap', flexShrink: 0,
-                                  }}
-                                >
-                                  {preset} SOL
-                                </button>
-                              ))}
+                              {PREDICTION_PRESETS.map(preset => {
+                                const usd = solToUsd(preset, solPrice);
+                                return (
+                                  <button
+                                    key={preset}
+                                    onClick={() => { setBetAmount(preset); setCustomBet(''); }}
+                                    style={{
+                                      padding: '8px 16px', borderRadius: 'var(--r-pill)',
+                                      border: `1px solid ${betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--border)'}`,
+                                      background: betAmount === preset && !customBet ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
+                                      color: betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--muted)',
+                                      fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk',
+                                      whiteSpace: 'nowrap', flexShrink: 0,
+                                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
+                                    }}
+                                  >
+                                    <span>{preset} SOL</span>
+                                    {usd && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>{usd}</span>}
+                                  </button>
+                                );
+                              })}
                             </div>
                             {/* Custom bet input */}
                             <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
