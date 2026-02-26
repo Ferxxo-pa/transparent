@@ -18,24 +18,24 @@ export const GameOverPage: React.FC = () => {
   // Fetch final state on mount
   useEffect(() => { pollGameState(); }, [pollGameState]);
 
-  if (!gameState) return null;
-
-  const isHost = publicKey?.toBase58() === (gameState as any).hostWallet;
-  const scores = gameState.scores ?? {};
-  const isSplitPot = gameState.payoutMode === 'split-pot';
-  const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
-
-  const hostWallet = (gameState as any).hostWallet;
+  const isHost = publicKey?.toBase58() === (gameState as any)?.hostWallet;
+  const scores = gameState?.scores ?? {};
+  const isSplitPot = gameState?.payoutMode === 'split-pot';
+  const totalRounds = gameState ? (gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length) : 0;
+  const hostWallet = (gameState as any)?.hostWallet ?? '';
 
   // Calculate split-pot payouts (host excluded — they're the pot holder, not a player)
   const splitPayouts = useMemo(() => {
-    if (!isSplitPot) return {};
+    if (!isSplitPot || !gameState) return {};
     const playerScores: Record<string, any> = {};
     for (const [w, s] of Object.entries(scores)) {
       if (w !== hostWallet) playerScores[w] = s;
     }
     return calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
-  }, [isSplitPot, scores, gameState.buyInAmount, totalRounds, hostWallet]);
+  }, [isSplitPot, scores, gameState?.buyInAmount, totalRounds, hostWallet]);
+
+  // Guard AFTER all hooks to avoid rules-of-hooks violation
+  if (!gameState) return null;
 
   // Exclude host from rankings — host is pot holder, not a player
   const ranked = gameState.players
