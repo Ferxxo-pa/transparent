@@ -318,8 +318,8 @@ export const GameOverPage: React.FC = () => {
           );
         })()}
 
-        {/* Return Home — host sees after distributing, players see after distribution */}
-        {((isHost && confirmed) || (!isHost && confirmed)) && (
+        {/* Return Home — host sees after distributing, players always can leave */}
+        {(confirmed || !isHost) && (
           <motion.button
             className="btn btn-primary"
             onClick={() => { resetGame(); navigate('/'); }}
