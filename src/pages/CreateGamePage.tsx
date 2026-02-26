@@ -88,7 +88,7 @@ export const CreateGamePage: React.FC = () => {
           <motion.div variants={field}>
             <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
             {/* Presets */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', paddingBottom: 4 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
               {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => {
                 const usd = preset !== '0' ? solToUsd(parseFloat(preset), solPrice) : '';
                 return (
