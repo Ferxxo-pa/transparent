@@ -12,6 +12,7 @@ export const GameOverPage: React.FC = () => {
   const [selected, setSelected] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [distributing, setDistributing] = useState(false);
+  const [distStatus, setDistStatus] = useState('');
   const [distErr, setDistErr] = useState<string | null>(null);
 
   // Fetch final state on mount
@@ -49,11 +50,17 @@ export const GameOverPage: React.FC = () => {
     setDistributing(true);
     setDistErr(null);
     try {
+      setDistStatus(isSplitPot ? 'Distributing game pot…' : 'Sending winnings…');
       await distributeWinnings(activeWinner);
-      if (predictions.length > 0) await distributePredictions(activeWinner).catch(() => {});
+      if (predictions.length > 0) {
+        setDistStatus('Distributing prediction pot…');
+        await distributePredictions(activeWinner).catch(() => {});
+      }
+      setDistStatus('');
       setConfirmed(true);
     } catch (e: any) {
       setDistErr(e?.message || 'Distribution failed');
+      setDistStatus('');
       setConfirmed(true);
     }
     setDistributing(false);
@@ -249,7 +256,7 @@ export const GameOverPage: React.FC = () => {
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
           >
-            {distributing ? 'Sending…' : isSplitPot
+            {distributing ? (distStatus || 'Sending…') : isSplitPot
               ? gameState.buyInAmount > 0
                 ? `Distribute ${gameState.currentPot.toFixed(2)} SOL by honesty`
                 : `End Game 🤝`

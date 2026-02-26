@@ -1168,24 +1168,32 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const gameId = gameIdRef.current;
     if (!wallet || !gameId) return;
 
-    // Find correct predictors
-    const correctBets = predictions.filter(p => p.predicted_winner_wallet === winnerWallet && !p.settled);
+    const unsettled = predictions.filter(p => !p.settled);
+    const correctBets = unsettled.filter(p => p.predicted_winner_wallet === winnerWallet);
+
     if (!correctBets.length) {
+      // Nobody predicted correctly — host keeps the prediction pot
       await settlePredictions(gameId);
       return;
     }
 
-    const totalPot = correctBets.reduce((sum, p) => sum + p.amount_lamports, 0);
-    const totalCorrect = correctBets.length;
+    // Full prediction pot (all bets — correct + incorrect)
+    const fullPot = unsettled.reduce((sum, p) => sum + p.amount_lamports, 0);
+    // Split proportionally by bet size among correct predictors
+    const correctTotal = correctBets.reduce((sum, p) => sum + p.amount_lamports, 0);
 
     try {
-      // Pay out each correct predictor proportionally
-      // (simplified: equal split for now)
-      const perWinner = Math.floor(totalPot / totalCorrect);
       for (const bet of correctBets) {
-        if (perWinner > 0 && bet.bettor_wallet !== wallet.publicKey.toBase58()) {
-          const { joinGameOnChainWithAmount } = await import('../lib/anchor');
-          await joinGameOnChainWithAmount(wallet, new PublicKey(bet.bettor_wallet), perWinner).catch(() => {});
+        // Proportional share: (their bet / total correct bets) × full pot
+        const share = Math.floor((bet.amount_lamports / correctTotal) * fullPot);
+        if (share > 0 && bet.bettor_wallet !== wallet.publicKey.toBase58()) {
+          try {
+            const { joinGameOnChainWithAmount } = await import('../lib/anchor');
+            await joinGameOnChainWithAmount(wallet, new PublicKey(bet.bettor_wallet), share);
+            console.log(`[predictions] Sent ${share / 1e9} SOL to ${bet.bettor_wallet.slice(0, 8)}...`);
+          } catch (sendErr) {
+            console.warn(`[predictions] Failed to send to ${bet.bettor_wallet}:`, sendErr);
+          }
         }
       }
       await settlePredictions(gameId);
