@@ -18,6 +18,7 @@ export const WaitingRoomPage: React.FC = () => {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [playerWantsLeave, setPlayerWantsLeave] = useState(false);
   const [deniedLeaves, setDeniedLeaves] = useState<string[]>([]);
+  const [refunding, setRefunding] = useState<string | null>(null);
   const [readying, setReadying] = useState(false);
 
   // Prediction state
@@ -301,15 +302,21 @@ export const WaitingRoomPage: React.FC = () => {
                       Deny
                     </button>
                     <button
-                      onClick={() => approveLeave(wallet)}
+                      disabled={refunding === wallet}
+                      onClick={async () => {
+                        setRefunding(wallet);
+                        await approveLeave(wallet);
+                        setRefunding(null);
+                      }}
                       style={{
                         flex: 1, padding: '12px 0', borderRadius: 'var(--r-sm)',
+                        opacity: refunding === wallet ? 0.5 : 1,
                         background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)',
                         color: 'var(--lime)', fontSize: 13, fontWeight: 700,
                         cursor: 'pointer', fontFamily: 'Space Grotesk',
                       }}
                     >
-                      Refund & Remove
+                      {refunding === wallet ? 'Refunding…' : 'Refund & Remove'}
                     </button>
                   </div>
                 </div>
