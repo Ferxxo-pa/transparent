@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode } from '../types/game';
+import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode, calculateSplitPayouts } from '../types/game';
 import {
   createGameInDB,
   getGameByRoomCode,
@@ -777,20 +777,44 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoading(true);
       try {
         const gid = (gameState as any).gameId;
+        const hostWallet = (gameState as any).hostWallet;
+        const isHost = wallet.publicKey.toBase58() === hostWallet;
 
-        // Only attempt on-chain distribution if there's an actual buy-in
-        if (gameState.buyInAmount > 0) {
+        // Only attempt on-chain distribution if there's an actual buy-in and we're the host
+        if (gameState.buyInAmount > 0 && isHost) {
           try {
-            const hostWallet = (gameState as any).hostWallet;
             const hostPubkey = new PublicKey(hostWallet);
             const [gamePDA] = deriveGamePDA(hostPubkey, gameState.roomName);
-            const winnerPubkey = new PublicKey(winnerWallet);
-            // Pass exact pot lamports — prevents draining host's full wallet
-            const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
-            await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+
+            if (gameState.payoutMode === 'winner-takes-all') {
+              // Winner gets entire pot
+              const winnerPubkey = new PublicKey(winnerWallet);
+              const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
+              await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+            } else if (gameState.payoutMode === 'split-pot') {
+              // Split pot: each player gets payout based on honesty scores
+              const scores = gameState.scores ?? {};
+              const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+              const payouts = calculateSplitPayouts(scores, gameState.buyInAmount, totalRounds);
+
+              console.log('[distribute] Split pot payouts:', payouts);
+
+              // Send each player their share (skip host — they already hold the pot)
+              for (const [playerWallet, amountSol] of Object.entries(payouts)) {
+                if (playerWallet === hostWallet) continue; // host keeps their share
+                if (amountSol <= 0) continue;
+                const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+                try {
+                  const playerPubkey = new PublicKey(playerWallet);
+                  await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                  console.log(`[distribute] Sent ${amountSol} SOL to ${playerWallet.slice(0, 8)}...`);
+                } catch (sendErr) {
+                  console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
+                }
+              }
+            }
           } catch (chainErr) {
             console.warn('On-chain distribution failed (non-fatal):', chainErr);
-            // Game still recorded as over — host can send manually
           }
         }
 

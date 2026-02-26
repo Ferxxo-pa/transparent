@@ -15,7 +15,7 @@ const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] =
 ];
 
 const PAYOUT_MODES: { id: PayoutMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'honest-talkers',   label: 'Split Pot',        sub: "Answer honestly and keep your money. Don't answer? You lose it to the pot.", emoji: '🤝' },
+  { id: 'split-pot',        label: 'Split Pot',        sub: "Each fake vote costs you a slice of your buy-in. Stay honest, keep your money.", emoji: '🤝' },
   { id: 'winner-takes-all', label: 'Winner Takes All', sub: 'Most honest player wins the entire pot', emoji: '🏆' },
 ];
 
@@ -33,7 +33,7 @@ export const CreateGamePage: React.FC = () => {
   const [buyIn,      setBuyIn]      = useState('0');
   const [roomName,   setRoomName]   = useState('');
   const [mode,       setMode]       = useState<QuestionMode>('classic');
-  const [payoutMode, setPayoutMode] = useState<PayoutMode>('honest-talkers');
+  const [payoutMode, setPayoutMode] = useState<PayoutMode>('split-pot');
   const [numQs,        setNumQs]        = useState(3);
   const [customRounds, setCustomRounds] = useState('');
   const [customQs,     setCustomQs]     = useState<string[]>(['', '']);
@@ -122,7 +122,7 @@ export const CreateGamePage: React.FC = () => {
             />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
               {parseFloat(buyIn) > 0
-                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · ${payoutMode === 'honest-talkers' ? "don't answer, lose your stake" : 'winner takes everything'}`
+                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · ${payoutMode === 'split-pot' ? "fake votes cost you" : 'winner takes everything'}`
                 : 'Free game · no entry fee'}
             </p>
           </motion.div>

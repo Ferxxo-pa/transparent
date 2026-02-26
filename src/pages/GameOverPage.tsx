@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { calculateSplitPayouts } from '../types/game';
 
 export const GameOverPage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,21 +21,25 @@ export const GameOverPage: React.FC = () => {
 
   const isHost = publicKey?.toBase58() === (gameState as any).hostWallet;
   const scores = gameState.scores ?? {};
-  const isHonestTalkers = gameState.payoutMode === 'honest-talkers';
+  const isSplitPot = gameState.payoutMode === 'split-pot';
+  const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+
+  // Calculate split-pot payouts
+  const splitPayouts = useMemo(() => {
+    if (!isSplitPot) return {};
+    return calculateSplitPayouts(scores, gameState.buyInAmount, totalRounds);
+  }, [isSplitPot, scores, gameState.buyInAmount, totalRounds]);
 
   const ranked = gameState.players
     .map(p => {
       const s = scores[p.id];
       const t = s ? s.transparent + s.fake : 0;
       const honesty = t > 0 ? s.transparent / t : 0;
-      // For honest-talkers: "answered" means they were in hot seat and got votes
       const answered = s ? s.rounds > 0 : false;
-      return { p, s, honesty, t, answered };
+      const payout = splitPayouts[p.id] ?? 0;
+      return { p, s, honesty, t, answered, payout };
     })
     .sort((a, b) => b.honesty - a.honesty);
-
-  const answerers = ranked.filter(r => r.answered);
-  const splitAmount = answerers.length > 0 ? gameState.currentPot / answerers.length : 0;
 
   const activeWinner = selected ?? ranked[0]?.p.id ?? null;
   const winnerPlayer = gameState.players.find(p => p.id === activeWinner);
@@ -83,14 +88,14 @@ export const GameOverPage: React.FC = () => {
           transition={{ type: 'spring', stiffness: 300, damping: 22 }}
         >
           {confirmed ? (
-            isHonestTalkers ? (
+            isSplitPot ? (
               <>
-                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Split</p>
+                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Distributed</p>
                 <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  {answerers.length} Transparent Player{answerers.length !== 1 ? 's' : ''}
+                  Split Pot Complete
                 </p>
-                <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
-                  {splitAmount.toFixed(3)} SOL each
+                <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 8 }}>
+                  Each player received their honesty-adjusted share
                 </p>
               </>
             ) : (
@@ -111,9 +116,9 @@ export const GameOverPage: React.FC = () => {
                 {gameState.currentPot.toFixed(2)}
                 <span style={{ fontSize: 18, color: 'var(--muted)', fontWeight: 600, marginLeft: 6 }}>SOL</span>
               </p>
-              {isHonestTalkers && answerers.length > 0 && (
+              {isSplitPot && (
                 <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                  Split among {answerers.length} player{answerers.length > 1 ? 's' : ''} · {splitAmount.toFixed(3)} SOL each
+                  Fake votes cost you · honest players keep more
                 </p>
               )}
             </>
@@ -124,7 +129,7 @@ export const GameOverPage: React.FC = () => {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <p className="label-cipher">
-              {isHonestTalkers ? 'Split Pot' : isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
+              {isSplitPot ? 'Split Pot' : isHost && !confirmed ? 'Select Winner' : 'Final Standings'}
             </p>
             {isHost && !confirmed && ranked[0] && (
               <span style={{ fontSize: 10, color: 'var(--muted)' }}>
@@ -134,9 +139,10 @@ export const GameOverPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ranked.map(({ p, s, honesty, answered }, i) => {
-              const isWinner = isHonestTalkers ? answered : p.id === activeWinner;
-              const canSelect = isHost && !confirmed && !isHonestTalkers;
+            {ranked.map(({ p, s, honesty, answered, payout }, i) => {
+              const isWinner = isSplitPot ? (payout > 0) : p.id === activeWinner;
+              const canSelect = isHost && !confirmed && !isSplitPot;
+              const netGain = payout - gameState.buyInAmount;
               return (
                 <motion.div
                   key={p.id}
@@ -159,23 +165,27 @@ export const GameOverPage: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
-                      {isHonestTalkers && answered && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Transparent ✓</span>}
-                      {!isHonestTalkers && i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
-                      {!isHonestTalkers && isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
+                      {isSplitPot && netGain > 0.001 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>+{netGain.toFixed(3)} SOL</span>}
+                      {isSplitPot && netGain < -0.001 && <span className="chip" style={{ fontSize: 9, padding: '1px 7px', background: 'rgba(255,80,80,0.15)', color: '#ff5050' }}>{netGain.toFixed(3)} SOL</span>}
+                      {!isSplitPot && i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
+                      {!isSplitPot && isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
                     </div>
                     {s ? (
                       <div style={{ display: 'flex', gap: 8, marginTop: 2, fontSize: 11, color: 'var(--muted)' }}>
                         <span style={{ color: 'var(--lime)' }}>✓ {s.transparent}</span>
                         <span>✗ {s.fake}</span>
                         <span>{Math.round(honesty * 100)}%</span>
+                        {isSplitPot && gameState.buyInAmount > 0 && (
+                          <span style={{ color: 'var(--lavender)' }}>→ {payout.toFixed(3)} SOL</span>
+                        )}
                       </div>
                     ) : (
                       <span style={{ fontSize: 11, color: 'var(--muted)' }}>No votes</span>
                     )}
                   </div>
-                  {confirmed && isWinner && (
+                  {confirmed && !isSplitPot && isWinner && (
                     <span style={{ fontWeight: 800, fontSize: 13, color: 'var(--lime)', whiteSpace: 'nowrap' }}>
-                      +{isHonestTalkers ? splitAmount.toFixed(3) : gameState.currentPot.toFixed(2)} SOL
+                      +{gameState.currentPot.toFixed(2)} SOL
                     </span>
                   )}
                 </motion.div>
@@ -234,14 +244,14 @@ export const GameOverPage: React.FC = () => {
           <motion.button
             className="btn btn-primary"
             onClick={distribute}
-            disabled={distributing || (!isHonestTalkers && !activeWinner)}
+            disabled={distributing || (!isSplitPot && !activeWinner)}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             whileTap={{ scale: 0.96 }}
             whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
           >
-            {distributing ? 'Sending…' : isHonestTalkers
+            {distributing ? 'Sending…' : isSplitPot
               ? gameState.buyInAmount > 0
-                ? `Split ${gameState.currentPot.toFixed(2)} SOL among ${answerers.length} players`
+                ? `Distribute ${gameState.currentPot.toFixed(2)} SOL by honesty`
                 : `End Game 🤝`
               : gameState.buyInAmount > 0
                 ? `Send ${gameState.currentPot.toFixed(2)} SOL → ${winnerPlayer?.name ?? 'Winner'}`

@@ -9,7 +9,61 @@ export interface Player {
 
 export type QuestionMode = 'classic' | 'custom' | 'hot-take';
 
-export type PayoutMode = 'winner-takes-all' | 'honest-talkers';
+export type PayoutMode = 'winner-takes-all' | 'split-pot';
+
+/**
+ * Split-pot payout calculation.
+ *
+ * Each round a player is in the hot seat, voters decide "transparent" or "fake".
+ * If majority votes "fake", the hot-seat player loses a penalty slice of their buy-in.
+ *
+ * penaltyPerRound = buyIn / totalRounds
+ * playerKeeps = buyIn - (timesVotedFake × penaltyPerRound)
+ * penaltyPool = sum of all deductions
+ * bonusPerPlayer = penaltyPool × (playerTransparentVotes / totalTransparentVotes)
+ * finalPayout = playerKeeps + bonus
+ *
+ * If everyone is honest: everyone gets their buy-in back.
+ * If everyone is fake: penalty pool split evenly (edge case).
+ */
+export function calculateSplitPayouts(
+  scores: Record<string, PlayerScore>,
+  buyIn: number,
+  totalRounds: number,
+): Record<string, number> {
+  const wallets = Object.keys(scores);
+  if (wallets.length === 0 || totalRounds === 0) return {};
+
+  const penaltyPerRound = buyIn / totalRounds;
+  let penaltyPool = 0;
+  const keeps: Record<string, number> = {};
+
+  // Calculate what each player keeps and build penalty pool
+  for (const wallet of wallets) {
+    const s = scores[wallet];
+    const timesVotedFake = s.fake; // number of rounds majority voted them fake
+    const deduction = Math.min(timesVotedFake * penaltyPerRound, buyIn); // can't lose more than buy-in
+    keeps[wallet] = buyIn - deduction;
+    penaltyPool += deduction;
+  }
+
+  // Distribute penalty pool proportionally to transparent votes
+  const totalTransparent = wallets.reduce((sum, w) => sum + scores[w].transparent, 0);
+  const payouts: Record<string, number> = {};
+
+  for (const wallet of wallets) {
+    let bonus = 0;
+    if (totalTransparent > 0) {
+      bonus = penaltyPool * (scores[wallet].transparent / totalTransparent);
+    } else {
+      // Edge case: everyone voted fake on everyone — split evenly
+      bonus = penaltyPool / wallets.length;
+    }
+    payouts[wallet] = Math.max(keeps[wallet] + bonus, 0);
+  }
+
+  return payouts;
+}
 
 export type GamePhase =
   | 'submitting-questions'
