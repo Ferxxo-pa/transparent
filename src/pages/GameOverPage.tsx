@@ -274,7 +274,64 @@ export const GameOverPage: React.FC = () => {
             }
           </motion.button>
         )}
-        {(confirmed || !isHost) && (
+        {/* Player view: show their payout and waiting status */}
+        {!isHost && gameState.buyInAmount > 0 && (() => {
+          const myWallet = publicKey?.toBase58() ?? '';
+          const myPayout = isSplitPot ? (splitPayouts[myWallet] ?? 0) : (activeWinner === myWallet ? gameState.currentPot : 0);
+          const myNet = myPayout - gameState.buyInAmount;
+          const isWinner = !isSplitPot && activeWinner === myWallet;
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              style={{
+                textAlign: 'center', padding: '18px 16px', borderRadius: 'var(--r-sm)',
+                background: myNet >= 0 ? 'rgba(196,255,60,0.06)' : 'rgba(255,80,80,0.06)',
+                border: `1px solid ${myNet >= 0 ? 'var(--lime-border)' : 'rgba(255,80,80,0.3)'}`,
+              }}
+            >
+              <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 6 }}>
+                Your Result
+              </p>
+              <p style={{
+                fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em',
+                color: myNet >= 0 ? 'var(--lime)' : '#ff5050',
+              }}>
+                {myNet >= 0 ? '+' : ''}{myNet.toFixed(3)} SOL
+              </p>
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                {isSplitPot
+                  ? `Payout: ${myPayout.toFixed(3)} SOL (bought in ${gameState.buyInAmount.toFixed(3)})`
+                  : isWinner ? `You won the pot! 🏆` : `Better luck next time`
+                }
+              </p>
+              {!confirmed && (
+                <p style={{ fontSize: 11, color: 'var(--lavender)', marginTop: 10, fontWeight: 600 }}>
+                  ⏳ Waiting for host to distribute…
+                </p>
+              )}
+              {confirmed && (
+                <p style={{ fontSize: 11, color: 'var(--lime)', marginTop: 10, fontWeight: 600 }}>
+                  ✅ Funds sent to your wallet
+                </p>
+              )}
+            </motion.div>
+          );
+        })()}
+
+        {/* Return Home — host sees after distributing, players see after distribution */}
+        {((isHost && confirmed) || (!isHost && confirmed)) && (
+          <motion.button
+            className="btn btn-primary"
+            onClick={() => { resetGame(); navigate('/'); }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            whileTap={{ scale: 0.96 }}
+          >
+            Return Home
+          </motion.button>
+        )}
+
+        {/* Players in free games can always go home */}
+        {!isHost && gameState.buyInAmount === 0 && (
           <motion.button
             className="btn btn-primary"
             onClick={() => { resetGame(); navigate('/'); }}
