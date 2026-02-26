@@ -36,7 +36,7 @@ export const GameCreatedPage: React.FC = () => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
   }, [gameState?.gameStatus, navigate]);
 
-  if (!gameState) { navigate('/'); return null; }
+  if (!gameState) return null;
 
   const copy = () => {
     navigator.clipboard.writeText(gameState.roomCode);

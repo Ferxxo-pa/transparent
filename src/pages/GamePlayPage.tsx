@@ -50,7 +50,7 @@ export const GamePlayPage: React.FC = () => {
     if (isHost) advanceHotTakePhase();
   }, [advanceHotTakePhase, isHost]);
 
-  if (!gameState) { navigate('/'); return null; }
+  if (!gameState) return null;
 
   const player     = gameState.players.find(p => p.id === gameState.currentPlayerInHotSeat);
   const hasVoted   = !!gameState.votes[myWallet];

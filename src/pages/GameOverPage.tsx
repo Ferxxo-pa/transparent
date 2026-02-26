@@ -16,7 +16,7 @@ export const GameOverPage: React.FC = () => {
   // Fetch final state on mount
   useEffect(() => { pollGameState(); }, [pollGameState]);
 
-  if (!gameState) { navigate('/'); return null; }
+  if (!gameState) return null;
 
   const isHost = publicKey?.toBase58() === (gameState as any).hostWallet;
   const scores = gameState.scores ?? {};
