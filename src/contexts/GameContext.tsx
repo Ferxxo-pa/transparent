@@ -793,15 +793,19 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
             } else if (gameState.payoutMode === 'split-pot') {
               // Split pot: each player gets payout based on honesty scores
-              const scores = gameState.scores ?? {};
+              // Host is pot holder only — exclude from payout calc
+              const playerScores: Record<string, any> = {};
+              const allScores = gameState.scores ?? {};
+              for (const [w, s] of Object.entries(allScores)) {
+                if (w !== hostWallet) playerScores[w] = s;
+              }
               const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
-              const payouts = calculateSplitPayouts(scores, gameState.buyInAmount, totalRounds);
+              const payouts = calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
 
-              console.log('[distribute] Split pot payouts:', payouts);
+              console.log('[distribute] Split pot payouts (host excluded):', payouts);
 
-              // Send each player their share (skip host — they already hold the pot)
+              // Send each player their share — host sends ALL pot money out
               for (const [playerWallet, amountSol] of Object.entries(payouts)) {
-                if (playerWallet === hostWallet) continue; // host keeps their share
                 if (amountSol <= 0) continue;
                 const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
                 try {

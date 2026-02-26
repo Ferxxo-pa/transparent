@@ -25,13 +25,21 @@ export const GameOverPage: React.FC = () => {
   const isSplitPot = gameState.payoutMode === 'split-pot';
   const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
-  // Calculate split-pot payouts
+  const hostWallet = (gameState as any).hostWallet;
+
+  // Calculate split-pot payouts (host excluded — they're the pot holder, not a player)
   const splitPayouts = useMemo(() => {
     if (!isSplitPot) return {};
-    return calculateSplitPayouts(scores, gameState.buyInAmount, totalRounds);
-  }, [isSplitPot, scores, gameState.buyInAmount, totalRounds]);
+    const playerScores: Record<string, any> = {};
+    for (const [w, s] of Object.entries(scores)) {
+      if (w !== hostWallet) playerScores[w] = s;
+    }
+    return calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
+  }, [isSplitPot, scores, gameState.buyInAmount, totalRounds, hostWallet]);
 
+  // Exclude host from rankings — host is pot holder, not a player
   const ranked = gameState.players
+    .filter(p => p.id !== hostWallet)
     .map(p => {
       const s = scores[p.id];
       const t = s ? s.transparent + s.fake : 0;
