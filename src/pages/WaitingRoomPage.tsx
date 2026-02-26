@@ -76,8 +76,9 @@ export const WaitingRoomPage: React.FC = () => {
   };
 
   const handleLeave = async () => {
-    await leaveGame();
-    navigate('/');
+    navigate('/', { replace: true });
+    // Clean up after navigation to avoid context errors during exit animation
+    setTimeout(() => leaveGame(), 100);
   };
 
   return (
