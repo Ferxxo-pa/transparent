@@ -1,6 +1,6 @@
 # Transparent 🎮
 
-**The party game with real stakes.** Everyone puts in cash. Answer honestly. Most transparent player takes the pot.
+**The party game with real stakes.** Everyone puts in money. Answer honestly. Most transparent player takes the pot.
 
 Built on Solana • Real-time multiplayer • Prediction market • Glass morphism UI
 
