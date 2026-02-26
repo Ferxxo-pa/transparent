@@ -49,9 +49,10 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
               {[
                 ['01', 'Host creates a room',    'Set the entry fee'],
                 ['02', 'Everyone buys in',       'Cash goes into the pot'],
-                ['03', 'Hot seat answers',        'One player faces the questions'],
-                ['04', 'Group votes',             'Honest or lying?'],
-                ['05', 'Most honest player wins', 'Pot paid out instantly'],
+                ['03', 'Predict the winner',     'Optional side bet — who\'s most honest?'],
+                ['04', 'Hot seat answers',        'One player faces the questions'],
+                ['05', 'Group votes',             'Honest or lying?'],
+                ['06', 'Most honest player wins', 'Pot paid out instantly'],
               ].map(([num, title, sub], i, arr) => (
                 <React.Fragment key={num}>
                   <motion.div
@@ -181,7 +182,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
       {/* Top spacing — clear wallet pill */}
-      <div style={{ width: '100%', minHeight: 48, marginBottom: 12 }} />
+      <div style={{ width: '100%', minHeight: 20, marginBottom: 4 }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -221,9 +222,10 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
             {[
               ['01', 'Host creates a room',    'Set the entry fee'],
               ['02', 'Everyone buys in',       'Cash goes into the pot'],
-              ['03', 'Hot seat answers',        'One player faces the questions'],
-              ['04', 'Group votes',             'Honest or lying?'],
-              ['05', 'Most honest player wins', 'Pot paid out instantly'],
+              ['03', 'Predict the winner',     'Optional side bet — who\'s most honest?'],
+              ['04', 'Hot seat answers',        'One player faces the questions'],
+              ['05', 'Group votes',             'Honest or lying?'],
+              ['06', 'Most honest player wins', 'Pot paid out instantly'],
             ].map(([num, title, sub], i, arr) => (
               <React.Fragment key={num}>
                 <motion.div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0' }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.06, type: 'spring', stiffness: 300, damping: 28 }}>

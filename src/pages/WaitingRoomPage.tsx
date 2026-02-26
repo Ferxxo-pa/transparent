@@ -5,7 +5,7 @@ import { Copy, Check, TrendingUp, Coins, RefreshCw } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
-const PREDICTION_PRESETS = [0.01, 0.05, 0.1, 0.25];
+const PREDICTION_PRESETS = [0.01, 0.05, 0.1, 0.25, 0.5, 1];
 const LAMPORTS = 1_000_000_000;
 
 export const WaitingRoomPage: React.FC = () => {
@@ -21,6 +21,7 @@ export const WaitingRoomPage: React.FC = () => {
   const [betAmount, setBetAmount]           = useState(0.01);
   const [placing, setPlacing]               = useState(false);
   const [placed, setPlaced]                 = useState(false);
+  const [customBet, setCustomBet]           = useState('');
 
   const myWallet = publicKey?.toBase58() ?? '';
   const isHost   = myWallet === (gameState as any)?.hostWallet;
@@ -256,6 +257,7 @@ export const WaitingRoomPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                 <TrendingUp size={13} color="var(--lavender)" />
                 <p className="label-cipher">Prediction Market</p>
+                <span style={{ fontSize: 9, fontWeight: 600, color: 'var(--muted)', background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r-pill)', padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Optional</span>
               </div>
               {predictionPot > 0 && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -421,35 +423,62 @@ export const WaitingRoomPage: React.FC = () => {
                             transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                           >
                             <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bet amount</p>
-                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                            {/* Horizontal scrolling presets */}
+                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, marginBottom: 8, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
                               {PREDICTION_PRESETS.map(preset => (
                                 <button
                                   key={preset}
-                                  onClick={() => setBetAmount(preset)}
+                                  onClick={() => { setBetAmount(preset); setCustomBet(''); }}
                                   style={{
-                                    padding: '6px 14px', borderRadius: 'var(--r-pill)',
-                                    border: `1px solid ${betAmount === preset ? 'var(--lavender)' : 'var(--border)'}`,
-                                    background: betAmount === preset ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
-                                    color: betAmount === preset ? 'var(--lavender)' : 'var(--muted)',
+                                    padding: '8px 16px', borderRadius: 'var(--r-pill)',
+                                    border: `1px solid ${betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--border)'}`,
+                                    background: betAmount === preset && !customBet ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
+                                    color: betAmount === preset && !customBet ? 'var(--lavender)' : 'var(--muted)',
                                     fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk',
+                                    whiteSpace: 'nowrap', flexShrink: 0,
                                   }}
                                 >
                                   {preset} SOL
                                 </button>
                               ))}
                             </div>
+                            {/* Custom bet input */}
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0.001"
+                                placeholder="Custom amount"
+                                value={customBet}
+                                onChange={(e) => {
+                                  setCustomBet(e.target.value);
+                                  const val = parseFloat(e.target.value);
+                                  if (val > 0) setBetAmount(val);
+                                }}
+                                style={{
+                                  flex: 1, padding: '10px 14px', borderRadius: 'var(--r-sm)',
+                                  border: `1px solid ${customBet ? 'var(--lavender)' : 'var(--border)'}`,
+                                  background: 'var(--glass)', color: 'var(--text)',
+                                  fontSize: 14, fontFamily: 'Space Grotesk', outline: 'none',
+                                }}
+                              />
+                              <span style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: 'var(--muted)', fontWeight: 600 }}>SOL</span>
+                            </div>
+                            {/* Bet button — high contrast */}
                             <motion.button
-                              className="btn btn-primary"
                               onClick={handlePredict}
-                              disabled={placing}
+                              disabled={placing || betAmount <= 0}
                               whileTap={{ scale: 0.96 }}
                               style={{
-                                width: '100%', height: 46, fontSize: 14,
-                                background: 'linear-gradient(135deg, rgba(180,120,255,0.3) 0%, rgba(196,255,60,0.2) 100%)',
-                                borderColor: 'var(--lavender)',
+                                width: '100%', height: 50, fontSize: 15, fontWeight: 700,
+                                borderRadius: 'var(--r-sm)', cursor: 'pointer',
+                                background: 'linear-gradient(135deg, #b478ff 0%, #C4FF3C 100%)',
+                                color: '#000', border: 'none',
+                                fontFamily: 'Space Grotesk',
+                                opacity: placing || betAmount <= 0 ? 0.5 : 1,
                               }}
                             >
-                              {placing ? 'Placing…' : `Bet ${betAmount} SOL → ${gameState.players.find(p => p.id === selectedPlayer)?.name ?? 'player'}`}
+                              {placing ? 'Placing…' : `🎯 Bet ${betAmount} SOL → ${gameState.players.find(p => p.id === selectedPlayer)?.name ?? 'player'}`}
                             </motion.button>
                           </motion.div>
                         )}

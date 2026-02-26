@@ -305,7 +305,7 @@ export function subscribeToGame(
     )
     .on(
       'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'predictions', filter: `game_id=eq.${gameId}` },
+      { event: '*', schema: 'public', table: 'predictions', filter: `game_id=eq.${gameId}` },
       async () => {
         if (!onPredictionsChange) return;
         const predictions = await getPredictionsForGame(gameId);
