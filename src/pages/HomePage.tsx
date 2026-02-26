@@ -34,10 +34,10 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
           style={{ display: 'flex', flexDirection: 'column', gap: 40 }}
         >
           <div>
-            <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 500, height: 'auto', marginBottom: 16 }} />
-            <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 0, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
-              The party game with real stakes. Everyone puts in money. Answer honestly. Most transparent player takes the pot.
-            </p>
+            <div className="display" style={{ fontSize: 'clamp(48px, 5vw, 72px)', lineHeight: 1.05 }}>
+              The party game<br />with real stakes.
+            </div>
+            <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 400, height: 'auto', marginTop: 16 }} />
           </div>
 
           {/* How it works */}
@@ -188,10 +188,8 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
         style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 0, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
-          <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 340, height: 'auto', marginBottom: 8 }} />
-          <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 0, lineHeight: 1.6, fontWeight: 400 }}>
-            The party game with real stakes. Everyone puts in money. Answer honestly. Most transparent player takes the pot.
-          </p>
+          <div className="display">The party game<br />with real stakes.</div>
+          <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 300, height: 'auto', marginTop: 12 }} />
         </motion.div>
 
         <motion.div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 26, delay: 0.3 }}>
