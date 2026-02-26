@@ -276,10 +276,8 @@ export function subscribeToGame(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
       async (payload) => {
-        console.log('[Realtime] players change:', payload.eventType, payload.new);
         // Re-fetch all players on any change for consistency
         const players = await getPlayersForGame(gameId);
-        console.log('[Realtime] re-fetched players:', players.length);
         onPlayersChange(players);
       },
     )
@@ -313,7 +311,6 @@ export function subscribeToGame(
       },
     )
     .subscribe((status, err) => {
-      console.log(`[Realtime] game-${gameId} status: ${status}`, err ?? '');
     });
 
   return channel;

@@ -85,7 +85,6 @@ function WalletInner({ children }: { children: ReactNode }) {
         verifySignatures: false,
       });
 
-      console.log('[PrivyWallet] Calling signAndSendTransaction with', serialized.length, 'bytes');
 
       const result = await signAndSendTransaction({
         transaction: serialized,
@@ -94,7 +93,6 @@ function WalletInner({ children }: { children: ReactNode }) {
       } as any);
 
       const sig = result.signature;
-      console.log('[PrivyWallet] Transaction sent, signature:', sig);
       // Confirmation handled by caller (anchor.ts buildAndSend)
       return sig;
     };

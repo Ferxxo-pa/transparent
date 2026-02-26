@@ -249,13 +249,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const name = payload?.payload?.name;
         if (wallet) {
           setLeaveRequests(prev => prev.includes(wallet) ? prev : [...prev, wallet]);
-          console.log(`[Broadcast] Leave request from ${name} (${wallet})`);
         }
       });
 
       // Listen for host leaving (all players receive this)
       channel.on('broadcast', { event: 'host_leaving' }, () => {
-        console.log('[Broadcast] Host is leaving — game cancelled');
         setGameState(prev => prev ? { ...prev, gameStatus: 'cancelled' as any } : null);
       });
 
@@ -264,7 +262,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const approvedWallet = payload?.payload?.wallet;
         const myWallet = walletRef.current?.publicKey?.toBase58();
         if (approvedWallet && approvedWallet === myWallet) {
-          console.log('[Broadcast] Leave approved — cleaning up');
           // Clean up local state (player will navigate away from WaitingRoomPage)
           if (channelRef.current) {
             unsubscribeFromGame(channelRef.current);
@@ -840,7 +837,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
               const payouts = calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
 
-              console.log('[distribute] Split pot payouts (host excluded):', payouts);
 
               // Send each player their share — host sends ALL pot money out
               for (const [playerWallet, amountSol] of Object.entries(payouts)) {
@@ -849,7 +845,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
                   await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
-                  console.log(`[distribute] Sent ${amountSol} SOL to ${playerWallet.slice(0, 8)}...`);
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
                 }
@@ -934,7 +929,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!gameId) return;
     try {
       const players = await getPlayersForGame(gameId);
-      console.log('[Manual refresh] players:', players.length);
 
       // Also refresh game status so joiners detect when host starts
       const game = await supabase.from('games').select('*').eq('id', gameId).single();
@@ -1125,7 +1119,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
               const playerPubkey = new PublicKey(player.id);
               await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
-              console.log(`[hostLeave] Refunded ${gs.buyInAmount} SOL to ${player.name}`);
             } catch (err) {
               console.warn(`[hostLeave] Failed to refund ${player.name}:`, err);
             }
@@ -1197,7 +1190,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         const playerPubkey = new PublicKey(playerWallet);
         await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
-        console.log(`[approveLeave] Refunded ${gs.buyInAmount} SOL to ${playerWallet.slice(0, 8)}`);
       } catch (err) {
         console.warn('[approveLeave] Refund failed:', err);
       }
@@ -1315,7 +1307,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           try {
             const { joinGameOnChainWithAmount } = await import('../lib/anchor');
             await joinGameOnChainWithAmount(wallet, new PublicKey(bet.bettor_wallet), share);
-            console.log(`[predictions] Sent ${share / 1e9} SOL to ${bet.bettor_wallet.slice(0, 8)}...`);
           } catch (sendErr) {
             console.warn(`[predictions] Failed to send to ${bet.bettor_wallet}:`, sendErr);
           }
