@@ -243,13 +243,31 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
       );
 
-      // Listen for leave requests via broadcast
+      // Listen for leave requests via broadcast (host receives these)
       channel.on('broadcast', { event: 'leave_request' }, (payload: any) => {
         const wallet = payload?.payload?.wallet;
         const name = payload?.payload?.name;
         if (wallet) {
           setLeaveRequests(prev => prev.includes(wallet) ? prev : [...prev, wallet]);
           console.log(`[Broadcast] Leave request from ${name} (${wallet})`);
+        }
+      });
+
+      // Listen for leave approvals (player receives this)
+      channel.on('broadcast', { event: 'leave_approved' }, (payload: any) => {
+        const approvedWallet = payload?.payload?.wallet;
+        const myWallet = walletRef.current?.publicKey?.toBase58();
+        if (approvedWallet && approvedWallet === myWallet) {
+          console.log('[Broadcast] Leave approved — cleaning up');
+          // Clean up local state (player will navigate away from WaitingRoomPage)
+          if (channelRef.current) {
+            unsubscribeFromGame(channelRef.current);
+            channelRef.current = null;
+          }
+          gameIdRef.current = null;
+          setGameState(null);
+          setError(null);
+          setLoading(false);
         }
       });
 
@@ -1146,7 +1164,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         const playerPubkey = new PublicKey(playerWallet);
-        await distributeOnChain(wallet, playerPubkey, playerPubkey, lamports);
+        await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
         console.log(`[approveLeave] Refunded ${gs.buyInAmount} SOL to ${playerWallet.slice(0, 8)}`);
       } catch (err) {
         console.warn('[approveLeave] Refund failed:', err);
@@ -1162,6 +1180,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .eq('wallet_address', playerWallet);
     } catch (err) {
       console.warn('[approveLeave] Remove failed:', err);
+    }
+
+    // Notify the player they've been approved via broadcast
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'leave_approved',
+        payload: { wallet: playerWallet },
+      });
     }
 
     // Remove from leave requests

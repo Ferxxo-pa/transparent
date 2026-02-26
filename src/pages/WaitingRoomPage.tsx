@@ -32,6 +32,13 @@ export const WaitingRoomPage: React.FC = () => {
 
   const [hostLeft, setHostLeft] = useState(false);
 
+  // If gameState goes null (e.g. leave approved), redirect home
+  useEffect(() => {
+    if (playerWantsLeave && !gameState) {
+      navigate('/', { replace: true });
+    }
+  }, [gameState, playerWantsLeave, navigate]);
+
   useEffect(() => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
     if (gameState?.gameStatus === 'cancelled') {
