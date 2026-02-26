@@ -90,7 +90,8 @@ function WalletInner({ children }: { children: ReactNode }) {
       const result = await signAndSendTransaction({
         transaction: serialized,
         wallet: activeWallet,
-      });
+        chain: 'solana:devnet',
+      } as any);
 
       const sig = result.signature;
       console.log('[PrivyWallet] Transaction sent, signature:', sig);
