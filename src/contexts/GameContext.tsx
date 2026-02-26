@@ -253,6 +253,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       });
 
+      // Listen for host leaving (all players receive this)
+      channel.on('broadcast', { event: 'host_leaving' }, () => {
+        console.log('[Broadcast] Host is leaving — game cancelled');
+        setGameState(prev => prev ? { ...prev, gameStatus: 'cancelled' as any } : null);
+      });
+
       // Listen for leave approvals (player receives this)
       channel.on('broadcast', { event: 'leave_approved' }, (payload: any) => {
         const approvedWallet = payload?.payload?.wallet;
@@ -1135,6 +1141,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // If host leaves, cancel the game so all clients get notified
         if (isHost) {
+          // Broadcast host leaving so players get it immediately
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'host_leaving',
+              payload: {},
+            });
+          }
+
           await supabase
             .from('games')
             .update({ status: 'cancelled' })
