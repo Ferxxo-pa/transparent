@@ -34,11 +34,9 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
           style={{ display: 'flex', flexDirection: 'column', gap: 40 }}
         >
           <div>
-            <div className="display" style={{ fontSize: 'clamp(48px, 5vw, 72px)', lineHeight: 1.05 }}>
-              The party game<br />with real stakes.
-            </div>
-            <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 16, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
-              Everyone puts in money. Answer honestly. Most transparent player takes the pot.
+            <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 500, height: 'auto', marginBottom: 16 }} />
+            <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 0, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
+              The party game with real stakes. Everyone puts in money. Answer honestly. Most transparent player takes the pot.
             </p>
           </div>
 
@@ -190,9 +188,9 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
         style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 0, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
       >
         <motion.div variants={pop} initial="initial" animate="animate">
-          <div className="display">The party game<br />with real stakes.</div>
-          <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 12, lineHeight: 1.6, fontWeight: 400 }}>
-            Everyone puts in money. Answer honestly. Most transparent player takes the pot.
+          <img src="/logo-glass.svg" alt="Transparent" style={{ width: '100%', maxWidth: 340, height: 'auto', marginBottom: 8 }} />
+          <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 0, lineHeight: 1.6, fontWeight: 400 }}>
+            The party game with real stakes. Everyone puts in money. Answer honestly. Most transparent player takes the pot.
           </p>
         </motion.div>
 
