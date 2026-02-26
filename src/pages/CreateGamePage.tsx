@@ -34,8 +34,9 @@ export const CreateGamePage: React.FC = () => {
   const [roomName,   setRoomName]   = useState('');
   const [mode,       setMode]       = useState<QuestionMode>('classic');
   const [payoutMode, setPayoutMode] = useState<PayoutMode>('honest-talkers');
-  const [numQs,      setNumQs]      = useState(0); // 0 = one per player
-  const [customQs,   setCustomQs]   = useState<string[]>(['', '']);
+  const [numQs,        setNumQs]        = useState(3);
+  const [customRounds, setCustomRounds] = useState('');
+  const [customQs,     setCustomQs]     = useState<string[]>(['', '']);
 
   const handleCreate = async () => {
     const filtered = mode === 'custom' ? customQs.filter(q => q.trim()) : undefined;
@@ -188,29 +189,43 @@ export const CreateGamePage: React.FC = () => {
 
           {/* Number of questions */}
           <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 8 }}>How many questions?</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[0, 3, 5, 7, 10, 15].map(n => (
+            <p className="label-cipher" style={{ marginBottom: 8 }}>How many rounds?</p>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              {[2, 3, 4, 5].map(n => (
                 <button
                   key={n}
-                  onClick={() => setNumQs(n)}
+                  onClick={() => { setNumQs(n); setCustomRounds(''); }}
                   style={{
                     padding: '6px 16px',
                     borderRadius: 'var(--r-pill)',
-                    border: `1px solid ${numQs === n ? 'var(--lime)' : 'var(--border)'}`,
-                    background: numQs === n ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                    color: numQs === n ? 'var(--lime)' : 'var(--muted)',
+                    border: `1px solid ${numQs === n && !customRounds ? 'var(--lime)' : 'var(--border)'}`,
+                    background: numQs === n && !customRounds ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
+                    color: numQs === n && !customRounds ? 'var(--lime)' : 'var(--muted)',
                     fontSize: 13, fontWeight: 600, cursor: 'pointer',
                     fontFamily: 'Space Grotesk',
                     transition: 'all 0.15s',
                   }}
                 >
-                  {n === 0 ? '1 per player' : n}
+                  {n}
                 </button>
               ))}
+              <input
+                className="input"
+                type="number"
+                min="1"
+                max="30"
+                value={customRounds}
+                onChange={e => {
+                  setCustomRounds(e.target.value);
+                  const v = parseInt(e.target.value);
+                  if (v > 0) setNumQs(v);
+                }}
+                placeholder="Custom"
+                style={{ width: 80, height: 34, fontSize: 13, textAlign: 'center' }}
+              />
             </div>
             <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-              {numQs === 0 ? 'Each player gets one turn in the hot seat' : `${numQs} rounds — hot seat cycles through players`}
+              {numQs} round{numQs !== 1 ? 's' : ''} — hot seat cycles through players
             </p>
           </motion.div>
 

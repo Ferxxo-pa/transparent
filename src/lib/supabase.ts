@@ -33,6 +33,7 @@ export interface PlayerRow {
   wallet_address: string;
   display_name: string;
   has_paid: boolean;
+  is_ready: boolean;
   joined_at: string;
 }
 
@@ -118,6 +119,15 @@ export async function addPlayerToDB(data: {
     .single();
   if (error) throw error;
   return player;
+}
+
+export async function readyUpPlayer(gameId: string, walletAddress: string): Promise<void> {
+  const { error } = await supabase
+    .from('players')
+    .update({ is_ready: true })
+    .eq('game_id', gameId)
+    .eq('wallet_address', walletAddress);
+  if (error) throw error;
 }
 
 export async function getPlayersForGame(gameId: string): Promise<PlayerRow[]> {

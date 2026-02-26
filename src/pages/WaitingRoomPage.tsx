@@ -10,9 +10,11 @@ const LAMPORTS = 1_000_000_000;
 
 export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame, refreshPlayers } = useGame();
+  const { gameState, startGame, loading, error, predictions, predictionPot, placePrediction, leaveGame, readyUp, refreshPlayers } = useGame();
   const { publicKey, displayName } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [readying, setReadying] = useState(false);
 
   // Prediction state
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
@@ -37,6 +39,9 @@ export const WaitingRoomPage: React.FC = () => {
   if (!gameState) { navigate('/'); return null; }
 
   const pot = (gameState.players.length * gameState.buyInAmount).toFixed(3);
+  const allReady = gameState.players.length >= 2 && gameState.players.every(p => p.isReady);
+  const meReady = gameState.players.find(p => p.id === myWallet)?.isReady ?? false;
+  const readyCount = gameState.players.filter(p => p.isReady).length;
 
   // Prediction totals per player
   const predTotals = useMemo(() => {
@@ -64,13 +69,84 @@ export const WaitingRoomPage: React.FC = () => {
     if (ok) { setPlaced(true); setSelectedPlayer(null); }
   };
 
+  const handleReadyUp = async () => {
+    setReadying(true);
+    await readyUp();
+    setReadying(false);
+  };
+
+  const handleLeave = async () => {
+    await leaveGame();
+    navigate('/');
+  };
+
   return (
     <div className="page fade-in">
+      {/* Leave confirmation modal */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 100,
+              background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+            }}
+            onClick={() => setShowLeaveConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: 'var(--card)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r)', padding: 24, maxWidth: 340, width: '100%',
+                display: 'flex', flexDirection: 'column', gap: 16, textAlign: 'center',
+              }}
+            >
+              <p style={{ fontSize: 16, fontWeight: 700 }}>Leave lobby?</p>
+              <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+                {gameState.buyInAmount > 0 && meReady
+                  ? "You've already paid in. Leaving means you'll lose your buy-in."
+                  : "Are you sure you want to leave this game?"}
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  onClick={() => setShowLeaveConfirm(false)}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
+                    background: 'var(--glass)', border: '1px solid var(--border)',
+                    color: 'var(--text)', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'Space Grotesk',
+                  }}
+                >
+                  Stay
+                </button>
+                <button
+                  onClick={handleLeave}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
+                    background: 'rgba(255,60,60,0.15)', border: '1px solid rgba(255,60,60,0.3)',
+                    color: '#ff4444', fontSize: 13, fontWeight: 600,
+                    cursor: 'pointer', fontFamily: 'Space Grotesk',
+                  }}
+                >
+                  Leave
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top row */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
         <span className="chip chip-lime blink" style={{ fontSize: 11 }}>● Waiting</span>
         <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-          {gameState.players.length} player{gameState.players.length !== 1 ? 's' : ''}
+          {readyCount}/{gameState.players.length} ready
         </span>
       </div>
 
@@ -123,18 +199,19 @@ export const WaitingRoomPage: React.FC = () => {
                       {String(i + 1).padStart(2, '0')}
                     </span>
                     <span style={{ fontSize: 14, fontWeight: 600 }}>{p.name || `Player ${i + 1}`}</span>
-                    {p.isHost && <span className="chip chip-muted" style={{ padding: '2px 8px', fontSize: 10 }}>Host</span>}
                     {p.id === myWallet && <span className="chip chip-white" style={{ padding: '2px 8px', fontSize: 10 }}>You</span>}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {hasPreds && (
                       <span style={{ fontSize: 11, color: 'var(--lavender)', fontWeight: 600 }}>
-                        🎯 {playerPredSol} SOL bet
+                        🎯 {playerPredSol} SOL
                       </span>
                     )}
-                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lime)' }}>
-                      {gameState.buyInAmount > 0 ? `${gameState.buyInAmount} SOL` : 'Free'}
-                    </span>
+                    {p.isReady ? (
+                      <span className="chip chip-lime" style={{ padding: '2px 8px', fontSize: 10 }}>Ready ✓</span>
+                    ) : (
+                      <span className="chip chip-muted" style={{ padding: '2px 8px', fontSize: 10 }}>Not ready</span>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -142,7 +219,7 @@ export const WaitingRoomPage: React.FC = () => {
           </div>
         </div>
 
-        {/* ── Prediction Market ── */}
+        {/* ── Prediction Market (host sees read-only, players can bet) ── */}
         {gameState.players.length >= 2 && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -165,13 +242,15 @@ export const WaitingRoomPage: React.FC = () => {
             </div>
 
             <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Header */}
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
                   Who's gonna win? 🎯
                 </p>
                 <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
-                  Bet on who tells the most truth. Correct predictors split the prediction pot.
+                  {isHost
+                    ? 'See what players are betting on. You can\'t bet as the host.'
+                    : 'Bet on who tells the most truth. Correct predictors split the prediction pot.'
+                  }
                   {myBet && (
                     <span style={{ color: 'var(--lime)', fontWeight: 600 }}>
                       {' '}You bet {(myBet.amount_lamports / LAMPORTS).toFixed(3)} SOL on {
@@ -182,128 +261,179 @@ export const WaitingRoomPage: React.FC = () => {
                 </p>
               </div>
 
-              <AnimatePresence>
-                {placed ? (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    style={{
-                      textAlign: 'center', padding: '16px', background: 'rgba(196,255,60,0.08)',
-                      border: '1px solid var(--lime-border)', borderRadius: 'var(--r-sm)',
-                    }}
-                  >
-                    <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--lime)' }}>✅ Prediction locked in!</p>
-                    <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                      You'll earn from the prediction pot if you're right.
-                    </p>
-                    <button
-                      onClick={() => setPlaced(false)}
-                      style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'Space Grotesk' }}
-                    >
-                      Place another bet
-                    </button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-                  >
-                    {/* Player selection */}
-                    <div>
-                      <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pick a player</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {gameState.players.map(p => {
-                          const isMe = p.id === myWallet;
-                          const playerPredSol = ((predTotals[p.id] ?? 0) / LAMPORTS).toFixed(3);
-                          const totalPreds = predictions.filter(pr => pr.predicted_winner_wallet === p.id).length;
-                          return (
-                            <motion.button
-                              key={p.id}
-                              onClick={() => !isMe && setSelectedPlayer(p.id)}
-                              disabled={isMe}
-                              whileTap={!isMe ? { scale: 0.97 } : {}}
-                              style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                padding: '10px 14px', borderRadius: 'var(--r-sm)',
-                                border: `1px solid ${selectedPlayer === p.id ? 'var(--lavender)' : 'var(--border)'}`,
-                                background: selectedPlayer === p.id ? 'rgba(180,120,255,0.1)' : 'var(--glass)',
-                                cursor: isMe ? 'not-allowed' : 'pointer',
-                                opacity: isMe ? 0.4 : 1,
-                                fontFamily: 'Space Grotesk',
-                              }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                                  {p.name || 'Player'}
-                                </span>
-                                {isMe && <span style={{ fontSize: 11, color: 'var(--muted)' }}>(you)</span>}
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {totalPreds > 0 && (
-                                  <span style={{ fontSize: 11, color: 'var(--lavender)' }}>
-                                    {totalPreds} bet{totalPreds !== 1 ? 's' : ''} · {playerPredSol} SOL
-                                  </span>
-                                )}
-                                {selectedPlayer === p.id && (
-                                  <span style={{ fontSize: 13, color: 'var(--lavender)' }}>✓</span>
-                                )}
-                              </div>
-                            </motion.button>
-                          );
-                        })}
+              {/* Host: read-only Polymarket-style view */}
+              {isHost ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {gameState.players.map(p => {
+                    const total = (predTotals[p.id] ?? 0) / LAMPORTS;
+                    const totalAll = predictionPot / LAMPORTS;
+                    const pct = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
+                    const numBets = predictions.filter(pr => pr.predicted_winner_wallet === p.id).length;
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          padding: '10px 14px', borderRadius: 'var(--r-sm)',
+                          background: 'var(--glass)', border: '1px solid var(--border)',
+                          position: 'relative', overflow: 'hidden',
+                        }}
+                      >
+                        {/* Progress bar background */}
+                        <div style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0,
+                          width: `${pct}%`,
+                          background: 'rgba(180,120,255,0.1)',
+                          transition: 'width 0.3s',
+                        }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</span>
+                            {numBets > 0 && (
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                {numBets} bet{numBets !== 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lavender)' }}>
+                              {pct}%
+                            </span>
+                            {total > 0 && (
+                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                                {total.toFixed(3)} SOL
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Bet amount presets */}
-                    <AnimatePresence>
-                      {selectedPlayer && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-                        >
-                          <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bet amount</p>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                            {PREDICTION_PRESETS.map(preset => (
-                              <button
-                                key={preset}
-                                onClick={() => setBetAmount(preset)}
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Players: can place bets */
+                <AnimatePresence>
+                  {placed ? (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      style={{
+                        textAlign: 'center', padding: '16px', background: 'rgba(196,255,60,0.08)',
+                        border: '1px solid var(--lime-border)', borderRadius: 'var(--r-sm)',
+                      }}
+                    >
+                      <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--lime)' }}>✅ Prediction locked in!</p>
+                      <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                        You'll earn from the prediction pot if you're right.
+                      </p>
+                      <button
+                        onClick={() => setPlaced(false)}
+                        style={{ marginTop: 10, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'Space Grotesk' }}
+                      >
+                        Place another bet
+                      </button>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+                    >
+                      {/* Player selection */}
+                      <div>
+                        <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pick a player</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {gameState.players.map(p => {
+                            const isMe = p.id === myWallet;
+                            const playerPredSol = ((predTotals[p.id] ?? 0) / LAMPORTS).toFixed(3);
+                            const totalPreds = predictions.filter(pr => pr.predicted_winner_wallet === p.id).length;
+                            return (
+                              <motion.button
+                                key={p.id}
+                                onClick={() => !isMe && setSelectedPlayer(p.id)}
+                                disabled={isMe}
+                                whileTap={!isMe ? { scale: 0.97 } : {}}
                                 style={{
-                                  padding: '6px 14px', borderRadius: 'var(--r-pill)',
-                                  border: `1px solid ${betAmount === preset ? 'var(--lavender)' : 'var(--border)'}`,
-                                  background: betAmount === preset ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
-                                  color: betAmount === preset ? 'var(--lavender)' : 'var(--muted)',
-                                  fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                  padding: '10px 14px', borderRadius: 'var(--r-sm)',
+                                  border: `1px solid ${selectedPlayer === p.id ? 'var(--lavender)' : 'var(--border)'}`,
+                                  background: selectedPlayer === p.id ? 'rgba(180,120,255,0.1)' : 'var(--glass)',
+                                  cursor: isMe ? 'not-allowed' : 'pointer',
+                                  opacity: isMe ? 0.4 : 1,
+                                  fontFamily: 'Space Grotesk',
                                 }}
                               >
-                                {preset} SOL
-                              </button>
-                            ))}
-                          </div>
-                          <motion.button
-                            className="btn btn-primary"
-                            onClick={handlePredict}
-                            disabled={placing}
-                            whileTap={{ scale: 0.96 }}
-                            style={{
-                              width: '100%', height: 46, fontSize: 14,
-                              background: 'linear-gradient(135deg, rgba(180,120,255,0.3) 0%, rgba(196,255,60,0.2) 100%)',
-                              borderColor: 'var(--lavender)',
-                            }}
-                          >
-                            {placing ? 'Placing…' : `Bet ${betAmount} SOL → ${gameState.players.find(p => p.id === selectedPlayer)?.name ?? 'player'}`}
-                          </motion.button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                                    {p.name || 'Player'}
+                                  </span>
+                                  {isMe && <span style={{ fontSize: 11, color: 'var(--muted)' }}>(you)</span>}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {totalPreds > 0 && (
+                                    <span style={{ fontSize: 11, color: 'var(--lavender)' }}>
+                                      {totalPreds} bet{totalPreds !== 1 ? 's' : ''} · {playerPredSol} SOL
+                                    </span>
+                                  )}
+                                  {selectedPlayer === p.id && (
+                                    <span style={{ fontSize: 13, color: 'var(--lavender)' }}>✓</span>
+                                  )}
+                                </div>
+                              </motion.button>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-              {/* Live prediction leaderboard */}
+                      {/* Bet amount presets */}
+                      <AnimatePresence>
+                        {selectedPlayer && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+                          >
+                            <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bet amount</p>
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                              {PREDICTION_PRESETS.map(preset => (
+                                <button
+                                  key={preset}
+                                  onClick={() => setBetAmount(preset)}
+                                  style={{
+                                    padding: '6px 14px', borderRadius: 'var(--r-pill)',
+                                    border: `1px solid ${betAmount === preset ? 'var(--lavender)' : 'var(--border)'}`,
+                                    background: betAmount === preset ? 'rgba(180,120,255,0.15)' : 'var(--glass)',
+                                    color: betAmount === preset ? 'var(--lavender)' : 'var(--muted)',
+                                    fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'Space Grotesk',
+                                  }}
+                                >
+                                  {preset} SOL
+                                </button>
+                              ))}
+                            </div>
+                            <motion.button
+                              className="btn btn-primary"
+                              onClick={handlePredict}
+                              disabled={placing}
+                              whileTap={{ scale: 0.96 }}
+                              style={{
+                                width: '100%', height: 46, fontSize: 14,
+                                background: 'linear-gradient(135deg, rgba(180,120,255,0.3) 0%, rgba(196,255,60,0.2) 100%)',
+                                borderColor: 'var(--lavender)',
+                              }}
+                            >
+                              {placing ? 'Placing…' : `Bet ${betAmount} SOL → ${gameState.players.find(p => p.id === selectedPlayer)?.name ?? 'player'}`}
+                            </motion.button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+
+              {/* Live prediction feed */}
               {predictions.length > 0 && (
                 <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                   <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Live Predictions</p>
@@ -339,30 +469,51 @@ export const WaitingRoomPage: React.FC = () => {
             <motion.button
               className="btn btn-primary"
               onClick={async () => { await startGame(); navigate('/game'); }}
-              disabled={loading || gameState.players.length < 2}
+              disabled={loading || !allReady}
               whileTap={{ scale: 0.96 }}
-              whileHover={!loading && gameState.players.length >= 2 ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
+              whileHover={!loading && allReady ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
               transition={{ type: 'spring', stiffness: 400, damping: 20 }}
             >
-              {loading ? 'Starting…' : gameState.players.length < 2 ? `Waiting for players (${gameState.players.length}/2+)` : 'Start Game →'}
+              {loading ? 'Starting…' : !allReady
+                ? `Waiting for ready (${readyCount}/${gameState.players.length})`
+                : 'Start Game →'}
             </motion.button>
             <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-              {gameState.players.length < 2 ? 'Need at least 2 players to start' : `${gameState.players.length} players ready`}
+              {gameState.players.length < 2
+                ? 'Need at least 2 players to start'
+                : allReady
+                  ? `All ${gameState.players.length} players ready!`
+                  : `${readyCount} of ${gameState.players.length} players ready`}
             </p>
           </>
+        ) : !meReady ? (
+          <motion.button
+            className="btn btn-primary"
+            onClick={handleReadyUp}
+            disabled={readying}
+            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+          >
+            {readying
+              ? gameState.buyInAmount > 0 ? 'Paying & readying…' : 'Readying up…'
+              : gameState.buyInAmount > 0
+                ? `Ready Up & Pay ${gameState.buyInAmount} SOL`
+                : 'Ready Up ✓'}
+          </motion.button>
         ) : (
           <motion.div
-            style={{ textAlign: 'center', padding: '18px 0', background: 'var(--glass)', backdropFilter: 'blur(10px)', borderRadius: 'var(--r)', border: '1px solid var(--border)' }}
-            animate={{ opacity: [1, 0.6, 1] }}
+            style={{ textAlign: 'center', padding: '18px 0', background: 'var(--glass)', backdropFilter: 'blur(10px)', borderRadius: 'var(--r)', border: '1px solid var(--lime-border)' }}
+            animate={{ opacity: [1, 0.7, 1] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           >
-            <p style={{ color: 'var(--muted)', fontSize: 14 }}>⏳ Waiting for host to start…</p>
+            <p style={{ color: 'var(--lime)', fontSize: 14, fontWeight: 600 }}>✓ Ready — waiting for host to start…</p>
           </motion.div>
         )}
 
         {/* Leave lobby */}
         <button
-          onClick={async () => { await leaveGame(); navigate('/'); }}
+          onClick={() => setShowLeaveConfirm(true)}
           style={{
             marginTop: 12, background: 'none', border: '1px solid var(--border)',
             borderRadius: 'var(--r-pill)', padding: '10px 20px', cursor: 'pointer',

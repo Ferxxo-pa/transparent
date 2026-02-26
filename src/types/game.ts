@@ -4,6 +4,7 @@ export interface Player {
   balance: number;
   isHost?: boolean;
   walletAddress?: string;
+  isReady?: boolean;
 }
 
 export type QuestionMode = 'classic' | 'custom' | 'hot-take';

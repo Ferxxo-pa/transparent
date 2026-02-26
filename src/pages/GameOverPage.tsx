@@ -87,7 +87,7 @@ export const GameOverPage: React.FC = () => {
               <>
                 <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Split</p>
                 <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  {answerers.length} honest talkers
+                  {answerers.length} Transparent Player{answerers.length !== 1 ? 's' : ''}
                 </p>
                 <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
                   {splitAmount.toFixed(3)} SOL each
@@ -159,7 +159,7 @@ export const GameOverPage: React.FC = () => {
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</span>
-                      {isHonestTalkers && answered && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Answered ✓</span>}
+                      {isHonestTalkers && answered && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Transparent ✓</span>}
                       {!isHonestTalkers && i === 0 && ranked[0].t > 0 && <span className="chip chip-lime" style={{ fontSize: 9, padding: '1px 7px' }}>Most honest</span>}
                       {!isHonestTalkers && isWinner && isHost && !confirmed && <span className="chip chip-white" style={{ fontSize: 9, padding: '1px 7px' }}>Selected</span>}
                     </div>

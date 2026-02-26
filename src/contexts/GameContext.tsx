@@ -12,6 +12,7 @@ import {
   getVotesForRound,
   submitQuestionToDB,
   voteForQuestionInDB,
+  readyUpPlayer,
   placePrediction as placePredictionInDB,
   getPredictionsForGame,
   settlePredictions,
@@ -54,6 +55,7 @@ interface GameContextType {
   distributePredictions: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
   endGameNow: () => Promise<void>;
+  readyUp: () => Promise<void>;
   leaveGame: () => Promise<void>;
   refreshPlayers: () => Promise<void>;
   pollGameState: () => Promise<void>;
@@ -82,6 +84,7 @@ function playerRowsToPlayers(rows: PlayerRow[], hostWallet: string): Player[] {
     balance: 0,
     isHost: r.wallet_address === hostWallet,
     walletAddress: r.wallet_address,
+    isReady: r.is_ready ?? false,
   }));
 }
 
@@ -104,10 +107,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const walletRef = useRef<WalletAdapter | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const gameIdRef = useRef<string | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
 
   const setWalletAdapter = useCallback((adapter: WalletAdapter | null) => {
     walletRef.current = adapter;
   }, []);
+
+  // Keep ref in sync
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
   // ── Persist gameState to localStorage ──────────────────
   useEffect(() => {
@@ -371,26 +378,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           return false;
         }
 
-        // 2. Send buy-in SOL to host wallet on-chain
-        try {
-          const hostPubkey = new PublicKey(game.host_wallet);
-          const buyInLamports = game.buy_in_lamports;
-          if (buyInLamports > 0 && wallet.publicKey.toBase58() !== game.host_wallet) {
-            await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
-          }
-        } catch (chainErr: any) {
-          console.error('On-chain buy-in failed:', chainErr);
-          // Log details for debugging
-          console.error('Buy-in details:', {
-            host: game.host_wallet,
-            player: wallet.publicKey.toBase58(),
-            lamports: game.buy_in_lamports,
-            error: chainErr?.message,
-          });
-          // Non-fatal during dev — game continues in Supabase
-        }
-
-        // 3. Add player to Supabase
+        // 2. Add player to Supabase (buy-in happens when game starts)
         const walletAddr = wallet.publicKey.toBase58();
         const joinerDisplayName = playerName?.trim() || `${walletAddr.slice(0, 4)}...${walletAddr.slice(-4)}`;
         await addPlayerToDB({
@@ -461,8 +449,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const startGame = useCallback(async () => {
     if (!gameState) return;
 
-    if (gameState.players.length < 1) {
-      setError('Need at least 1 player to start');
+    if (gameState.players.length < 2) {
+      setError('Need at least 2 players to start');
       return;
     }
 
@@ -1023,6 +1011,36 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── Leave Game (remove player from DB + reset local) ────
 
+  const readyUp = useCallback(async () => {
+    const wallet = walletRef.current;
+    const gameId = gameIdRef.current;
+    if (!wallet || !gameId) return;
+    try {
+      // If there's a buy-in, pay now
+      const gs = gameStateRef.current;
+      if (gs && gs.buyInAmount > 0 && gs.hostWallet) {
+        const hostPubkey = new PublicKey(gs.hostWallet);
+        const buyInLamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
+        if (wallet.publicKey.toBase58() !== gs.hostWallet) {
+          await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+        }
+      }
+      await readyUpPlayer(gameId, wallet.publicKey.toBase58());
+      setGameState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map(p =>
+            p.id === wallet.publicKey.toBase58() ? { ...p, isReady: true } : p
+          ),
+        };
+      });
+    } catch (err: any) {
+      console.error('Ready up failed:', err);
+      setError(err?.message || 'Failed to ready up');
+    }
+  }, []);
+
   const leaveGame = useCallback(async () => {
     const wallet = walletRef.current;
     const gameId = gameIdRef.current;
@@ -1177,6 +1195,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         distributePredictions,
         forceAdvanceRound,
         endGameNow,
+        readyUp,
         leaveGame,
         refreshPlayers,
         pollGameState,
