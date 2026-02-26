@@ -16,7 +16,6 @@ export const WaitingRoomPage: React.FC = () => {
   const solPrice = useSolPrice();
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-  const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
   const [playerWantsLeave, setPlayerWantsLeave] = useState(false);
   const [readying, setReadying] = useState(false);
 
