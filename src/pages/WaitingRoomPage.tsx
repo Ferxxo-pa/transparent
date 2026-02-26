@@ -29,10 +29,6 @@ export const WaitingRoomPage: React.FC = () => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
   }, [gameState?.gameStatus, navigate]);
 
-  // Guard: if gameState was cleared (e.g. after leaving), render nothing
-  // This prevents crashes during AnimatePresence exit animations
-  if (!gameState) return null;
-
   // Auto-refresh players every 5s as fallback for Realtime
   useEffect(() => {
     if (!gameState || gameState.gameStatus !== 'waiting') return;
@@ -40,7 +36,9 @@ export const WaitingRoomPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState?.gameStatus, refreshPlayers]);
 
-  if (!gameState) { navigate('/'); return null; }
+  // Guard: if gameState was cleared (after leaving), render nothing
+  // Must be AFTER all hooks to avoid rules-of-hooks violation
+  if (!gameState) return null;
 
   const pot = (gameState.players.length * gameState.buyInAmount).toFixed(3);
   const allReady = gameState.players.length >= 2 && gameState.players.every(p => p.isReady);

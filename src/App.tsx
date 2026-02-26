@@ -55,7 +55,7 @@ function AnimatedRoutes() {
     <>
       <GameRedirect />
       <WalletHeader />
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         <Routes location={location} key={location.pathname}>
           <Route path="/"         element={<PageWrap><HomePage /></PageWrap>} />
           <Route path="/join"     element={<PageWrap><JoinGamePage /></PageWrap>} />
