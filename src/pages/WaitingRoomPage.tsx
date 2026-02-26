@@ -19,6 +19,7 @@ export const WaitingRoomPage: React.FC = () => {
   const [playerWantsLeave, setPlayerWantsLeave] = useState(false);
   const [deniedLeaves, setDeniedLeaves] = useState<string[]>([]);
   const [refunding, setRefunding] = useState<string | null>(null);
+  const [hostLeaving, setHostLeaving] = useState(false);
   const [readying, setReadying] = useState(false);
 
   // Prediction state
@@ -174,29 +175,50 @@ export const WaitingRoomPage: React.FC = () => {
               }}
             >
               <p style={{ fontSize: 16, fontWeight: 700 }}>Leave lobby?</p>
-              <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-                {gameState.buyInAmount > 0 && meReady
-                  ? "You've already paid in. Leaving means you'll lose your buy-in."
-                  : "Are you sure you want to leave this game?"}
-              </p>
+              {(() => {
+                const readiedCount = isHost ? gameState.players.filter(p => p.isReady && p.id !== (gameState as any).hostWallet).length : 0;
+                const refundTotal = readiedCount * gameState.buyInAmount;
+                return (
+                  <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+                    {isHost && readiedCount > 0 && gameState.buyInAmount > 0
+                      ? `${readiedCount} player${readiedCount !== 1 ? 's have' : ' has'} paid in. You'll refund ${refundTotal.toFixed(3)} SOL (${gameState.buyInAmount} SOL × ${readiedCount}) before the game closes.`
+                      : isHost
+                        ? "This will end the game for everyone."
+                        : gameState.buyInAmount > 0 && meReady
+                          ? "You've already paid in. Leaving means you'll lose your buy-in."
+                          : "Are you sure you want to leave this game?"}
+                  </p>
+                );
+              })()}
+              {hostLeaving && (
+                <p style={{ fontSize: 12, color: 'var(--lavender)', fontWeight: 600 }}>⏳ Refunding players…</p>
+              )}
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
+                  disabled={hostLeaving}
                   onClick={() => setShowLeaveConfirm(false)}
                   style={{
                     flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
                     background: 'var(--glass)', border: '1px solid var(--border)',
                     color: 'var(--text)', fontSize: 13, fontWeight: 600,
                     cursor: 'pointer', fontFamily: 'Space Grotesk',
+                    opacity: hostLeaving ? 0.5 : 1,
                   }}
                 >
                   Stay
                 </button>
                 <button
-                  onClick={handleLeave}
+                  disabled={hostLeaving}
+                  onClick={async () => {
+                    if (isHost) setHostLeaving(true);
+                    await handleLeave();
+                    setHostLeaving(false);
+                  }}
                   style={{
                     flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
                     background: 'rgba(255,60,60,0.15)', border: '1px solid rgba(255,60,60,0.3)',
                     color: '#ff4444', fontSize: 13, fontWeight: 600,
+                    opacity: hostLeaving ? 0.5 : 1,
                     cursor: 'pointer', fontFamily: 'Space Grotesk',
                   }}
                 >

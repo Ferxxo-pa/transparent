@@ -1109,6 +1109,23 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const gs = gameStateRef.current;
         const isHost = wallet.publicKey.toBase58() === gs?.hostWallet;
 
+        // If host leaves, refund all readied players first
+        if (isHost && gs && gs.buyInAmount > 0) {
+          const readiedPlayers = gs.players.filter(
+            p => p.isReady && p.id !== gs.hostWallet
+          );
+          for (const player of readiedPlayers) {
+            try {
+              const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
+              const playerPubkey = new PublicKey(player.id);
+              await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
+              console.log(`[hostLeave] Refunded ${gs.buyInAmount} SOL to ${player.name}`);
+            } catch (err) {
+              console.warn(`[hostLeave] Failed to refund ${player.name}:`, err);
+            }
+          }
+        }
+
         // Remove player from DB
         await supabase
           .from('players')
