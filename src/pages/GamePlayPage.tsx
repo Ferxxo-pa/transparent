@@ -274,7 +274,7 @@ export const GamePlayPage: React.FC = () => {
           /* === HOT SEAT PLAYER VIEW === */
           <div style={{ background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r)', textAlign: 'center', padding: '18px' }}>
             <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
-              Answer out loud. Others are voting on whether you're being honest.
+              Answer out loud. {voterCount === 1 ? 'The other player is voting' : 'Others are voting'} on whether you're being honest.
             </p>
             <div style={{ marginTop: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 11 }}>

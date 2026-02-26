@@ -7,7 +7,7 @@ import { useWalletBalance } from '../hooks/useWalletBalance';
 import { WalletDrawer } from './WalletDrawer';
 
 // Pages where we show the full wallet pill — everything else gets compact icon
-const FULL_PILL_PATHS = ['/', '/join', '/create', '/waitlist'];
+const FULL_PILL_PATHS = ['/', '/join', '/create', '/waitlist', '/waiting', '/game', '/gameover'];
 
 export const WalletHeader: React.FC = () => {
   const { connected, publicKey, walletReady, displayName } = usePrivyWallet();
@@ -68,7 +68,7 @@ export const WalletHeader: React.FC = () => {
         )}
 
         {!compact && !walletReady && (
-          <span style={{ color: 'var(--muted)', fontSize: 12 }}>{displayName}</span>
+          <span style={{ color: 'var(--muted)', fontSize: 12 }}>{displayName || 'Connecting…'}</span>
         )}
 
         {!compact && <ChevronDown size={12} color="var(--muted)" style={{ marginLeft: -2, flexShrink: 0 }} />}
