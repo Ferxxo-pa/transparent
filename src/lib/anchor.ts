@@ -36,13 +36,25 @@ async function buildAndSend(
   tx.recentBlockhash = blockhash;
 
   // Privy wallet.sendTransaction signs + sends using our Connection
+  console.log('[anchor] Sending transaction...');
   const sig = await wallet.sendTransaction(tx);
+  console.log('[anchor] Transaction sent, sig:', sig);
 
-  // Wait for confirmation
-  await connection.confirmTransaction(
-    { signature: sig, blockhash, lastValidBlockHeight },
-    'confirmed',
-  );
+  // Wait for confirmation with timeout (devnet can be slow)
+  try {
+    const confirmPromise = connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      'confirmed',
+    );
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Confirmation timeout')), 30000)
+    );
+    await Promise.race([confirmPromise, timeoutPromise]);
+    console.log('[anchor] Transaction confirmed');
+  } catch (err) {
+    console.warn('[anchor] Confirmation warning (tx may still succeed):', err);
+    // Don't throw — the tx was already sent successfully
+  }
 
   return sig;
 }

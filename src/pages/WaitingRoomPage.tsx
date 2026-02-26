@@ -25,9 +25,20 @@ export const WaitingRoomPage: React.FC = () => {
   const myWallet = publicKey?.toBase58() ?? '';
   const isHost   = myWallet === (gameState as any)?.hostWallet;
 
+  const [hostLeft, setHostLeft] = useState(false);
+
   useEffect(() => {
     if (gameState?.gameStatus === 'playing') navigate('/game');
-  }, [gameState?.gameStatus, navigate]);
+    if (gameState?.gameStatus === 'cancelled') {
+      setHostLeft(true);
+      // Auto-redirect after showing message
+      const t = setTimeout(() => {
+        leaveGame();
+        navigate('/', { replace: true });
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [gameState?.gameStatus, navigate, leaveGame]);
 
   // Auto-refresh players every 5s as fallback for Realtime
   useEffect(() => {
@@ -48,6 +59,19 @@ export const WaitingRoomPage: React.FC = () => {
   // Guard: if gameState was cleared (after leaving), render nothing
   // Must be AFTER all hooks to avoid rules-of-hooks violation
   if (!gameState) return null;
+
+  // Host disconnected overlay
+  if (hostLeft) {
+    return (
+      <div className="page fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center', padding: 32 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>🔌</div>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Host Disconnected</h2>
+          <p style={{ fontSize: 14, color: 'var(--muted)' }}>The host left the game. Returning to home...</p>
+        </div>
+      </div>
+    );
+  }
 
   const pot = (gameState.players.length * gameState.buyInAmount).toFixed(3);
   const allReady = gameState.players.length >= 2 && gameState.players.every(p => p.isReady);

@@ -1046,11 +1046,23 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const gameId = gameIdRef.current;
     if (wallet && gameId) {
       try {
+        const gs = gameStateRef.current;
+        const isHost = wallet.publicKey.toBase58() === gs?.hostWallet;
+
+        // Remove player from DB
         await supabase
           .from('players')
           .delete()
           .eq('game_id', gameId)
           .eq('wallet_address', wallet.publicKey.toBase58());
+
+        // If host leaves, cancel the game so all clients get notified
+        if (isHost) {
+          await supabase
+            .from('games')
+            .update({ status: 'cancelled' })
+            .eq('id', gameId);
+        }
       } catch (err) {
         console.warn('Failed to remove player from DB:', err);
       }

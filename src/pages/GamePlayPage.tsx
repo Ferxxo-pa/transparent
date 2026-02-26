@@ -19,6 +19,7 @@ export const GamePlayPage: React.FC = () => {
 
   useEffect(() => {
     if (gameState?.gameStatus === 'gameover') navigate('/gameover');
+    if (gameState?.gameStatus === 'cancelled') navigate('/', { replace: true });
   }, [gameState?.gameStatus, navigate]);
 
   // Poll every 3s as Realtime fallback
