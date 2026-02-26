@@ -17,6 +17,7 @@ export const WaitingRoomPage: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [playerWantsLeave, setPlayerWantsLeave] = useState(false);
+  const [deniedLeaves, setDeniedLeaves] = useState<string[]>([]);
   const [readying, setReadying] = useState(false);
 
   // Prediction state
@@ -238,50 +239,63 @@ export const WaitingRoomPage: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Host: leave request notifications */}
-      {isHost && leaveRequests.length > 0 && (
+      {/* Host: leave request modal (centered) */}
+      {isHost && leaveRequests.filter(w => !deniedLeaves.includes(w)).length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           style={{
-            position: 'fixed', top: 70, left: 16, right: 16, zIndex: 90,
-            display: 'flex', flexDirection: 'column', gap: 8,
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
           }}
         >
-          {leaveRequests.map(wallet => {
-            const player = gameState.players.find(p => p.id === wallet);
-            return (
-              <motion.div
-                key={wallet}
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                style={{
-                  background: 'var(--card)', border: '1px solid rgba(255,180,60,0.4)',
-                  borderRadius: 'var(--r-sm)', padding: '12px 16px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                }}
-              >
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                    🙋 {player?.name ?? wallet.slice(0, 8)} wants to leave
+          <motion.div
+            initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+            style={{
+              background: 'var(--card)', border: '1px solid rgba(255,180,60,0.4)',
+              borderRadius: 'var(--r)', padding: 24, maxWidth: 360, width: '100%',
+              display: 'flex', flexDirection: 'column', gap: 16,
+            }}
+          >
+            {leaveRequests.filter(w => !deniedLeaves.includes(w)).map(wallet => {
+              const player = gameState.players.find(p => p.id === wallet);
+              return (
+                <div key={wallet} style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ fontSize: 36 }}>🙋</div>
+                  <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                    {player?.name ?? wallet.slice(0, 8)} wants to leave
                   </p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>
-                    Refund {gameState.buyInAmount} SOL to let them go
+                  <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+                    Refund their {gameState.buyInAmount} SOL buy-in to remove them from the game.
                   </p>
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button
+                      onClick={() => setDeniedLeaves(prev => [...prev, wallet])}
+                      style={{
+                        flex: 1, padding: '12px 0', borderRadius: 'var(--r-sm)',
+                        background: 'var(--glass)', border: '1px solid var(--border)',
+                        color: 'var(--text)', fontSize: 13, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'Space Grotesk',
+                      }}
+                    >
+                      Deny
+                    </button>
+                    <button
+                      onClick={() => approveLeave(wallet)}
+                      style={{
+                        flex: 1, padding: '12px 0', borderRadius: 'var(--r-sm)',
+                        background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)',
+                        color: 'var(--lime)', fontSize: 13, fontWeight: 700,
+                        cursor: 'pointer', fontFamily: 'Space Grotesk',
+                      }}
+                    >
+                      Refund & Remove
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => approveLeave(wallet)}
-                  style={{
-                    padding: '8px 14px', borderRadius: 'var(--r-pill)',
-                    background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)',
-                    color: 'var(--lime)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    fontFamily: 'Space Grotesk', whiteSpace: 'nowrap',
-                  }}
-                >
-                  Refund & Remove
-                </button>
-              </motion.div>
-            );
-          })}
+              );
+            })}
+          </motion.div>
         </motion.div>
       )}
 
