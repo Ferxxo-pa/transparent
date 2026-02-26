@@ -32,6 +32,13 @@ export const WaitingRoomPage: React.FC = () => {
 
   const [hostLeft, setHostLeft] = useState(false);
 
+  // Re-broadcast leave request every 10s so host picks it up after refresh
+  useEffect(() => {
+    if (!playerWantsLeave) return;
+    const interval = setInterval(() => { requestLeave(); }, 10000);
+    return () => clearInterval(interval);
+  }, [playerWantsLeave, requestLeave]);
+
   // If gameState goes null (e.g. leave approved), redirect home
   useEffect(() => {
     if (playerWantsLeave && !gameState) {
@@ -224,17 +231,30 @@ export const WaitingRoomPage: React.FC = () => {
               The host has been notified. They need to refund your {gameState.buyInAmount} SOL before you can leave.
             </p>
             <p style={{ fontSize: 11, color: 'var(--lavender)' }}>⏳ Waiting for host to approve…</p>
-            <button
-              onClick={handleForceLeave}
-              style={{
-                padding: '10px 0', borderRadius: 'var(--r-sm)',
-                background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.3)',
-                color: '#ff4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'Space Grotesk',
-              }}
-            >
-              Leave without refund
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setPlayerWantsLeave(false)}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
+                  background: 'var(--glass)', border: '1px solid var(--border)',
+                  color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'Space Grotesk',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleForceLeave}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 'var(--r-sm)',
+                  background: 'rgba(255,60,60,0.1)', border: '1px solid rgba(255,60,60,0.3)',
+                  color: '#ff4444', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                  fontFamily: 'Space Grotesk',
+                }}
+              >
+                Leave without refund
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}
