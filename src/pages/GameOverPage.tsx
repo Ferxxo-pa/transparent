@@ -274,14 +274,16 @@ export const GameOverPage: React.FC = () => {
             }
           </motion.button>
         )}
-        <motion.button
-          className={isHost && !confirmed ? 'btn btn-secondary' : 'btn btn-primary'}
-          onClick={() => { resetGame(); navigate('/'); }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          whileTap={{ scale: 0.96 }}
-        >
-          Return Home
-        </motion.button>
+        {(confirmed || !isHost) && (
+          <motion.button
+            className="btn btn-primary"
+            onClick={() => { resetGame(); navigate('/'); }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            whileTap={{ scale: 0.96 }}
+          >
+            Return Home
+          </motion.button>
+        )}
       </div>
     </div>
   );
