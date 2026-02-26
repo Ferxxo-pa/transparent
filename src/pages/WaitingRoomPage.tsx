@@ -36,6 +36,15 @@ export const WaitingRoomPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState?.gameStatus, refreshPlayers]);
 
+  // Prediction totals per player (must be before any early return — rules of hooks)
+  const predTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    predictions.forEach(p => {
+      totals[p.predicted_winner_wallet] = (totals[p.predicted_winner_wallet] ?? 0) + p.amount_lamports;
+    });
+    return totals;
+  }, [predictions]);
+
   // Guard: if gameState was cleared (after leaving), render nothing
   // Must be AFTER all hooks to avoid rules-of-hooks violation
   if (!gameState) return null;
@@ -44,15 +53,6 @@ export const WaitingRoomPage: React.FC = () => {
   const allReady = gameState.players.length >= 2 && gameState.players.every(p => p.isReady);
   const meReady = gameState.players.find(p => p.id === myWallet)?.isReady ?? false;
   const readyCount = gameState.players.filter(p => p.isReady).length;
-
-  // Prediction totals per player
-  const predTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    predictions.forEach(p => {
-      totals[p.predicted_winner_wallet] = (totals[p.predicted_winner_wallet] ?? 0) + p.amount_lamports;
-    });
-    return totals;
-  }, [predictions]);
 
   const predPotSol = (predictionPot / LAMPORTS).toFixed(3);
   const myBet = predictions.find(p => p.bettor_wallet === myWallet);
