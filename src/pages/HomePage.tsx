@@ -182,7 +182,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
       {/* Top spacing — clear wallet pill */}
-      <div style={{ width: '100%', minHeight: 64, marginBottom: 16 }} />
+      <div style={{ width: '100%', minHeight: 100, marginBottom: 24 }} />
 
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
