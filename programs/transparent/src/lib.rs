@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_lang::system_program;
 
-declare_id!("TransPARENTEscr0w11111111111111111111111111");
+declare_id!("2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9");
 
 /// Transparent Escrow Program
 ///

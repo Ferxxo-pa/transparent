@@ -25,7 +25,7 @@ import { SOLANA_RPC } from './config';
 import { WalletAdapter, connection } from './anchor';
 
 // ── Program ID (update after deploy) ──────────────────────
-const PROGRAM_ID = new PublicKey('TransPARENTEscr0w11111111111111111111111111');
+const PROGRAM_ID = new PublicKey('2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9');
 
 // ── PDA Derivations ───────────────────────────────────────
 
