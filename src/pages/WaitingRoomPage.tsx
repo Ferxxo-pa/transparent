@@ -455,7 +455,7 @@ export const WaitingRoomPage: React.FC = () => {
                 </p>
                 <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
                   {isHost
-                    ? 'See what players are betting on. You can\'t bet as the host.'
+                    ? 'Bet on who tells the most truth. Correct predictors split the prediction pot.'
                     : 'Bet on who tells the most truth. Correct predictors split the prediction pot.'
                   }
                   {myBet && (
@@ -468,56 +468,7 @@ export const WaitingRoomPage: React.FC = () => {
                 </p>
               </div>
 
-              {/* Host: read-only Polymarket-style view */}
-              {isHost ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {gameState.players.map(p => {
-                    const total = (predTotals[p.id] ?? 0) / LAMPORTS;
-                    const totalAll = predictionPot / LAMPORTS;
-                    const pct = totalAll > 0 ? Math.round((total / totalAll) * 100) : 0;
-                    const numBets = predictions.filter(pr => pr.predicted_winner_wallet === p.id).length;
-                    return (
-                      <div
-                        key={p.id}
-                        style={{
-                          padding: '10px 14px', borderRadius: 'var(--r-sm)',
-                          background: 'var(--glass)', border: '1px solid var(--border)',
-                          position: 'relative', overflow: 'hidden',
-                        }}
-                      >
-                        {/* Progress bar background */}
-                        <div style={{
-                          position: 'absolute', left: 0, top: 0, bottom: 0,
-                          width: `${pct}%`,
-                          background: 'rgba(180,120,255,0.1)',
-                          transition: 'width 0.3s',
-                        }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</span>
-                            {numBets > 0 && (
-                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                                {numBets} bet{numBets !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--lavender)' }}>
-                              {pct}%
-                            </span>
-                            {total > 0 && (
-                              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                                {total.toFixed(3)} SOL
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                /* Players: can place bets */
+              {(
                 <AnimatePresence>
                   {placed ? (
                     <motion.div
@@ -550,23 +501,22 @@ export const WaitingRoomPage: React.FC = () => {
                       <div>
                         <p style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Pick a player</p>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {gameState.players.map(p => {
+                          {gameState.players.filter(p => p.id !== (gameState as any).hostWallet).map(p => {
                             const isMe = p.id === myWallet;
                             const playerPredSol = ((predTotals[p.id] ?? 0) / LAMPORTS).toFixed(3);
                             const totalPreds = predictions.filter(pr => pr.predicted_winner_wallet === p.id).length;
                             return (
                               <motion.button
                                 key={p.id}
-                                onClick={() => !isMe && setSelectedPlayer(p.id)}
-                                disabled={isMe}
-                                whileTap={!isMe ? { scale: 0.97 } : {}}
+                                onClick={() => setSelectedPlayer(p.id)}
+                                whileTap={{ scale: 0.97 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                   padding: '10px 14px', borderRadius: 'var(--r-sm)',
                                   border: `1px solid ${selectedPlayer === p.id ? 'var(--lavender)' : 'var(--border)'}`,
                                   background: selectedPlayer === p.id ? 'rgba(180,120,255,0.1)' : 'var(--glass)',
-                                  cursor: isMe ? 'not-allowed' : 'pointer',
-                                  opacity: isMe ? 0.4 : 1,
+                                  cursor: 'pointer',
+                                  opacity: 1,
                                   fontFamily: 'Space Grotesk',
                                 }}
                               >
