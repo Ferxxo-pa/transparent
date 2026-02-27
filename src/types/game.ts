@@ -125,57 +125,55 @@ export interface GameState {
 // Edgy, fun, college-appropriate — designed to make people laugh and squirm
 
 export const QUESTIONS: string[] = [
-  // Classic confessions
-  "What's the most embarrassing thing you've done while drunk?",
-  "Have you ever stolen something from a friend?",
-  "What's the biggest lie you've ever told your parents?",
-  "Have you ever cheated on a test or exam?",
-  "What's your most embarrassing dating app story?",
-  "Have you ever been kicked out of somewhere? Where and why?",
-  "What's the pettiest thing you've ever done for revenge?",
-  "Have you ever pretended to be sick to skip something important?",
+  // Receipts — real confessions the room can judge
+  "What's the worst thing you've done to an ex that you never told anyone?",
+  "What's the most expensive impulse purchase you regret? How much?",
+  "Have you ever snitched on someone? What happened?",
+  "What's the shadiest thing you've done for money?",
+  "Have you ever hooked up with a friend's ex? Who?",
+  "What's the biggest secret you're keeping from your best friend right now?",
+  "Have you ever lied on your resume? What did you make up?",
+  "What's the worst thing you've said behind someone's back in this room?",
+  "Have you ever ghosted someone who genuinely liked you? Why?",
+  "What's a promise you made to someone and completely broke?",
 
-  // Spicy hypotheticals
-  "If you had to delete one app from your phone forever, which would it be?",
-  "If everyone in this room could read your last 10 texts, how screwed are you?",
-  "If you had to marry someone in this room, who would it be?",
-  "You get $10,000 but your search history gets posted on your Instagram story. Deal?",
-  "If you had to give up showering for a week or give up your phone for a week, which one?",
-  "Would you rather have your parents read every DM you've ever sent or your boss?",
-  "If you could swap lives with someone in this room for a week, who and why?",
+  // Body count & dating — spicy but judgeable
+  "What's your real body count? No rounding down.",
+  "Who's the most questionable person you've hooked up with and why was it questionable?",
+  "What's the most desperate thing you've ever done to get someone's attention?",
+  "Have you ever been the side piece? Did the other person find out?",
+  "What's the fastest you've caught feelings and how badly did it end?",
+  "Have you ever gone through someone's phone? What did you find?",
+  "What's the biggest ick you've overlooked because the person was attractive?",
+  "Have you ever faked an emotion to manipulate someone? What was the situation?",
 
-  // Would-you-rather dilemmas
-  "Would you rather accidentally 'like' your ex's photo from 3 years ago or send a screenshot of their profile to them?",
-  "Would you rather have everyone know your body count or your bank balance?",
-  "Would you rather give up coffee forever or give up alcohol forever?",
-  "Would you rather be caught singing in the mirror or talking to yourself?",
+  // Money & hustle — numbers don't lie
+  "What's the most money you've lost on a bad decision? Be specific.",
+  "Have you ever scammed someone, even a little? What happened?",
+  "What's the brokest you've ever been and what did you do about it?",
+  "Have you ever lied about how much money you make? By how much?",
+  "What's something you spend money on that you'd be embarrassed for people to know?",
+  "Have you ever taken credit for someone else's work? What was it?",
 
-  // Truth-bomb confessions
-  "What's the most unhinged thing on your camera roll right now?",
-  "What's the worst text you've sent to the wrong person?",
-  "What's the most money you've wasted on something stupid?",
-  "What's the biggest red flag you've ignored in a relationship?",
-  "What's something you've done that would get you cancelled?",
-  "What's your most embarrassing music guilty pleasure?",
-  "Have you ever lied about your age? For what?",
-  "What's the longest you've gone without showering and why?",
+  // Loyalty tests — the room WILL know
+  "Who in this room do you trust the least and why?",
+  "If you had to cut one person in this room out of your life, who and why?",
+  "What's something you actually think about someone in this room but would never say?",
+  "Who here do you think is putting on the biggest act right now?",
+  "Have you ever talked shit about someone in this room? What did you say?",
+  "Who in this room would you never go into business with?",
 
-  // Social chaos
-  "If someone in this room was a secret agent, who would it be and why?",
-  "Who in this room would survive the longest in a zombie apocalypse?",
-  "Who here has the worst taste in music? Defend yourself.",
-  "If this room was a reality TV show, who would be the villain?",
-  "Who in this room is most likely to become famous? For what?",
-  "If you had to pick someone in this room to be your lawyer, who would you trust?",
-
-  // Deep cuts
-  "What's your most controversial food opinion?",
-  "What's a hill you'll die on that most people disagree with?",
-  "What's the most embarrassing thing your parents have caught you doing?",
-  "What's the weirdest thing you've done when you thought nobody was watching?",
-  "If your Spotify Wrapped was projected on a screen right now, what's the most embarrassing thing on it?",
-  "What's the worst excuse you've given to get out of plans?",
-  "What's something everyone else loves that you secretly think is overrated?",
+  // Unhinged confessions — the ones that haunt you at 3AM
+  "What's the most illegal thing you've gotten away with?",
+  "What's something you did as a teenager that would ruin you if it came out today?",
+  "Have you ever cried in a public bathroom? What broke you?",
+  "What's a lie you've been telling so long it basically became your truth?",
+  "What's the pettiest reason you've ended a friendship?",
+  "Have you ever pretended to like someone's cooking/art/music to their face? Whose?",
+  "What's the worst thing you've done that you genuinely feel no guilt about?",
+  "Have you ever sabotaged someone's opportunity? Why?",
+  "What's something you've never told anyone in this room until right now?",
+  "What's the most two-faced thing you've ever done?",
 ];
 
 export const FAKE_PLAYER_NAMES = [
