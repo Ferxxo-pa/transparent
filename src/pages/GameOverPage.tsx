@@ -14,9 +14,22 @@ export const GameOverPage: React.FC = () => {
   const [distributing, setDistributing] = useState(false);
   const [distStatus, setDistStatus] = useState('');
   const [distErr, setDistErr] = useState<string | null>(null);
+  const [showPayoutPopup, setShowPayoutPopup] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState(0);
 
   // Fetch final state on mount
   useEffect(() => { pollGameState(); }, [pollGameState]);
+
+  // Show payout popup when player receives funds
+  useEffect(() => {
+    const myPayout = (gameState as any)?.myPayout;
+    const potDist = (gameState as any)?.potDistributed;
+    if (potDist && myPayout > 0 && !showPayoutPopup) {
+      setPayoutAmount(myPayout);
+      setShowPayoutPopup(true);
+      setConfirmed(true);
+    }
+  }, [(gameState as any)?.myPayout, (gameState as any)?.potDistributed]);
 
   const isHost = publicKey?.toBase58() === (gameState as any)?.hostWallet;
   const scores = gameState?.scores ?? {};
@@ -342,6 +355,76 @@ export const GameOverPage: React.FC = () => {
           </motion.button>
         )}
       </div>
+
+      {/* ── Payout Received Popup ── */}
+      {showPayoutPopup && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9999,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+          }}
+          onClick={() => setShowPayoutPopup(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--glass-bg, rgba(30,30,40,0.95))',
+              border: '1px solid var(--lime-border, rgba(196,255,60,0.3))',
+              borderRadius: 'var(--r-md, 16px)',
+              padding: '32px 40px',
+              textAlign: 'center',
+              maxWidth: 360,
+              width: '90%',
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 12 }}>💰</div>
+            <h2 style={{
+              fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em',
+              marginBottom: 8, color: 'var(--text, #fff)',
+            }}>
+              Payout Received!
+            </h2>
+            <p style={{
+              fontSize: 36, fontWeight: 800, letterSpacing: '-0.03em',
+              color: 'var(--lime, #c4ff3c)',
+              marginBottom: 8,
+            }}>
+              {payoutAmount.toFixed(3)} SOL
+            </p>
+            <p style={{
+              fontSize: 13, color: 'var(--muted, #888)',
+              marginBottom: 4,
+            }}>
+              {(() => {
+                const net = payoutAmount - (gameState?.buyInAmount ?? 0);
+                if (net > 0) return `+${net.toFixed(3)} SOL profit 🎉`;
+                if (net === 0) return `Broke even — your buy-in returned`;
+                return `${net.toFixed(3)} SOL net`;
+              })()}
+            </p>
+            <p style={{ fontSize: 11, color: 'var(--muted, #888)', marginTop: 4 }}>
+              Funds have been sent to your wallet
+            </p>
+            <motion.button
+              onClick={() => setShowPayoutPopup(false)}
+              whileTap={{ scale: 0.96 }}
+              style={{
+                marginTop: 20, padding: '10px 32px', borderRadius: 'var(--r-sm, 10px)',
+                background: 'var(--lime, #c4ff3c)', color: '#000',
+                fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer',
+              }}
+            >
+              Nice 🤙
+            </motion.button>
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 };

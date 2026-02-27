@@ -243,6 +243,21 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
       );
 
+      // Listen for payout distribution (players receive this)
+      channel.on('broadcast', { event: 'payout_distributed' }, (payload: any) => {
+        const myWallet = walletRef.current?.publicKey?.toBase58();
+        if (myWallet && payload?.payload?.payouts) {
+          const myPayout = payload.payload.payouts[myWallet];
+          if (myPayout && myPayout > 0) {
+            setGameState(prev => prev ? {
+              ...prev,
+              myPayout: myPayout,
+              potDistributed: true,
+            } : null);
+          }
+        }
+      });
+
       // Listen for leave requests via broadcast (host receives these)
       channel.on('broadcast', { event: 'leave_request' }, (payload: any) => {
         const wallet = payload?.payload?.wallet;
@@ -848,6 +863,35 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
                 }
+              }
+            }
+            // Broadcast payout info to all players
+            if (channelRef.current) {
+              if (gameState.payoutMode === 'winner-takes-all') {
+                channelRef.current.send({
+                  type: 'broadcast',
+                  event: 'payout_distributed',
+                  payload: {
+                    mode: 'winner-takes-all',
+                    payouts: { [winnerWallet]: gameState.currentPot },
+                  },
+                });
+              } else if (gameState.payoutMode === 'split-pot') {
+                const playerScoresForBroadcast: Record<string, any> = {};
+                const allScoresForBroadcast = gameState.scores ?? {};
+                for (const [w, s] of Object.entries(allScoresForBroadcast)) {
+                  if (w !== hostWallet) playerScoresForBroadcast[w] = s;
+                }
+                const totalRoundsForBroadcast = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+                const payoutsForBroadcast = calculateSplitPayouts(playerScoresForBroadcast, gameState.buyInAmount, totalRoundsForBroadcast);
+                channelRef.current.send({
+                  type: 'broadcast',
+                  event: 'payout_distributed',
+                  payload: {
+                    mode: 'split-pot',
+                    payouts: payoutsForBroadcast,
+                  },
+                });
               }
             }
           } catch (chainErr) {
