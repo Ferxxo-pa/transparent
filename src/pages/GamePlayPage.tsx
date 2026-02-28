@@ -8,7 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, voteForQuestionOption, skipQuestionPick, forceAdvanceRound, endGameNow, pollGameState } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -185,111 +185,6 @@ export const GamePlayPage: React.FC = () => {
             </p>
           )}
           <Scores />
-        </div>
-      </div>
-    );
-  }
-
-  // ── Picking Question Phase ──────────────────────────────────
-  if (phase === 'picking-question' && gameState.questionOptions) {
-    const myPickVote = gameState.questionPickVotes?.[myWallet];
-    const hasPickVoted = myPickVote !== undefined;
-    const pickVotes = gameState.questionPickVotes ?? {};
-    const totalPickVotes = Object.keys(pickVotes).length;
-    const hostWallet = (gameState as any).hostWallet;
-    const eligiblePickers = gameState.players.filter(p => p.id !== gameState.currentPlayerInHotSeat && p.id !== hostWallet).length;
-
-    return (
-      <div className="page fade-in">
-        <TopBar />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
-          <HotSeatCard />
-
-          <div style={{
-            padding: '20px', textAlign: 'center',
-            background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r)',
-          }}>
-            <p className="label-cipher" style={{ marginBottom: 6 }}>Pick the question 🎯</p>
-            <p style={{ fontSize: 12, color: 'var(--muted)' }}>
-              {isHotSeat
-                ? "The group is picking your question... brace yourself"
-                : isHost
-                  ? "Watch them choose — or skip to a random question"
-                  : "Vote on which question they have to answer"
-              }
-            </p>
-          </div>
-
-          {/* Host skip button */}
-          {isHost && (
-            <motion.button
-              className="btn btn-secondary"
-              onClick={skipQuestionPick}
-              whileTap={{ scale: 0.96 }}
-              style={{ fontSize: 12 }}
-            >
-              Skip → Random Question
-            </motion.button>
-          )}
-
-          {!isHotSeat && !isHost ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {gameState.questionOptions.map((q, idx) => {
-                const votesForThis = Object.values(pickVotes).filter(v => v === idx).length;
-                return (
-                  <motion.button
-                    key={idx}
-                    onClick={() => !hasPickVoted && voteForQuestionOption(idx)}
-                    disabled={hasPickVoted}
-                    whileTap={!hasPickVoted ? { scale: 0.97 } : {}}
-                    style={{
-                      padding: '14px 16px',
-                      background: myPickVote === idx ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                      border: `1px solid ${myPickVote === idx ? 'var(--lime-border, rgba(196,255,60,0.4))' : 'var(--border)'}`,
-                      borderRadius: 'var(--r-sm, 10px)',
-                      cursor: hasPickVoted ? 'default' : 'pointer',
-                      opacity: hasPickVoted && myPickVote !== idx ? 0.5 : 1,
-                      textAlign: 'left',
-                      fontFamily: 'inherit',
-                      color: 'var(--text)',
-                      fontSize: 13,
-                      lineHeight: 1.4,
-                      transition: '0.2s',
-                    }}
-                  >
-                    <span style={{ fontWeight: 600, color: 'var(--lime, #C4FF3C)', marginRight: 8 }}>
-                      {String.fromCharCode(65 + idx)}.
-                    </span>
-                    {q}
-                    {hasPickVoted && votesForThis > 0 && (
-                      <span style={{ float: 'right', fontSize: 11, color: 'var(--muted)' }}>
-                        {votesForThis} vote{votesForThis !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                  </motion.button>
-                );
-              })}
-              {hasPickVoted && (
-                <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                  Waiting for others... {totalPickVotes}/{eligiblePickers}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div style={{
-              padding: '24px', textAlign: 'center',
-              background: 'rgba(196,255,60,0.05)', border: '1px solid var(--lime-border, rgba(196,255,60,0.2))',
-              borderRadius: 'var(--r)',
-            }}>
-              <p style={{ fontSize: 24, marginBottom: 8 }}>{isHotSeat ? '😰' : '👀'}</p>
-              <p style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600 }}>
-                {isHotSeat ? "They're picking your question..." : "Players are choosing..."}
-              </p>
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-                {totalPickVotes}/{eligiblePickers} voted
-              </p>
-            </div>
-          )}
         </div>
       </div>
     );

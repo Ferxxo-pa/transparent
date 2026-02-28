@@ -187,6 +187,28 @@ export const QUESTIONS: string[] = [
   "What's the worst date you've ever been on and what made it so bad?",
   "Have you ever stalked someone's social media so deep you accidentally liked an old photo?",
   "What's a hill you'll die on that everyone else thinks is insane?",
+
+  // CHAOS MODE — no coming back from these
+  "Rate everyone in this room 1-10 out loud. No ties allowed.",
+  "What's the most sus thing on your screen time report right now?",
+  "Who in this room do you think secretly hates you and why?",
+  "If you could read one person in this room's mind for a day who and what do you think you'd find?",
+  "What's the most manipulative thing you've done in a relationship that actually worked?",
+  "Who in this room would be the worst to be stuck on a deserted island with and why?",
+  "What's the biggest lie you've told THIS WEEK?",
+  "If everyone in this room had a leaked notes app whose would be the most unhinged?",
+  "Have you ever made someone cry on purpose? What did you do?",
+  "What's something about yourself that if people really knew they'd look at you different?",
+  "Who in this room are you lowkey jealous of and what specifically makes you jealous?",
+  "What's the worst thing someone in this room has done to you that they think you're over but you're not?",
+  "Describe your type and then point to the person in this room who fits it the most.",
+  "What's the most delusional thing you currently believe about yourself?",
+  "If you had to pick one person in this room to be your ride or die forever and cut everyone else off who?",
+  "What's something you've done that you'll take to the grave? Actually no say it right now.",
+  "Who in this room would you trust with your unlocked phone for 5 minutes and who absolutely not?",
+  "Have you ever ruined something good because you got bored? What was it?",
+  "What's the most toxic trait you look for in a partner that you know is a red flag but you love it?",
+  "If this room had a group chat without you in it what do you think they'd say about you?",
 ];
 
 export const FAKE_PLAYER_NAMES = [
