@@ -8,7 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, voteForQuestionOption, forceAdvanceRound, endGameNow, pollGameState } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, voteForQuestionOption, skipQuestionPick, forceAdvanceRound, endGameNow, pollGameState } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -216,6 +216,18 @@ export const GamePlayPage: React.FC = () => {
               }
             </p>
           </div>
+
+          {/* Host can skip the pick and go with a random question */}
+          {isHost && (
+            <motion.button
+              className="btn btn-secondary"
+              onClick={skipQuestionPick}
+              whileTap={{ scale: 0.96 }}
+              style={{ fontSize: 12 }}
+            >
+              Skip → Random Question
+            </motion.button>
+          )}
 
           {!isHotSeat ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

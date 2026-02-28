@@ -54,6 +54,7 @@ interface GameContextType {
   submitQuestion: (text: string) => Promise<void>;
   voteForQuestion: (questionId: string) => Promise<void>;
   voteForQuestionOption: (optionIndex: number) => Promise<void>;
+  skipQuestionPick: () => Promise<void>;
   advanceHotTakePhase: () => Promise<void>;
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
@@ -767,12 +768,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         prev ? { ...prev, questionPickVotes: newVotes } : null,
       );
 
-      // Check if all non-hot-seat players have voted
+      // Check if all non-hot-seat players (excluding host) have voted
       const hotSeat = gameState.currentPlayerInHotSeat;
-      const eligibleVoters = gameState.players.filter(p => p.id !== hotSeat).length;
-      const totalVotes = Object.keys(newVotes).length;
+      const hostWallet = (gameState as any).hostWallet;
+      const eligibleVoters = gameState.players.filter(p => p.id !== hotSeat && p.id !== hostWallet).length;
+      const totalVotes = Object.keys(newVotes).filter(k => k !== hotSeat && k !== hostWallet).length;
 
-      if (totalVotes >= eligibleVoters && gameState.questionOptions) {
+      if ((totalVotes >= eligibleVoters || eligibleVoters <= 0) && gameState.questionOptions) {
         // Tally votes — pick the question with the most votes
         const tally: Record<number, number> = {};
         Object.values(newVotes).forEach(idx => {
@@ -792,6 +794,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     },
     [gameState],
   );
+
+  // ── Skip Question Pick (host can force-pick a random question) ───
+  const skipQuestionPick = useCallback(async () => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    if (!gid || !gameState.questionOptions) return;
+
+    // Pick random from the 4 options
+    const randomIdx = Math.floor(Math.random() * gameState.questionOptions.length);
+    const chosenQuestion = gameState.questionOptions[randomIdx];
+
+    await updateGameStatus(gid, {
+      game_phase: 'answering',
+      current_question_index: randomIdx,
+    });
+    setGameState((prev) =>
+      prev ? { ...prev, currentQuestion: chosenQuestion, gamePhase: 'answering' } : null,
+    );
+  }, [gameState]);
 
   // ── Advance Hot-Take Phase ─────────────────────────────
 
@@ -1457,6 +1478,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         submitQuestion,
         voteForQuestion,
         voteForQuestionOption,
+        skipQuestionPick,
         advanceHotTakePhase,
         selectWinner,
         distributeWinnings,
