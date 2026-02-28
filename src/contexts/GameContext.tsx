@@ -53,8 +53,6 @@ interface GameContextType {
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
   submitQuestion: (text: string) => Promise<void>;
   voteForQuestion: (questionId: string) => Promise<void>;
-  voteForQuestionOption: (optionIndex: number) => Promise<void>;
-  skipQuestionPick: () => Promise<void>;
   advanceHotTakePhase: () => Promise<void>;
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
@@ -172,8 +170,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               currentPlayerInHotSeat: game.current_hot_seat_player,
               gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
               currentRound: game.current_round ?? prev.currentRound,
-              questionOptions: game.question_options ?? prev.questionOptions,
-              questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
               // Clear votes for all clients when round or player changes
               ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
             };
@@ -739,71 +735,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     [gameState],
   );
 
-  // ── Vote for Question Option (picking-question phase) ───
-
-  const voteForQuestionOption = useCallback(
-    async (optionIndex: number) => {
-      if (!gameState) return;
-      const wallet = walletRef.current;
-      if (!wallet) return;
-      const gid = gameState.gameId;
-      if (!gid) return;
-
-      const myWallet = wallet.publicKey.toBase58();
-      const newVotes = { ...(gameState.questionPickVotes ?? {}), [myWallet]: optionIndex };
-
-      // Update locally + broadcast
-      await updateGameStatus(gid, { question_pick_votes: newVotes });
-      setGameState((prev) =>
-        prev ? { ...prev, questionPickVotes: newVotes } : null,
-      );
-
-      // Check if all non-hot-seat players (excluding host) have voted
-      const hotSeat = gameState.currentPlayerInHotSeat;
-      const hostWallet = (gameState as any).hostWallet;
-      const eligibleVoters = gameState.players.filter(p => p.id !== hotSeat && p.id !== hostWallet).length;
-      const totalVotes = Object.keys(newVotes).filter(k => k !== hotSeat && k !== hostWallet).length;
-
-      if ((totalVotes >= eligibleVoters || eligibleVoters <= 0) && gameState.questionOptions) {
-        // Tally votes — pick the question with the most votes
-        const tally: Record<number, number> = {};
-        Object.values(newVotes).forEach(idx => {
-          tally[idx] = (tally[idx] || 0) + 1;
-        });
-        const winningIdx = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '0';
-        const chosenQuestion = gameState.questionOptions[Number(winningIdx)] || gameState.questionOptions[0];
-
-        await updateGameStatus(gid, {
-          game_phase: 'answering',
-          current_question_index: Number(winningIdx),
-        });
-        setGameState((prev) =>
-          prev ? { ...prev, currentQuestion: chosenQuestion, gamePhase: 'answering' } : null,
-        );
-      }
-    },
-    [gameState],
-  );
-
-  // ── Skip Question Pick (host can force-pick a random question) ───
-  const skipQuestionPick = useCallback(async () => {
-    if (!gameState) return;
-    const gid = gameState.gameId;
-    if (!gid || !gameState.questionOptions) return;
-
-    // Pick random from the 4 options
-    const randomIdx = Math.floor(Math.random() * gameState.questionOptions.length);
-    const chosenQuestion = gameState.questionOptions[randomIdx];
-
-    await updateGameStatus(gid, {
-      game_phase: 'answering',
-      current_question_index: randomIdx,
-    });
-    setGameState((prev) =>
-      prev ? { ...prev, currentQuestion: chosenQuestion, gamePhase: 'answering' } : null,
-    );
-  }, [gameState]);
-
   // ── Advance Hot-Take Phase ─────────────────────────────
 
   const advanceHotTakePhase = useCallback(async () => {
@@ -913,7 +844,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Winner gets entire pot
               const winnerPubkey = new PublicKey(winnerWallet);
               const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
-              await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+              // Route payout through MagicBlock Ephemeral Rollups
+              try {
+                await distributeViaMagicBlock(wallet, winnerPubkey, potLamports);
+              } catch (mbErr) {
+                console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
+                await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+              }
             } else if (gameState.payoutMode === 'split-pot') {
               // Split pot: each player gets payout based on honesty scores
               // Host is pot holder only — exclude from payout calc
@@ -932,7 +869,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
-                  await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                  // Route split payouts through MagicBlock ER
+                  try {
+                    await distributeViaMagicBlock(wallet, playerPubkey, lamports);
+                  } catch (mbErr) {
+                    console.warn('[MagicBlock] ER split payout failed, falling back:', mbErr);
+                    await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                  }
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
                 }
@@ -1199,8 +1142,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const hostPubkey = new PublicKey(gs.hostWallet);
         const buyInLamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         if (wallet.publicKey.toBase58() !== gs.hostWallet) {
-          // Direct Solana tx (MagicBlock kept but bypassed until post-hackathon)
-          await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+          // Route buy-in through MagicBlock Ephemeral Rollups for faster confirmations
+          try {
+            await buyInViaMagicBlock(wallet, hostPubkey, buyInLamports);
+          } catch (mbErr) {
+            console.warn('[MagicBlock] ER buy-in failed, falling back:', mbErr);
+            await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+          }
         }
       }
       await readyUpPlayer(gameId, wallet.publicKey.toBase58());
@@ -1467,8 +1415,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         castVote,
         submitQuestion,
         voteForQuestion,
-        voteForQuestionOption,
-        skipQuestionPick,
         advanceHotTakePhase,
         selectWinner,
         distributeWinnings,

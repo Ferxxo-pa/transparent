@@ -100,22 +100,9 @@ export async function getGameByRoomCode(roomCode: string): Promise<GameRow | nul
 
 export async function updateGameStatus(
   gameId: string,
-  updates: Record<string, any>,
+  updates: Partial<Pick<GameRow, 'status' | 'current_question_index' | 'current_hot_seat_player' | 'game_phase' | 'current_round'>>
 ) {
-  // Only send columns that exist in the games table to avoid 400 errors
-  const validColumns = new Set([
-    'status', 'current_question_index', 'current_hot_seat_player',
-    'game_phase', 'current_round', 'question_mode', 'custom_questions',
-    'payout_mode', 'num_questions', 'room_name', 'buy_in_lamports',
-  ]);
-  const filtered: Record<string, any> = {};
-  for (const [key, value] of Object.entries(updates)) {
-    if (validColumns.has(key)) {
-      filtered[key] = value;
-    }
-  }
-  if (Object.keys(filtered).length === 0) return;
-  const { error } = await supabase.from('games').update(filtered).eq('id', gameId);
+  const { error } = await supabase.from('games').update(updates).eq('id', gameId);
   if (error) throw error;
 }
 

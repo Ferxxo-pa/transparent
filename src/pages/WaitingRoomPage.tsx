@@ -68,13 +68,6 @@ export const WaitingRoomPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState?.gameStatus, refreshPlayers]);
 
-  // Poll game status every 2s so players navigate when game starts (Realtime fallback)
-  useEffect(() => {
-    if (!gameState || gameState.gameStatus !== 'waiting') return;
-    const interval = setInterval(() => { pollGameState(); }, 2000);
-    return () => clearInterval(interval);
-  }, [gameState?.gameStatus, pollGameState]);
-
   // Prediction totals per player (must be before any early return — rules of hooks)
   const predTotals = useMemo(() => {
     const totals: Record<string, number> = {};
