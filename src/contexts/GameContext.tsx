@@ -553,18 +553,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionMode === 'custom' && gameState.customQuestions?.length
             ? gameState.customQuestions
             : QUESTIONS;
-        
-        // Pick 4 random question options for the group to vote on
-        const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
-        const options = shuffled.slice(0, Math.min(4, shuffled.length));
+        const questionIndex = Math.floor(Math.random() * questionPool.length);
 
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
-          game_phase: 'picking-question',
+          current_question_index: questionIndex,
+          game_phase: 'answering',
           current_round: 0,
-          question_options: options,
-          question_pick_votes: {},
         });
 
         setGameState((prev) =>
@@ -573,10 +569,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...prev,
                 gameStatus: 'playing',
                 currentPlayerInHotSeat: firstPlayer,
-                gamePhase: 'picking-question',
+                currentQuestion: questionPool[questionIndex],
+                gamePhase: 'answering',
                 currentRound: 0,
-                questionOptions: options,
-                questionPickVotes: {},
               }
             : null,
         );
@@ -653,17 +648,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               gameState.questionMode === 'custom' && gameState.customQuestions?.length
                 ? gameState.customQuestions
                 : QUESTIONS;
-            
-            // Pick 4 new question options for the group to vote on
-            const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
-            const options = shuffled.slice(0, Math.min(4, shuffled.length));
+            const nextQuestionIndex = Math.floor(Math.random() * questionPool.length);
 
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
+              current_question_index: nextQuestionIndex,
               current_round: nextRound,
-              game_phase: 'picking-question',
-              question_options: options,
-              question_pick_votes: {},
+              game_phase: 'answering',
             });
 
             setGameState((prev) =>
@@ -671,12 +662,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ? {
                     ...prev,
                     currentPlayerInHotSeat: nextPlayer.id,
+                    currentQuestion: questionPool[nextQuestionIndex],
                     currentRound: nextRound,
                     votes: {},
                     voteCount: 0,
-                    gamePhase: 'picking-question',
-                    questionOptions: options,
-                    questionPickVotes: {},
+                    gamePhase: 'answering',
                   }
                 : null,
             );
