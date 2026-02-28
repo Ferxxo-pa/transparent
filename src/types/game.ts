@@ -163,6 +163,30 @@ export const QUESTIONS: string[] = [
   "What's a fantasy you have that you'd never say out loud? Say it now.",
   "Who in this room is the worst liar and what's the biggest lie you've caught them in?",
   "If you had to rank everyone in this room by attractiveness out loud right now do it.",
+
+  // MORE SPICY
+  "What's the biggest lie you've ever told your parents and do they still believe it?",
+  "Have you ever pretended to be someone's friend just to get something from them?",
+  "What's the most embarrassing thing you've been caught doing?",
+  "Who was your most toxic ex and what made them toxic? Or were you the toxic one?",
+  "Have you ever cheated on a test or an assignment? How and did you get caught?",
+  "What's a red flag you have that you know about but refuse to fix?",
+  "Who in this room do you think is the biggest player and why?",
+  "What's the most embarrassing thing in your camera roll right now?",
+  "Have you ever pretended to be drunker than you were to get out of something?",
+  "What's a secret you know about someone in this room that they don't know you know?",
+
+  // MORE UNHINGED
+  "If you had to date someone in this room for a month who and why?",
+  "What's the weirdest place you've ever hooked up?",
+  "Have you ever sent a risky text to the wrong person? What happened?",
+  "What's something you've done that if it was recorded would go viral for the wrong reasons?",
+  "Who in this room gives off the most main character energy and who gives NPC energy?",
+  "What's the most embarrassing thing you've cried about?",
+  "If someone offered you $10,000 to never talk to one person in this room again who would you pick?",
+  "What's the worst date you've ever been on and what made it so bad?",
+  "Have you ever stalked someone's social media so deep you accidentally liked an old photo?",
+  "What's a hill you'll die on that everyone else thinks is insane?",
 ];
 
 export const FAKE_PLAYER_NAMES = [

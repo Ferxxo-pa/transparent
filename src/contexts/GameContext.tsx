@@ -53,6 +53,8 @@ interface GameContextType {
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
   submitQuestion: (text: string) => Promise<void>;
   voteForQuestion: (questionId: string) => Promise<void>;
+  voteForQuestionOption: (optionIndex: number) => Promise<void>;
+  skipQuestionPick: () => Promise<void>;
   advanceHotTakePhase: () => Promise<void>;
   selectWinner: (playerId: string) => void;
   distributeWinnings: (winnerWallet: string) => Promise<void>;
@@ -290,6 +292,46 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setGameState(null);
           setError(null);
           setLoading(false);
+        }
+      });
+
+      // Listen for question options broadcast (all players receive)
+      channel.on('broadcast', { event: 'question_options' }, (payload: any) => {
+        const options = payload?.payload?.options;
+        if (options && Array.isArray(options)) {
+          setGameState(prev => prev ? {
+            ...prev,
+            questionOptions: options,
+            questionPickVotes: {},
+            gamePhase: 'picking-question',
+          } : null);
+        }
+      });
+
+      // Listen for question pick votes (all players receive)
+      channel.on('broadcast', { event: 'question_pick_vote' }, (payload: any) => {
+        const wallet = payload?.payload?.wallet;
+        const optionIndex = payload?.payload?.optionIndex;
+        if (wallet !== undefined && optionIndex !== undefined) {
+          setGameState(prev => {
+            if (!prev) return null;
+            const newVotes = { ...(prev.questionPickVotes ?? {}), [wallet]: optionIndex };
+            return { ...prev, questionPickVotes: newVotes };
+          });
+        }
+      });
+
+      // Listen for question chosen (host resolved the vote)
+      channel.on('broadcast', { event: 'question_chosen' }, (payload: any) => {
+        const question = payload?.payload?.question;
+        if (question) {
+          setGameState(prev => prev ? {
+            ...prev,
+            currentQuestion: question,
+            gamePhase: 'answering',
+            questionOptions: undefined,
+            questionPickVotes: undefined,
+          } : null);
         }
       });
 
@@ -544,20 +586,31 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             : null,
         );
       } else {
-        // Classic or Custom
+        // Classic or Custom — start with question picking phase
         const questionPool =
           questionMode === 'custom' && gameState.customQuestions?.length
             ? gameState.customQuestions
             : QUESTIONS;
-        const questionIndex = Math.floor(Math.random() * questionPool.length);
+        
+        // Pick 4 random options
+        const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
+        const options = shuffled.slice(0, Math.min(4, shuffled.length));
 
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
-          current_question_index: questionIndex,
-          game_phase: 'answering',
+          game_phase: 'picking-question',
           current_round: 0,
         });
+
+        // Broadcast question options to all players
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'question_options',
+            payload: { options },
+          });
+        }
 
         setGameState((prev) =>
           prev
@@ -565,8 +618,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...prev,
                 gameStatus: 'playing',
                 currentPlayerInHotSeat: firstPlayer,
-                currentQuestion: questionPool[questionIndex],
-                gamePhase: 'answering',
+                gamePhase: 'picking-question',
+                questionOptions: options,
+                questionPickVotes: {},
                 currentRound: 0,
               }
             : null,
@@ -644,25 +698,37 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               gameState.questionMode === 'custom' && gameState.customQuestions?.length
                 ? gameState.customQuestions
                 : QUESTIONS;
-            const nextQuestionIndex = Math.floor(Math.random() * questionPool.length);
+            
+            // Pick 4 random options for next round
+            const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
+            const options = shuffled.slice(0, Math.min(4, shuffled.length));
 
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
-              current_question_index: nextQuestionIndex,
               current_round: nextRound,
-              game_phase: 'answering',
+              game_phase: 'picking-question',
             });
+
+            // Broadcast question options to all players
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'question_options',
+                payload: { options },
+              });
+            }
 
             setGameState((prev) =>
               prev
                 ? {
                     ...prev,
                     currentPlayerInHotSeat: nextPlayer.id,
-                    currentQuestion: questionPool[nextQuestionIndex],
                     currentRound: nextRound,
                     votes: {},
                     voteCount: 0,
-                    gamePhase: 'answering',
+                    gamePhase: 'picking-question',
+                    questionOptions: options,
+                    questionPickVotes: {},
                   }
                 : null,
             );
@@ -677,6 +743,96 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 
   // ── Submit Question (Hot-Take Mode) ─────────────────────
+
+  // ── Vote for Question Option (picking-question phase via broadcast) ───
+
+  const voteForQuestionOption = useCallback(
+    async (optionIndex: number) => {
+      if (!gameState) return;
+      const wallet = walletRef.current;
+      if (!wallet) return;
+
+      const myWallet = wallet.publicKey.toBase58();
+
+      // Broadcast vote to all players
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'question_pick_vote',
+          payload: { wallet: myWallet, optionIndex },
+        });
+      }
+
+      // Update locally
+      const newVotes = { ...(gameState.questionPickVotes ?? {}), [myWallet]: optionIndex };
+      setGameState(prev => prev ? { ...prev, questionPickVotes: newVotes } : null);
+
+      // Check if all non-hot-seat, non-host players have voted
+      const hotSeat = gameState.currentPlayerInHotSeat;
+      const hostWallet = (gameState as any).hostWallet;
+      const eligibleVoters = gameState.players.filter(p => p.id !== hotSeat && p.id !== hostWallet).length;
+      const totalVotes = Object.keys(newVotes).filter(k => k !== hotSeat && k !== hostWallet).length;
+
+      if (totalVotes >= eligibleVoters && eligibleVoters > 0 && gameState.questionOptions) {
+        // Tally votes
+        const tally: Record<number, number> = {};
+        Object.values(newVotes).forEach(idx => { tally[idx] = (tally[idx] || 0) + 1; });
+        const winningIdx = Number(Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '0');
+        const chosenQuestion = gameState.questionOptions[winningIdx] || gameState.questionOptions[0];
+
+        // Broadcast chosen question to all
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'question_chosen',
+            payload: { question: chosenQuestion, index: winningIdx },
+          });
+        }
+
+        // Update DB with the chosen question
+        const gid = gameState.gameId;
+        if (gid) {
+          await updateGameStatus(gid, { game_phase: 'answering', current_question_index: winningIdx });
+        }
+
+        setGameState(prev => prev ? {
+          ...prev,
+          currentQuestion: chosenQuestion,
+          gamePhase: 'answering',
+          questionOptions: undefined,
+          questionPickVotes: undefined,
+        } : null);
+      }
+    },
+    [gameState],
+  );
+
+  // ── Skip Question Pick (host can force-pick a random question) ───
+  const skipQuestionPick = useCallback(async () => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    if (!gid || !gameState.questionOptions) return;
+
+    const randomIdx = Math.floor(Math.random() * gameState.questionOptions.length);
+    const chosenQuestion = gameState.questionOptions[randomIdx];
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'question_chosen',
+        payload: { question: chosenQuestion, index: randomIdx },
+      });
+    }
+
+    await updateGameStatus(gid, { game_phase: 'answering', current_question_index: randomIdx });
+    setGameState(prev => prev ? {
+      ...prev,
+      currentQuestion: chosenQuestion,
+      gamePhase: 'answering',
+      questionOptions: undefined,
+      questionPickVotes: undefined,
+    } : null);
+  }, [gameState]);
 
   const submitQuestion = useCallback(
     async (text: string) => {
@@ -951,20 +1107,28 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const nextRound = (gameState.currentRound ?? 0) + 1;
         const questionPool = gameState.questionMode === 'custom' && gameState.customQuestions?.length
           ? gameState.customQuestions : QUESTIONS;
-        const nextQIdx = Math.floor(Math.random() * questionPool.length);
+        const shuffled = [...questionPool].sort(() => Math.random() - 0.5);
+        const options = shuffled.slice(0, Math.min(4, shuffled.length));
         await updateGameStatus(gid, {
           current_hot_seat_player: nextPlayer.id,
-          current_question_index: nextQIdx,
           current_round: nextRound,
-          game_phase: 'answering',
+          game_phase: 'picking-question',
         });
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'question_options',
+            payload: { options },
+          });
+        }
         setGameState(prev => prev ? {
           ...prev,
           currentPlayerInHotSeat: nextPlayer.id,
-          currentQuestion: questionPool[nextQIdx],
           currentRound: nextRound,
           votes: {}, voteCount: 0,
-          gamePhase: 'answering',
+          gamePhase: 'picking-question',
+          questionOptions: options,
+          questionPickVotes: {},
         } : null);
       }
     } catch (err: any) {
@@ -1415,6 +1579,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         castVote,
         submitQuestion,
         voteForQuestion,
+        voteForQuestionOption,
+        skipQuestionPick,
         advanceHotTakePhase,
         selectWinner,
         distributeWinnings,
