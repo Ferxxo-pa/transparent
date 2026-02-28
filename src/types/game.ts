@@ -130,6 +130,18 @@ export interface GameState {
 // Edgy, fun, college-appropriate — designed to make people laugh and squirm
 
 export const QUESTIONS: string[] = [
+  // NSFW — these hit different
+  "What's the freakiest thing you've ever done in bed that you've never told anyone?",
+  "Who in this room would you hook up with tonight if nobody ever found out?",
+  "What's the most embarrassing thing that's happened to you during sex?",
+  "Have you ever faked it? How many times and with who?",
+  "What's the wildest sext you've ever sent? Read it word for word.",
+  "Who's someone you've hooked up with that you'd deny to anyone in this room?",
+  "What's the shortest time you've known someone before hooking up? What happened after?",
+  "Have you ever hooked up with two people in the same friend group? Did they find out?",
+  "What's something you're into that you've never told a partner because you thought they'd judge you?",
+  "Who in this room do you think is the freakiest and why?",
+
   // SPICY — real confessions, the room judges
   "What's your actual body count? No rounding down. The room will know if you're lying.",
   "Who in this room have you talked the most shit about? What did you say?",
