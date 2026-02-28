@@ -170,7 +170,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               gameStatus: game.status,
               currentQuestion,
               currentPlayerInHotSeat: game.current_hot_seat_player,
-              gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
+              // Don't overwrite picking-question phase from DB (picking is broadcast-only)
+              gamePhase: prev.gamePhase === 'picking-question' && game.game_phase === 'answering'
+                ? 'picking-question'
+                : (game.game_phase as GamePhase) || prev.gamePhase,
               currentRound: game.current_round ?? prev.currentRound,
               // Clear votes for all clients when round or player changes
               ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
@@ -599,19 +602,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
-          game_phase: 'picking-question',
+          game_phase: 'answering',
           current_round: 0,
         });
 
-        // Broadcast question options to all players
-        if (channelRef.current) {
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'question_options',
-            payload: { options },
-          });
-        }
-
+        // Set picking phase locally first, then broadcast
         setGameState((prev) =>
           prev
             ? {
@@ -625,6 +620,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
             : null,
         );
+
+        // Broadcast after state is set — small delay to ensure channel is ready
+        setTimeout(() => {
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'question_options',
+              payload: { options },
+            });
+          }
+        }, 500);
       }
     } catch (err: any) {
       console.error('Start game error:', err);
@@ -706,17 +712,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
               current_round: nextRound,
-              game_phase: 'picking-question',
+              game_phase: 'answering',
             });
-
-            // Broadcast question options to all players
-            if (channelRef.current) {
-              channelRef.current.send({
-                type: 'broadcast',
-                event: 'question_options',
-                payload: { options },
-              });
-            }
 
             setGameState((prev) =>
               prev
@@ -732,6 +729,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   }
                 : null,
             );
+
+            // Broadcast after state update
+            setTimeout(() => {
+              if (channelRef.current) {
+                channelRef.current.send({
+                  type: 'broadcast',
+                  event: 'question_options',
+                  payload: { options },
+                });
+              }
+            }, 500);
           }
         }
       } catch (err: any) {
@@ -1112,15 +1120,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await updateGameStatus(gid, {
           current_hot_seat_player: nextPlayer.id,
           current_round: nextRound,
-          game_phase: 'picking-question',
+          game_phase: 'answering',
         });
-        if (channelRef.current) {
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'question_options',
-            payload: { options },
-          });
-        }
         setGameState(prev => prev ? {
           ...prev,
           currentPlayerInHotSeat: nextPlayer.id,
@@ -1130,6 +1131,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionOptions: options,
           questionPickVotes: {},
         } : null);
+        setTimeout(() => {
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'question_options',
+              payload: { options },
+            });
+          }
+        }, 500);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to advance round');
@@ -1171,7 +1181,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ...(gameData ? {
             gameStatus: gameData.status,
             currentPlayerInHotSeat: gameData.current_hot_seat_player,
-            gamePhase: gameData.game_phase as GamePhase || prev.gamePhase,
+            gamePhase: prev.gamePhase === 'picking-question' && gameData.game_phase === 'answering'
+              ? 'picking-question'
+              : (gameData.game_phase as GamePhase || prev.gamePhase),
             currentRound: gameData.current_round ?? prev.currentRound,
           } : {}),
         };
@@ -1276,7 +1288,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           gameStatus: game.status,
           currentQuestion,
           currentPlayerInHotSeat: game.current_hot_seat_player,
-          gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
+          gamePhase: prev.gamePhase === 'picking-question' && game.game_phase === 'answering'
+            ? 'picking-question'
+            : (game.game_phase as GamePhase) || prev.gamePhase,
           currentRound,
           players: mapped,
           currentPot: mapped.length * prev.buyInAmount,
