@@ -130,55 +130,39 @@ export interface GameState {
 // Edgy, fun, college-appropriate — designed to make people laugh and squirm
 
 export const QUESTIONS: string[] = [
-  // Receipts — real confessions the room can judge
-  "What's the worst thing you've done to an ex that you never told anyone?",
-  "What's the most expensive impulse purchase you regret? How much?",
-  "Have you ever snitched on someone? What happened?",
-  "What's the shadiest thing you've done for money?",
-  "Have you ever hooked up with a friend's ex? Who?",
+  // SPICY — real confessions, the room judges
+  "What's your actual body count? No rounding down. The room will know if you're lying.",
+  "Who in this room have you talked the most shit about? What did you say?",
+  "What's the shadiest thing you've ever done for money and how much was it?",
+  "Have you ever hooked up with a friend's ex? Did they find out?",
   "What's the biggest secret you're keeping from your best friend right now?",
-  "Have you ever lied on your resume? What did you make up?",
-  "What's the worst thing you've said behind someone's back in this room?",
-  "Have you ever ghosted someone who genuinely liked you? Why?",
-  "What's a promise you made to someone and completely broke?",
-
-  // Body count & dating — spicy but judgeable
-  "What's your real body count? No rounding down.",
-  "Who's the most questionable person you've hooked up with and why was it questionable?",
-  "What's the most desperate thing you've ever done to get someone's attention?",
-  "Have you ever been the side piece? Did the other person find out?",
-  "What's the fastest you've caught feelings and how badly did it end?",
+  "Who's the most questionable person you've hooked up with? Why was it questionable?",
+  "What's the worst thing you've done to an ex that you never told anyone?",
   "Have you ever gone through someone's phone? What did you find?",
-  "What's the biggest ick you've overlooked because the person was attractive?",
-  "Have you ever faked an emotion to manipulate someone? What was the situation?",
-
-  // Money & hustle — numbers don't lie
-  "What's the most money you've lost on a bad decision? Be specific.",
-  "Have you ever scammed someone, even a little? What happened?",
-  "What's the brokest you've ever been and what did you do about it?",
+  "What's the most money you've lost being stupid? Be specific.",
   "Have you ever lied about how much money you make? By how much?",
-  "What's something you spend money on that you'd be embarrassed for people to know?",
-  "Have you ever taken credit for someone else's work? What was it?",
-
-  // Loyalty tests — the room WILL know
+  "What's a promise you made to someone and completely broke without feeling bad?",
+  "Have you ever taken credit for someone else's work? What happened after?",
   "Who in this room do you trust the least and why?",
-  "If you had to cut one person in this room out of your life, who and why?",
-  "What's something you actually think about someone in this room but would never say?",
-  "Who here do you think is putting on the biggest act right now?",
-  "Have you ever talked shit about someone in this room? What did you say?",
-  "Who in this room would you never go into business with?",
+  "What's the pettiest reason you've ever ended a friendship?",
+  "Have you ever faked an emotion to manipulate someone into doing what you wanted?",
 
-  // Unhinged confessions — the ones that haunt you at 3AM
-  "What's the most illegal thing you've gotten away with?",
-  "What's something you did as a teenager that would ruin you if it came out today?",
-  "Have you ever cried in a public bathroom? What broke you?",
-  "What's a lie you've been telling so long it basically became your truth?",
-  "What's the pettiest reason you've ended a friendship?",
-  "Have you ever pretended to like someone's cooking/art/music to their face? Whose?",
-  "What's the worst thing you've done that you genuinely feel no guilt about?",
-  "Have you ever sabotaged someone's opportunity? Why?",
-  "What's something you've never told anyone in this room until right now?",
-  "What's the most two-faced thing you've ever done?",
+  // UNHINGED — room goes silent, friendships tested
+  "Who in this room have you had a sex dream about? Describe the vibe.",
+  "What's the most illegal thing you've done that you'd go to jail for if caught?",
+  "If you had to hook up with one person in this room who would it be and why?",
+  "What's something you did drunk that you've never told a single soul?",
+  "Have you ever caught feelings for someone in a relationship and tried to make a move?",
+  "What's the most unhinged thing you've done after a breakup?",
+  "Who in this room would you absolutely never date and why? Be honest.",
+  "What's something on your phone right now that would ruin you if everyone saw it?",
+  "Have you ever lied to someone in this room about something serious? What was it?",
+  "What's the worst thing you've done that you genuinely feel zero guilt about?",
+  "If everyone in this room's search history got leaked whose would be the most embarrassing?",
+  "Have you ever used someone just because they were useful to you? Who?",
+  "What's a fantasy you have that you'd never say out loud? Say it now.",
+  "Who in this room is the worst liar and what's the biggest lie you've caught them in?",
+  "If you had to rank everyone in this room by attractiveness out loud right now do it.",
 ];
 
 export const FAKE_PLAYER_NAMES = [
