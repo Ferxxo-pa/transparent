@@ -68,6 +68,7 @@ export function calculateSplitPayouts(
 export type GamePhase =
   | 'submitting-questions'
   | 'voting-question'
+  | 'picking-question'
   | 'answering'
   | 'voting-honesty';
 
@@ -115,6 +116,10 @@ export interface GameState {
   questionVotes?: Record<string, string>;
   /** Current game phase (hot-take mode sub-phases) */
   gamePhase?: GamePhase;
+  /** 4 question options for picking-question phase */
+  questionOptions?: string[];
+  /** Votes for question options: playerId -> questionIndex */
+  questionPickVotes?: Record<string, number>;
   /** Current round number */
   currentRound?: number;
   /** Per-player scores across all rounds (wallet -> score) */
