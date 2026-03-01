@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/config';
-
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+import aiQuestionBank from '../data/ai-questions.json';
 
 interface Props {
   groupSize: number;
@@ -11,98 +9,46 @@ interface Props {
 }
 
 const VIBES = [
-  { label: 'College friends', emoji: '🎓', value: 'college friends who know everything about each other' },
-  { label: 'Coworkers', emoji: '💼', value: 'coworkers letting loose after work' },
-  { label: 'Couples night', emoji: '💕', value: 'couples who want chaos' },
-  { label: 'New friends', emoji: '🤝', value: 'people who just met and want to go deep fast' },
-  { label: 'Family', emoji: '👨‍👩‍👧‍👦', value: 'family members who can handle the truth' },
-  { label: 'Chaos mode', emoji: '🔥', value: 'degens who have zero boundaries' },
+  { label: 'College friends', emoji: '🎓', key: 'college' },
+  { label: 'Coworkers', emoji: '💼', key: 'coworkers' },
+  { label: 'Couples night', emoji: '💕', key: 'couples' },
+  { label: 'New friends', emoji: '🤝', key: 'new_friends' },
+  { label: 'Family', emoji: '👨‍👩‍👧‍👦', key: 'family' },
+  { label: 'Chaos mode', emoji: '🔥', key: 'chaos' },
 ];
 
 const SPICE_LEVELS = [
-  { label: 'Mild', emoji: '🌶️', value: 'mild — embarrassing but nothing too wild' },
-  { label: 'Spicy', emoji: '🌶️🌶️', value: 'spicy — uncomfortable truths, relationship drama, secrets' },
-  { label: 'No limits', emoji: '🌶️🌶️🌶️', value: 'absolutely no limits — the most unhinged questions possible' },
+  { label: 'Mild', emoji: '🌶️', filter: 0.5 },
+  { label: 'Spicy', emoji: '🌶️🌶️', filter: 0.75 },
+  { label: 'No limits', emoji: '🌶️🌶️🌶️', filter: 1.0 },
 ];
+
+// Shuffle array (Fisher-Yates)
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, onSkip }) => {
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
-  const [selectedSpice, setSelectedSpice] = useState<string | null>(null);
-  const [customContext, setCustomContext] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedSpice, setSelectedSpice] = useState<number | null>(null);
 
-  const generate = async () => {
-    if (!selectedVibe || !selectedSpice) return;
-    setLoading(true);
-    setError(null);
+  const generate = () => {
+    if (!selectedVibe || selectedSpice === null) return;
 
-    const systemPrompt = `You generate questions for Transparent — a party game where players answer brutally honest questions and others vote if they're lying. Generate questions that make people SQUIRM. Direct, punchy, uncomfortable. Mix: embarrassing confessions, relationship drama, secrets, bodily functions, drunk stories, sexual history. Some should reference "someone here" or "this room". Return ONLY a valid JSON array of question strings.`;
+    const bank = (aiQuestionBank as Record<string, string[]>)[selectedVibe] || [];
+    // Take a portion based on spice level and shuffle
+    const count = Math.ceil(bank.length * selectedSpice);
+    const questions = shuffle(bank).slice(0, Math.max(count, 15));
 
-    const userPrompt = `Generate 25 questions for: ${groupSize} people, ${selectedVibe}, spice level: ${selectedSpice}${customContext.trim() ? `. Context: ${customContext.trim()}` : ''}. Make them DEVASTATING for this group.`;
-
-    try {
-      let questions: string[] = [];
-
-      // Try Supabase Edge Function first
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-questions`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            groupSize,
-            vibe: selectedVibe,
-            spiceLevel: selectedSpice,
-            context: customContext.trim() || undefined,
-            count: 25,
-          }),
-        });
-        const data = await res.json();
-        if (data.questions?.length > 0) questions = data.questions;
-      } catch { /* fall through */ }
-
-      // Fallback: Direct Groq API call (free tier)
-      if (questions.length === 0 && GROQ_API_KEY) {
-        try {
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${GROQ_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: 'llama-3.1-70b-versatile',
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-              ],
-              temperature: 1.0,
-              max_tokens: 2000,
-            }),
-          });
-          const data = await res.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (content) {
-            try { questions = JSON.parse(content); }
-            catch { const m = content.match(/\[[\s\S]*\]/); if (m) questions = JSON.parse(m[0]); }
-          }
-        } catch { /* fall through */ }
-      }
-
-      if (questions.length > 0) {
-        onQuestionsGenerated(questions);
-      } else {
-        setError('AI unavailable. Using default questions.');
-        setTimeout(onSkip, 2000);
-      }
-    } catch (err) {
-      setError('Connection failed. Using default questions.');
-      setTimeout(onSkip, 2000);
-    } finally {
-      setLoading(false);
+    if (questions.length > 0) {
+      onQuestionsGenerated(questions);
+    } else {
+      onSkip();
     }
   };
 
@@ -110,9 +56,9 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
     <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: '24px 20px' }}>
       <div style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 28, display: 'block', marginBottom: 8 }}>🤖</span>
-        <p style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>AI Question Generator</p>
+        <p style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>AI Question Bank</p>
         <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
-          Tell us the vibe. We'll generate questions that hit different.
+          Pick your group vibe. We'll pull questions that hit different.
         </p>
       </div>
 
@@ -122,13 +68,13 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
           {VIBES.map(v => (
             <button
-              key={v.value}
-              onClick={() => setSelectedVibe(v.value)}
+              key={v.key}
+              onClick={() => setSelectedVibe(v.key)}
               style={{
                 padding: '10px 12px',
                 borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${selectedVibe === v.value ? 'var(--lime-border)' : 'var(--border)'}`,
-                background: selectedVibe === v.value ? 'var(--lime-bg)' : 'var(--glass)',
+                border: `1.5px solid ${selectedVibe === v.key ? 'var(--lime-border)' : 'var(--border)'}`,
+                background: selectedVibe === v.key ? 'var(--lime-bg)' : 'var(--glass)',
                 cursor: 'pointer',
                 textAlign: 'left',
                 display: 'flex',
@@ -141,7 +87,7 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
               <span style={{
                 fontSize: 12,
                 fontWeight: 600,
-                color: selectedVibe === v.value ? 'var(--lime)' : 'var(--text)',
+                color: selectedVibe === v.key ? 'var(--lime)' : 'var(--text)',
               }}>{v.label}</span>
             </button>
           ))}
@@ -154,14 +100,14 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
         <div style={{ display: 'flex', gap: 6 }}>
           {SPICE_LEVELS.map(s => (
             <button
-              key={s.value}
-              onClick={() => setSelectedSpice(s.value)}
+              key={s.label}
+              onClick={() => setSelectedSpice(s.filter)}
               style={{
                 flex: 1,
                 padding: '10px 8px',
                 borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${selectedSpice === s.value ? 'var(--lime-border)' : 'var(--border)'}`,
-                background: selectedSpice === s.value ? 'var(--lime-bg)' : 'var(--glass)',
+                border: `1.5px solid ${selectedSpice === s.filter ? 'var(--lime-border)' : 'var(--border)'}`,
+                background: selectedSpice === s.filter ? 'var(--lime-bg)' : 'var(--glass)',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.15s',
@@ -171,39 +117,12 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
               <span style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: selectedSpice === s.value ? 'var(--lime)' : 'var(--text)',
+                color: selectedSpice === s.filter ? 'var(--lime)' : 'var(--text)',
               }}>{s.label}</span>
             </button>
           ))}
         </div>
       </div>
-
-      {/* Optional context */}
-      <div>
-        <p className="label-sm" style={{ marginBottom: 6 }}>Anything else? <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></p>
-        <input
-          type="text"
-          value={customContext}
-          onChange={e => setCustomContext(e.target.value)}
-          placeholder='e.g. "We all went to Texas Tech, nothing is off limits"'
-          maxLength={200}
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            borderRadius: 'var(--r-sm)',
-            border: '1px solid var(--border)',
-            background: 'var(--glass)',
-            color: 'var(--text)',
-            fontSize: 13,
-            fontFamily: 'inherit',
-            outline: 'none',
-          }}
-        />
-      </div>
-
-      {error && (
-        <p style={{ fontSize: 12, color: '#ff5252', textAlign: 'center' }}>{error}</p>
-      )}
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 8 }}>
@@ -226,17 +145,17 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
         </button>
         <motion.button
           onClick={generate}
-          disabled={!selectedVibe || !selectedSpice || loading}
+          disabled={!selectedVibe || selectedSpice === null}
           whileTap={{ scale: 0.96 }}
           className="btn btn-primary"
           style={{
             flex: 2,
             height: 44,
             fontSize: 13,
-            opacity: (!selectedVibe || !selectedSpice || loading) ? 0.5 : 1,
+            opacity: (!selectedVibe || selectedSpice === null) ? 0.5 : 1,
           }}
         >
-          {loading ? '✨ Generating...' : '✨ Generate Questions'}
+          🎲 Generate Questions
         </motion.button>
       </div>
     </div>
