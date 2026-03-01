@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/config';
 
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || '';
+
 interface Props {
   groupSize: number;
   onQuestionsGenerated: (questions: string[]) => void;
@@ -35,28 +37,65 @@ export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, 
     setLoading(true);
     setError(null);
 
+    const systemPrompt = `You generate questions for Transparent — a party game where players answer brutally honest questions and others vote if they're lying. Generate questions that make people SQUIRM. Direct, punchy, uncomfortable. Mix: embarrassing confessions, relationship drama, secrets, bodily functions, drunk stories, sexual history. Some should reference "someone here" or "this room". Return ONLY a valid JSON array of question strings.`;
+
+    const userPrompt = `Generate 25 questions for: ${groupSize} people, ${selectedVibe}, spice level: ${selectedSpice}${customContext.trim() ? `. Context: ${customContext.trim()}` : ''}. Make them DEVASTATING for this group.`;
+
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-questions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({
-          groupSize,
-          vibe: selectedVibe,
-          spiceLevel: selectedSpice,
-          context: customContext.trim() || undefined,
-          count: 25,
-        }),
-      });
+      let questions: string[] = [];
 
-      const data = await res.json();
+      // Try Supabase Edge Function first
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-questions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            groupSize,
+            vibe: selectedVibe,
+            spiceLevel: selectedSpice,
+            context: customContext.trim() || undefined,
+            count: 25,
+          }),
+        });
+        const data = await res.json();
+        if (data.questions?.length > 0) questions = data.questions;
+      } catch { /* fall through */ }
 
-      if (data.questions && data.questions.length > 0) {
-        onQuestionsGenerated(data.questions);
+      // Fallback: Direct Groq API call (free tier)
+      if (questions.length === 0 && GROQ_API_KEY) {
+        try {
+          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${GROQ_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'llama-3.1-70b-versatile',
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt },
+              ],
+              temperature: 1.0,
+              max_tokens: 2000,
+            }),
+          });
+          const data = await res.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (content) {
+            try { questions = JSON.parse(content); }
+            catch { const m = content.match(/\[[\s\S]*\]/); if (m) questions = JSON.parse(m[0]); }
+          }
+        } catch { /* fall through */ }
+      }
+
+      if (questions.length > 0) {
+        onQuestionsGenerated(questions);
       } else {
-        setError('AI couldn\'t generate questions. Using default bank instead.');
+        setError('AI unavailable. Using default questions.');
         setTimeout(onSkip, 2000);
       }
     } catch (err) {

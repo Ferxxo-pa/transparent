@@ -7,7 +7,7 @@ export interface Player {
   isReady?: boolean;
 }
 
-export type QuestionMode = 'classic' | 'custom' | 'hot-take';
+export type QuestionMode = 'classic' | 'custom' | 'hot-take' | 'ai';
 
 export type PayoutMode = 'winner-takes-all' | 'split-pot';
 
