@@ -76,6 +76,19 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 // ── Helpers ─────────────────────────────────────────────────
 
+/** Pick a random question index that hasn't been used yet */
+const pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
+  if (used.length >= poolSize) {
+    // All questions used — reset and reshuffle
+    return Math.floor(Math.random() * poolSize);
+  }
+  const available = [];
+  for (let i = 0; i < poolSize; i++) {
+    if (!used.includes(i)) available.push(i);
+  }
+  return available[Math.floor(Math.random() * available.length)];
+};
+
 const generateRoomCode = (): string => {
   const part1 = Math.floor(100 + Math.random() * 900);
   const part2 = Math.floor(100 + Math.random() * 900);
@@ -549,7 +562,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionMode === 'custom' && gameState.customQuestions?.length
             ? gameState.customQuestions
             : QUESTIONS;
-        const questionIndex = Math.floor(Math.random() * questionPool.length);
+        const questionIndex = pickUniqueQuestionIndex(questionPool.length, []);
 
         await updateGameStatus(gid, {
           status: 'playing',
@@ -568,6 +581,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 currentQuestion: questionPool[questionIndex],
                 gamePhase: 'answering',
                 currentRound: 0,
+                usedQuestionIndices: [questionIndex],
               }
             : null,
         );
@@ -644,7 +658,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               gameState.questionMode === 'custom' && gameState.customQuestions?.length
                 ? gameState.customQuestions
                 : QUESTIONS;
-            const nextQuestionIndex = Math.floor(Math.random() * questionPool.length);
+            const usedSoFar = gameState.usedQuestionIndices || [];
+            const nextQuestionIndex = pickUniqueQuestionIndex(questionPool.length, usedSoFar);
 
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
@@ -663,6 +678,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     votes: {},
                     voteCount: 0,
                     gamePhase: 'answering',
+                    usedQuestionIndices: [...(prev.usedQuestionIndices || []), nextQuestionIndex],
                   }
                 : null,
             );

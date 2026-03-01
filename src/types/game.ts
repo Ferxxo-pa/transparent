@@ -110,6 +110,8 @@ export interface GameState {
   numQuestions: number;
   /** Custom questions (for custom mode, set by host at creation) */
   customQuestions?: string[];
+  /** Track used question indices to prevent repeats */
+  usedQuestionIndices?: number[];
   /** Questions submitted by players (hot-take mode) */
   submittedQuestions?: SubmittedQuestion[];
   /** Hot-take mode: playerId -> questionId they voted for */
