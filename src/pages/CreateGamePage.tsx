@@ -6,7 +6,7 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
-import { QuestionMode, PayoutMode } from '../types/game';
+import { QuestionMode, PayoutMode, QUESTIONS } from '../types/game';
 import { AIVibeCheck } from '../components/AIVibeCheck';
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
@@ -51,8 +51,14 @@ export const CreateGamePage: React.FC = () => {
       if (!filtered?.length) return;
     } else if (mode === 'ai') {
       if (aiQuestions && aiQuestions.length > 0) {
-        // AI generated questions — pass as custom questions with classic mode
-        filtered = aiQuestions;
+        // AI vibe questions first, then shuffle in the curated bank for variety
+        const combined = [...aiQuestions];
+        const shuffledMain = [...QUESTIONS].sort(() => Math.random() - 0.5);
+        // Add curated questions that aren't duplicates
+        for (const q of shuffledMain) {
+          if (!combined.includes(q)) combined.push(q);
+        }
+        filtered = combined;
         actualMode = 'custom';
       } else {
         // No AI questions yet — show vibe check
