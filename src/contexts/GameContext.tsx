@@ -58,6 +58,7 @@ interface GameContextType {
   distributeWinnings: (winnerWallet: string) => Promise<void>;
   distributePredictions: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
+  hostPickQuestion: (question: string, index: number) => Promise<void>;
   endGameNow: () => Promise<void>;
   readyUp: () => Promise<void>;
   leaveGame: () => Promise<void>;
@@ -558,17 +559,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
       } else {
         // Classic or Custom
-        const questionPool =
-          questionMode === 'custom' && gameState.customQuestions?.length
-            ? gameState.customQuestions
-            : QUESTIONS;
-        const questionIndex = pickUniqueQuestionIndex(questionPool.length, []);
-
+        // Start in host-picking phase — host sees question list and picks
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
-          current_question_index: questionIndex,
-          game_phase: 'answering',
+          current_question_index: -1,
+          game_phase: 'host-picking',
           current_round: 0,
         });
 
@@ -578,10 +574,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...prev,
                 gameStatus: 'playing',
                 currentPlayerInHotSeat: firstPlayer,
-                currentQuestion: questionPool[questionIndex],
-                gamePhase: 'answering',
+                currentQuestion: '',
+                gamePhase: 'host-picking',
                 currentRound: 0,
-                usedQuestionIndices: [questionIndex],
+                usedQuestionIndices: [],
               }
             : null,
         );
@@ -654,18 +650,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
             const nextPlayer = gameState.players[nextPlayerIdx];
             const nextRound = round + 1;
-            const questionPool =
-              gameState.questionMode === 'custom' && gameState.customQuestions?.length
-                ? gameState.customQuestions
-                : QUESTIONS;
-            const usedSoFar = gameState.usedQuestionIndices || [];
-            const nextQuestionIndex = pickUniqueQuestionIndex(questionPool.length, usedSoFar);
-
+            // Go to host-picking phase for next round
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
-              current_question_index: nextQuestionIndex,
+              current_question_index: -1,
               current_round: nextRound,
-              game_phase: 'answering',
+              game_phase: 'host-picking',
             });
 
             setGameState((prev) =>
@@ -673,12 +663,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ? {
                     ...prev,
                     currentPlayerInHotSeat: nextPlayer.id,
-                    currentQuestion: questionPool[nextQuestionIndex],
+                    currentQuestion: '',
                     currentRound: nextRound,
                     votes: {},
                     voteCount: 0,
-                    gamePhase: 'answering',
-                    usedQuestionIndices: [...(prev.usedQuestionIndices || []), nextQuestionIndex],
+                    gamePhase: 'host-picking',
                   }
                 : null,
             );
@@ -945,6 +934,32 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     },
     [gameState],
   );
+
+  // ── Host Pick Question ─────────────────────────────────
+
+  const hostPickQuestion = useCallback(async (question: string, index: number) => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    if (!gid) return;
+
+    await updateGameStatus(gid, {
+      current_question_index: index >= 0 ? index : 0,
+      game_phase: 'answering',
+    });
+
+    setGameState((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentQuestion: question,
+            gamePhase: 'answering',
+            usedQuestionIndices: index >= 0
+              ? [...(prev.usedQuestionIndices || []), index]
+              : prev.usedQuestionIndices || [],
+          }
+        : null,
+    );
+  }, [gameState]);
 
   // ── Force Advance Round (host skip) ───────────────────
 
@@ -1436,6 +1451,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         distributeWinnings,
         distributePredictions,
         forceAdvanceRound,
+        hostPickQuestion,
         endGameNow,
         readyUp,
         leaveGame,

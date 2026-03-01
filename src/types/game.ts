@@ -66,6 +66,7 @@ export function calculateSplitPayouts(
 }
 
 export type GamePhase =
+  | 'host-picking'
   | 'submitting-questions'
   | 'voting-question'
   | 'picking-question'

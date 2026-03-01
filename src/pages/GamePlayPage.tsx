@@ -5,10 +5,12 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
 import { QuestionVotePhase } from '../components/QuestionVotePhase';
+import { HostQuestionPicker } from '../components/HostQuestionPicker';
+import { QUESTIONS } from '../types/game';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -122,6 +124,40 @@ export const GamePlayPage: React.FC = () => {
       </div>
     );
   };
+
+  // ── Host Picking Question ───────────────────────────────────
+  if (phase === 'host-picking') {
+    const questionPool =
+      gameState.questionMode === 'custom' && gameState.customQuestions?.length
+        ? gameState.customQuestions
+        : QUESTIONS;
+
+    return (
+      <div className="page fade-in">
+        <TopBar />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
+          <HotSeatCard />
+          {isHost ? (
+            <HostQuestionPicker
+              questions={questionPool}
+              usedIndices={gameState.usedQuestionIndices || []}
+              hotSeatPlayerName={player?.name || 'Unknown'}
+              onPick={(question, index) => hostPickQuestion(question, index)}
+            />
+          ) : (
+            <div className="card" style={{ textAlign: 'center', padding: '28px 18px' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🎯</div>
+              <p style={{ fontWeight: 700, fontSize: 17 }}>Host is picking a question</p>
+              <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 6 }}>
+                for {player?.name || 'the hot seat'}…
+              </p>
+            </div>
+          )}
+          <Scores />
+        </div>
+      </div>
+    );
+  }
 
   // ── Hot-Take: Writing questions ────────────────────────────
   if (isHotTake && phase === 'submitting-questions') {
