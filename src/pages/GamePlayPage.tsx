@@ -6,11 +6,13 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 import { QuestionSubmitPhase } from '../components/QuestionSubmitPhase';
 import { QuestionVotePhase } from '../components/QuestionVotePhase';
 import { HostQuestionPicker } from '../components/HostQuestionPicker';
+import { PlayerQuestionVote } from '../components/PlayerQuestionVote';
+import { RaisePot } from '../components/RaisePot';
 import { QUESTIONS } from '../types/game';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, voteForQuestionOption, raisePot, sendQuestionsToVote } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -143,6 +145,7 @@ export const GamePlayPage: React.FC = () => {
               usedIndices={gameState.usedQuestionIndices || []}
               hotSeatPlayerName={player?.name || 'Unknown'}
               onPick={(question, index) => hostPickQuestion(question, index)}
+              onSendToVote={(qs, indices) => sendQuestionsToVote(qs, indices)}
             />
           ) : (
             <div className="card" style={{ textAlign: 'center', padding: '28px 18px' }}>
@@ -153,6 +156,38 @@ export const GamePlayPage: React.FC = () => {
               </p>
             </div>
           )}
+          <Scores />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Player Voting on Questions ──────────────────────────────
+  if (phase === 'player-voting') {
+    const options = gameState.questionOptions || [];
+    const handleVoteEnd = () => {
+      // Pick the winning question
+      const picks = gameState.questionPickVotes || {};
+      const counts = options.map((_, idx) =>
+        Object.values(picks).filter(v => v === idx).length
+      );
+      const winIdx = counts.indexOf(Math.max(...counts));
+      const winQ = options[winIdx] || options[0];
+      hostPickQuestion(winQ, -1); // -1 for custom/voted questions
+    };
+
+    return (
+      <div className="page fade-in">
+        <TopBar />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
+          <HotSeatCard />
+          <PlayerQuestionVote
+            questions={options}
+            questionIndices={[]}
+            hotSeatPlayerName={player?.name || 'Unknown'}
+            isHotSeatPlayer={isHotSeat}
+            onTimerEnd={handleVoteEnd}
+          />
           <Scores />
         </div>
       </div>
@@ -401,6 +436,9 @@ export const GamePlayPage: React.FC = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Raise the Pot — visible during answering/voting phases */}
+      {gameState.gamePhase === 'answering' && <RaisePot />}
     </div>
   );
 };

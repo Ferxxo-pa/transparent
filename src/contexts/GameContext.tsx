@@ -59,6 +59,9 @@ interface GameContextType {
   distributePredictions: (winnerWallet: string) => Promise<void>;
   forceAdvanceRound: () => Promise<void>;
   hostPickQuestion: (question: string, index: number) => Promise<void>;
+  voteForQuestionOption: (optionIndex: number) => Promise<void>;
+  raisePot: (amount: number) => Promise<void>;
+  sendQuestionsToVote: (questions: string[], indices: number[]) => Promise<void>;
   endGameNow: () => Promise<void>;
   readyUp: () => Promise<void>;
   leaveGame: () => Promise<void>;
@@ -961,6 +964,95 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
   }, [gameState]);
 
+  // ── Send Questions to Player Vote ──────────────────────
+
+  const sendQuestionsToVote = useCallback(async (questions: string[], indices: number[]) => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+
+    if (gid) {
+      await updateGameStatus(gid, {
+        game_phase: 'player-voting',
+        question_options: questions,
+      });
+    }
+
+    setGameState((prev) =>
+      prev
+        ? {
+            ...prev,
+            gamePhase: 'player-voting',
+            questionOptions: questions,
+            questionPickVotes: {},
+          }
+        : null,
+    );
+  }, [gameState]);
+
+  // ── Vote for Question Option (player voting mode) ──────
+
+  const voteForQuestionOption = useCallback(async (optionIndex: number) => {
+    if (!gameState) return;
+    const myWallet = walletRef.current?.publicKey?.toBase58() ?? '';
+    if (!myWallet) return;
+
+    setGameState((prev) =>
+      prev
+        ? {
+            ...prev,
+            questionPickVotes: {
+              ...(prev.questionPickVotes || {}),
+              [myWallet]: optionIndex,
+            },
+          }
+        : null,
+    );
+
+    // If using Supabase, persist the vote
+    const gid = gameState.gameId;
+    if (gid) {
+      try {
+        await updateGameStatus(gid, {
+          question_pick_votes: {
+            ...(gameState.questionPickVotes || {}),
+            [myWallet]: optionIndex,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to persist question vote:', e);
+      }
+    }
+  }, [gameState, publicKey]);
+
+  // ── Raise the Pot ─────────────────────────────────────
+
+  const raisePot = useCallback(async (amount: number) => {
+    if (!gameState || amount <= 0) return;
+
+    const newPot = (gameState.currentPot || 0) + amount;
+
+    setGameState((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentPot: newPot,
+          }
+        : null,
+    );
+
+    // If using Supabase, persist the pot increase
+    const gid = gameState.gameId;
+    if (gid) {
+      try {
+        await updateGameStatus(gid, {
+          current_pot: newPot,
+        });
+      } catch (e) {
+        console.error('Failed to raise pot:', e);
+      }
+    }
+  }, [gameState]);
+
   // ── Force Advance Round (host skip) ───────────────────
 
   const forceAdvanceRound = useCallback(async () => {
@@ -1452,6 +1544,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         distributePredictions,
         forceAdvanceRound,
         hostPickQuestion,
+        voteForQuestionOption,
+        raisePot,
+        sendQuestionsToVote,
         endGameNow,
         readyUp,
         leaveGame,
