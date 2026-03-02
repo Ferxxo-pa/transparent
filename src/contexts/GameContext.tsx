@@ -1022,7 +1022,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.error('Failed to persist question vote:', e);
       }
     }
-  }, [gameState, publicKey]);
+  }, [gameState, walletRef.current?.publicKey]);
 
   // ── Raise the Pot ─────────────────────────────────────
 
