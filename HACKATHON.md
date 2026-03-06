@@ -50,15 +50,26 @@ Crypto party games had a moment in 2021-22 (FLUF World, Party Bears, etc.) — t
 | Styling | Custom CSS (glass morphism) + responsive (mobile-first) |
 | Auth & Wallets | Privy (embedded Solana wallets, email login) |
 | Blockchain | Solana Devnet (SystemProgram.transfer) |
+| **Speed Layer** | **MagicBlock Ephemeral Rollups (Magic Router)** |
 | Realtime | Supabase Postgres + WebSockets + Broadcast |
 | Hosting | Vercel |
+
+### MagicBlock Integration
+All game transactions (buy-ins, pot distributions, split payouts) route through **MagicBlock's Magic Router** for near-instant confirmations via Ephemeral Rollups. Graceful fallback to standard Solana RPC if ER is unavailable. This makes the game feel instant — no waiting 400ms+ for base layer confirmation during live gameplay.
+
+Key integration points:
+- `buyInViaMagicBlock()` — routes player buy-ins through ER
+- `distributeViaMagicBlock()` — routes winner/split payouts through ER
+- `sendGameTransaction()` — generic ER-routed transaction with automatic fallback
+- `isMagicBlockAvailable()` — health check for ER availability
+- Live status indicator in-game showing "⚡ MagicBlock" when ER is active
 
 ---
 
 ## Track Pitches
 
 ### 🎮 MagicBlock Gaming ($5k)
-Transparent is the first party game on Solana that actually works. No NFT gates, no token economies — just pure gameplay with crypto rails. The on-chain buy-in is verified on Solana Explorer. Every game session leaves a transaction trail. Built-in prediction market adds a DeFi mechanic to a social game. This is what gaming on Solana looks like when you ship the game first.
+Transparent is the first party game on Solana using **MagicBlock Ephemeral Rollups** for real-time gameplay. Every buy-in, vote, and payout routes through the **Magic Router** for near-instant confirmations — critical for a live party game where players are in the same room. No NFT gates, no token economies — just pure gameplay with crypto rails and ER speed. The on-chain buy-in is verified on Solana Explorer. Built-in prediction market adds a DeFi mechanic to a social game. This is what gaming on Solana looks like when you combine MagicBlock's speed with actual gameplay.
 
 ### 🔗 Tapestry Onchain Social ($5k)
 Transparent is a social trust game at its core. Every round generates a crowd-sourced honesty signal. The prediction market lets players put money behind their social reads. Every vote, every bet, every payout is an onchain social action. Future: aggregate honesty scores as onchain identity/reputation primitives.

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { AnimatedBackground } from '../components/AnimatedBackground';
+import { MagicBlockBadge } from '../components/MagicBlockBadge';
 
 const pop = {
   initial: { opacity: 0, y: 24, scale: 0.93 },
@@ -269,9 +270,12 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
         </motion.div>
       </motion.div>
 
-      <p style={{ fontSize: 11, color: 'var(--faint)', paddingBottom: 8, position: 'relative', zIndex: 1 }}>
-        Powered by Solana · v1.0
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 8, position: 'relative', zIndex: 1 }}>
+        <p style={{ fontSize: 11, color: 'var(--faint)' }}>
+          Powered by Solana · v1.0
+        </p>
+        <MagicBlockBadge compact />
+      </div>
     </div>
   );
 }

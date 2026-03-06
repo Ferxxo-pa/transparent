@@ -5,6 +5,7 @@ import { Copy, Check, TrendingUp, Coins, RefreshCw } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
+import { MagicBlockBadge } from '../components/MagicBlockBadge';
 
 const PREDICTION_PRESETS = [0.01, 0.05, 0.1, 0.25, 0.5, 1];
 const LAMPORTS = 1_000_000_000;
@@ -351,9 +352,12 @@ export const WaitingRoomPage: React.FC = () => {
       {/* Top row */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
         <span className="chip chip-lime blink" style={{ fontSize: 11 }}>● Waiting</span>
-        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
-          {readyCount}/{gameState.players.length} ready
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <MagicBlockBadge compact />
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>
+            {readyCount}/{gameState.players.length} ready
+          </span>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}>

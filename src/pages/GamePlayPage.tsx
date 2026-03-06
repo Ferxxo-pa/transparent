@@ -8,6 +8,7 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 import { HostQuestionPicker } from '../components/HostQuestionPicker';
 import { PlayerQuestionVote } from '../components/PlayerQuestionVote';
 import { RaisePot } from '../components/RaisePot';
+import { MagicBlockBadge } from '../components/MagicBlockBadge';
 import { QUESTIONS } from '../types/game';
 
 export const GamePlayPage: React.FC = () => {
@@ -69,8 +70,9 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Top bar ────────────────────────────────────────────────
   const TopBar = () => (
-    <div style={{ width: '100%', paddingTop: 16, marginBottom: 20 }}>
+    <div style={{ width: '100%', paddingTop: 16, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <span className="chip chip-lavender" style={{ fontSize: 11 }}>Round {round}/{total}</span>
+      <MagicBlockBadge compact />
     </div>
   );
 
