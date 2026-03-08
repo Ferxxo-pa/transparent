@@ -7,7 +7,7 @@ export interface Player {
   isReady?: boolean;
 }
 
-export type QuestionMode = 'classic' | 'custom' | 'hot-take' | 'ai';
+export type QuestionMode = 'classic' | 'custom' | 'hot-take' | 'ai' | 'storyteller';
 
 export type PayoutMode = 'winner-takes-all' | 'split-pot';
 
@@ -72,7 +72,11 @@ export type GamePhase =
   | 'voting-question'
   | 'picking-question'
   | 'answering'
-  | 'voting-honesty';
+  | 'voting-honesty'
+  | 'storyteller-prep'     // Hot-seat player sees prompt + chooses truth/fake
+  | 'storyteller-telling'  // Hot-seat player tells their story to the group
+  | 'storyteller-voting'   // Group votes: transparent or fake?
+  | 'storyteller-reveal';  // Reveal if it was truth or fake + update scores
 
 export interface SubmittedQuestion {
   id: string;
@@ -128,6 +132,10 @@ export interface GameState {
   currentRound?: number;
   /** Per-player scores across all rounds (wallet -> score) */
   scores?: Record<string, PlayerScore>;
+  /** Storyteller mode: hot-seat player's secret choice (only visible to them until reveal) */
+  storytellerChoice?: 'truth' | 'fake' | null;
+  /** Storyteller mode: the prompt given to the storyteller */
+  storytellerPrompt?: string;
 }
 
 // ── 30+ Party Questions ─────────────────────────────────────
@@ -262,6 +270,51 @@ export const QUESTIONS: string[] = [
   "Have you ever stalked an ex's new partner online? How deep did you go?",
   "What secret would end a friendship if it came out right now?",
   "What's something you've done that you'd literally pay money for people to forget?",
+];
+
+/**
+ * STORYTELLER MODE prompts — the hot-seat player gets a scenario prompt.
+ * They can either tell a REAL version (truth) or make one up (fake).
+ * Everyone else votes: is this person being transparent or faking it?
+ * 
+ * The hot-seat player privately selects "truth" or "fake" before telling the story.
+ * After voting, the real answer is revealed and scores are adjusted.
+ */
+export const STORYTELLER_PROMPTS: string[] = [
+  // Embarrassing stories
+  "Tell us about the most embarrassing thing that happened to you in public.",
+  "Tell us about a time you completely bombed at something you thought you'd be good at.",
+  "Tell us about the worst text you accidentally sent to the wrong person.",
+  "Tell us about a time you got caught doing something you shouldn't have been doing.",
+  "Tell us about your most embarrassing moment at a party.",
+  
+  // Wild stories
+  "Tell us about the craziest thing you've ever done on a dare.",
+  "Tell us about the wildest night out you've ever had.",
+  "Tell us about a time you broke a rule and almost got caught.",
+  "Tell us about the most random encounter you've had with a stranger.",
+  "Tell us about a time something unbelievable happened that nobody believed.",
+  
+  // Relationship stories
+  "Tell us about your worst first date ever.",
+  "Tell us about the most awkward encounter with an ex.",
+  "Tell us about a time you said 'I love you' and it went wrong.",
+  "Tell us about the worst pickup line someone ever used on you — or you used on someone.",
+  "Tell us about a time you got friend-zoned in the most brutal way.",
+  
+  // Life stories
+  "Tell us about the biggest lie you ever told that somehow worked out.",
+  "Tell us about a time you pretended to know something and got way in over your head.",
+  "Tell us about the most money you ever wasted on something stupid.",
+  "Tell us about a time you had to fake being an expert at something.",
+  "Tell us about a childhood memory that still makes you cringe.",
+  
+  // Spicy stories
+  "Tell us about a secret you kept from your best friend for way too long.",
+  "Tell us about a time you did something petty and don't regret it at all.",
+  "Tell us about the shadiest thing you've ever gotten away with.",
+  "Tell us about a time you completely overreacted to something minor.",
+  "Tell us about something you did that you'd never want your parents to know about.",
 ];
 
 export const FAKE_PLAYER_NAMES = [

@@ -10,10 +10,11 @@ import { PlayerQuestionVote } from '../components/PlayerQuestionVote';
 import { RaisePot } from '../components/RaisePot';
 import { MagicBlockBadge } from '../components/MagicBlockBadge';
 import { QUESTIONS } from '../types/game';
+import { StorytellerPhase } from '../components/StorytellerPhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, voteForQuestionOption, raisePot, sendQuestionsToVote } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, voteForQuestionOption, raisePot, sendQuestionsToVote, storytellerChoose, storytellerAdvance } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';
@@ -128,6 +129,34 @@ export const GamePlayPage: React.FC = () => {
       </div>
     );
   };
+
+  // ── Storyteller Mode ─────────────────────────────────────────
+  if (phase && phase.startsWith('storyteller-')) {
+    return (
+      <div className="page fade-in" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <TopBar />
+        <HotSeatCard />
+        <div style={{ marginTop: 24, width: '100%' }}>
+          <StorytellerPhase
+            phase={phase as any}
+            prompt={gameState.storytellerPrompt || gameState.currentQuestion || ''}
+            isHotSeat={isHotSeat}
+            isHost={isHost}
+            playerName={player?.name ?? 'Unknown'}
+            storytellerChoice={gameState.storytellerChoice ?? null}
+            votes={gameState.votes}
+            voteCount={votesIn}
+            voterCount={voterCount}
+            myVote={myVote}
+            onChoose={storytellerChoose}
+            onVote={castVote}
+            onAdvance={storytellerAdvance}
+          />
+        </div>
+        <Scores />
+      </div>
+    );
+  }
 
   // ── Host Picking Question ───────────────────────────────────
   if (phase === 'host-picking') {

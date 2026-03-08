@@ -10,10 +10,11 @@ import { QuestionMode, PayoutMode, QUESTIONS } from '../types/game';
 import { AIVibeCheck } from '../components/AIVibeCheck';
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'classic',  label: 'Classic',   sub: 'Curated questions from the vault',   emoji: '🎲' },
-  { id: 'hot-take', label: 'Hot Take',  sub: 'Players write, crowd picks best one', emoji: '🔥' },
-  { id: 'ai',       label: 'AI Mode',   sub: 'AI generates questions based on your group vibe', emoji: '🤖' },
-  { id: 'custom',   label: 'Custom',    sub: 'You write every question',            emoji: '✍️' },
+  { id: 'classic',     label: 'Classic',     sub: 'Curated questions from the vault',        emoji: '🎲' },
+  { id: 'hot-take',    label: 'Hot Take',    sub: 'Players write, crowd picks best one',     emoji: '🔥' },
+  { id: 'storyteller', label: 'Storyteller', sub: 'Tell a story — truth or fake? Group votes', emoji: '🎭' },
+  { id: 'ai',          label: 'AI Mode',     sub: 'AI generates questions based on your group vibe', emoji: '🤖' },
+  { id: 'custom',      label: 'Custom',      sub: 'You write every question',                emoji: '✍️' },
 ];
 
 const PAYOUT_MODES: { id: PayoutMode; label: string; sub: string; emoji: string }[] = [

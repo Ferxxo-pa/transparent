@@ -66,6 +66,8 @@ interface GameContextType {
   readyUp: () => Promise<void>;
   leaveGame: () => Promise<void>;
   requestLeave: () => void;
+  storytellerChoose: (choice: 'truth' | 'fake') => Promise<void>;
+  storytellerAdvance: () => Promise<void>;
   leaveRequests: string[];
   approveLeave: (playerWallet: string) => Promise<void>;
   refreshPlayers: () => Promise<void>;
@@ -536,7 +538,34 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const firstPlayer = gameState.players[0]?.id ?? null;
       const questionMode = gameState.questionMode;
 
-      if (questionMode === 'hot-take') {
+      if (questionMode === 'storyteller') {
+        // Storyteller mode: hot-seat player gets a prompt, chooses truth/fake
+        const { STORYTELLER_PROMPTS } = await import('../types/game');
+        const prompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+        
+        await updateGameStatus(gid, {
+          status: 'playing',
+          current_hot_seat_player: firstPlayer,
+          current_question_index: 0,
+          game_phase: 'storyteller-prep',
+          current_round: 0,
+        });
+
+        setGameState((prev) =>
+          prev
+            ? {
+                ...prev,
+                gameStatus: 'playing',
+                currentPlayerInHotSeat: firstPlayer,
+                currentQuestion: prompt,
+                gamePhase: 'storyteller-prep',
+                currentRound: 0,
+                storytellerChoice: null,
+                storytellerPrompt: prompt,
+              }
+            : null,
+        );
+      } else if (questionMode === 'hot-take') {
         // Hot-take: start in submitting-questions phase
         await updateGameStatus(gid, {
           status: 'playing',
@@ -1097,6 +1126,75 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── End Game Now ───────────────────────────────────────
 
+    // ── Storyteller Mode ──────────────────────────────────
+
+  const storytellerChoose = useCallback(async (choice: 'truth' | 'fake') => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    
+    // Store the choice (only hot-seat player sees this until reveal)
+    setGameState(prev => prev ? { ...prev, storytellerChoice: choice, gamePhase: 'storyteller-telling' } : null);
+    
+    if (gid) {
+      // Store choice encrypted/hidden server-side — for now just advance phase
+      await updateGameStatus(gid, { game_phase: 'storyteller-telling' });
+    }
+  }, [gameState]);
+
+  const storytellerAdvance = useCallback(async () => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    const currentPhase = gameState.gamePhase;
+
+    if (currentPhase === 'storyteller-telling') {
+      // Move to voting
+      setGameState(prev => prev ? { ...prev, gamePhase: 'storyteller-voting', votes: {}, voteCount: 0 } : null);
+      if (gid) await updateGameStatus(gid, { game_phase: 'storyteller-voting' });
+
+    } else if (currentPhase === 'storyteller-voting') {
+      // Move to reveal
+      setGameState(prev => prev ? { ...prev, gamePhase: 'storyteller-reveal' } : null);
+      if (gid) await updateGameStatus(gid, { game_phase: 'storyteller-reveal' });
+
+    } else if (currentPhase === 'storyteller-reveal') {
+      // Score and advance to next round
+      const { STORYTELLER_PROMPTS } = await import('../types/game');
+      const nextRound = (gameState.currentRound ?? 0) + 1;
+      const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+
+      if (nextRound >= totalRounds) {
+        // Game over
+        setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
+        if (gid) await updateGameStatus(gid, { status: 'gameover' });
+      } else {
+        // Next round — new player, new prompt
+        const nextPlayerIndex = nextRound % gameState.players.length;
+        const nextPlayer = gameState.players[nextPlayerIndex]?.id ?? null;
+        const nextPrompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+
+        setGameState(prev => prev ? {
+          ...prev,
+          currentRound: nextRound,
+          currentPlayerInHotSeat: nextPlayer,
+          currentQuestion: nextPrompt,
+          storytellerPrompt: nextPrompt,
+          storytellerChoice: null,
+          gamePhase: 'storyteller-prep',
+          votes: {},
+          voteCount: 0,
+        } : null);
+
+        if (gid) {
+          await updateGameStatus(gid, {
+            current_round: nextRound,
+            current_hot_seat_player: nextPlayer,
+            game_phase: 'storyteller-prep',
+          });
+        }
+      }
+    }
+  }, [gameState]);
+
   const endGameNow = useCallback(async () => {
     const gid = gameState?.gameId;
     if (gid) {
@@ -1548,6 +1646,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         raisePot,
         sendQuestionsToVote,
         endGameNow,
+        storytellerChoose,
+        storytellerAdvance,
         readyUp,
         leaveGame,
         requestLeave,
