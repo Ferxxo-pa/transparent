@@ -114,6 +114,20 @@ function playerRowsToPlayers(rows: PlayerRow[], hostWallet: string): Player[] {
   }));
 }
 
+function derivePotAmount(
+  players: Player[],
+  buyInAmount: number,
+  currentPot?: number | null,
+  previousPot = 0,
+): number {
+  if (typeof currentPot === 'number' && Number.isFinite(currentPot)) {
+    return currentPot;
+  }
+
+  const readyPot = players.filter((player) => player.isReady).length * buyInAmount;
+  return Math.max(readyPot, previousPot);
+}
+
 // ── Provider ────────────────────────────────────────────────
 
 const STORAGE_KEY = 'transparent_game_state';
@@ -189,6 +203,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               currentPlayerInHotSeat: game.current_hot_seat_player,
               gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
               currentRound: game.current_round ?? prev.currentRound,
+              currentPot: derivePotAmount(prev.players, prev.buyInAmount, game.current_pot, prev.currentPot),
+              questionOptions: game.question_options ?? prev.questionOptions,
+              questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
               // Clear votes for all clients when round or player changes
               ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
             };
@@ -202,7 +219,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return {
               ...prev,
               players: mapped,
-              currentPot: mapped.length * prev.buyInAmount,
+              currentPot: derivePotAmount(mapped, prev.buyInAmount, undefined, prev.currentPot),
               totalVotes: mapped.length,
             };
           });
@@ -1222,7 +1239,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return {
           ...prev,
           players: mapped,
-          currentPot: mapped.length * prev.buyInAmount,
+          currentPot: derivePotAmount(mapped, prev.buyInAmount, gameData?.current_pot, prev.currentPot),
           totalVotes: mapped.length,
           // Sync game status from DB
           ...(gameData ? {
@@ -1230,6 +1247,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             currentPlayerInHotSeat: gameData.current_hot_seat_player,
             gamePhase: gameData.game_phase as GamePhase || prev.gamePhase,
             currentRound: gameData.current_round ?? prev.currentRound,
+            questionOptions: gameData.question_options ?? prev.questionOptions,
+            questionPickVotes: gameData.question_pick_votes ?? prev.questionPickVotes,
           } : {}),
         };
       });
@@ -1336,9 +1355,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           gamePhase: (game.game_phase as GamePhase) || prev.gamePhase,
           currentRound,
           players: mapped,
-          currentPot: mapped.length * prev.buyInAmount,
+          currentPot: derivePotAmount(mapped, prev.buyInAmount, game.current_pot, prev.currentPot),
           totalVotes: mapped.length,
           scores: newScores,
+          questionOptions: game.question_options ?? prev.questionOptions,
+          questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
           // Clear votes on round change, otherwise update
           ...(roundChanged ? { votes: {}, voteCount: 0 } : { votes: voteMap, voteCount: votesRes.length }),
         };

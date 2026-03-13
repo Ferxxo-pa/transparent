@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import {
   PrivyProvider as _PrivyProvider,
   usePrivy,
@@ -47,6 +47,8 @@ function WalletInner({ children }: { children: ReactNode }) {
 
   const { wallets } = useSolanaWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
+  const [walletStabilized, setWalletStabilized] = useState(false);
+  const walletWarmupRef = useRef<Promise<void> | null>(null);
 
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
@@ -66,35 +68,83 @@ function WalletInner({ children }: { children: ReactNode }) {
     return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
+  useEffect(() => {
+    if (!activeWallet?.address || !publicKey) {
+      setWalletStabilized(false);
+      walletWarmupRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+
+    const warmup = (async () => {
+      try {
+        // Give Privy a short window to finish provisioning the embedded wallet
+        // before we expose transaction actions to the user.
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        await connection.getLatestBlockhash('confirmed');
+      } catch {
+        // Ignore warmup failures. Transaction send path still has retry protection.
+      } finally {
+        if (!cancelled) {
+          setWalletStabilized(true);
+        }
+      }
+    })();
+
+    walletWarmupRef.current = warmup;
+
+    return () => {
+      cancelled = true;
+      setWalletStabilized(false);
+      walletWarmupRef.current = null;
+    };
+  }, [activeWallet?.address, publicKey]);
+
   // Bridge: takes web3.js Transaction, serializes to Uint8Array, calls Privy signAndSendTransaction
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
-      // Ensure tx has blockhash and fee payer
-      if (!tx.recentBlockhash) {
+      await walletWarmupRef.current?.catch(() => undefined);
+
+      const serializeForPrivy = async () => {
         const { blockhash } = await connection.getLatestBlockhash('confirmed');
         tx.recentBlockhash = blockhash;
-      }
-      if (!tx.feePayer) {
         tx.feePayer = publicKey;
+        tx.signatures = [];
+
+        return tx.serialize({
+          requireAllSignatures: false,
+          verifySignatures: false,
+        });
+      };
+
+      let lastError: unknown = null;
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const serialized = await serializeForPrivy();
+          const result = await signAndSendTransaction({
+            transaction: serialized,
+            wallet: activeWallet,
+            chain: 'solana:devnet',
+          } as any);
+
+          return result.signature;
+        } catch (err) {
+          lastError = err;
+          if (attempt === 1) {
+            break;
+          }
+
+          console.warn('[privy] First transaction attempt failed, retrying once:', err);
+          await new Promise((resolve) => setTimeout(resolve, 900));
+        }
       }
 
-      // Serialize to Uint8Array (wire format) — this is what Privy v3 expects
-      const serialized = tx.serialize({
-        requireAllSignatures: false,
-        verifySignatures: false,
-      });
-
-
-      const result = await signAndSendTransaction({
-        transaction: serialized,
-        wallet: activeWallet,
-        chain: 'solana:devnet',
-      } as any);
-
-      const sig = result.signature;
-      // Confirmation handled by caller (anchor.ts buildAndSend)
-      return sig;
+      throw lastError instanceof Error
+        ? lastError
+        : new Error('Failed to send Solana transaction');
     };
   }, [activeWallet, publicKey, signAndSendTransaction]);
 
@@ -116,14 +166,14 @@ function WalletInner({ children }: { children: ReactNode }) {
     address: activeWallet?.address ?? null,
     sendTransaction,
     connected: authenticated,
-    walletReady: !!publicKey && !!sendTransaction,
+    walletReady: !!publicKey && !!sendTransaction && walletStabilized,
     walletType,
     login,
     logout,
     user,
     displayName,
     connection,
-  }), [publicKey, activeWallet?.address, sendTransaction, authenticated, walletType, login, logout, user, displayName]);
+  }), [publicKey, activeWallet?.address, sendTransaction, authenticated, walletStabilized, walletType, login, logout, user, displayName]);
 
   return (
     <PrivyWalletContext.Provider value={value}>

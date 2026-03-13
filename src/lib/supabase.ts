@@ -18,12 +18,15 @@ export interface GameRow {
   status: 'waiting' | 'playing' | 'voting' | 'gameover';
   current_question_index: number;
   current_hot_seat_player: string | null;
-  question_mode: 'classic' | 'custom' | 'hot-take';
+  question_mode: 'classic' | 'custom' | 'hot-take' | 'storyteller' | 'ai';
   custom_questions: string[] | null;
   game_phase: string | null;
   current_round: number;
   payout_mode: string | null;
   num_questions: number | null;
+  current_pot?: number | null;
+  question_options?: string[] | null;
+  question_pick_votes?: Record<string, number> | null;
   created_at: string;
 }
 
@@ -100,7 +103,7 @@ export async function getGameByRoomCode(roomCode: string): Promise<GameRow | nul
 
 export async function updateGameStatus(
   gameId: string,
-  updates: Partial<Pick<GameRow, 'status' | 'current_question_index' | 'current_hot_seat_player' | 'game_phase' | 'current_round'>>
+  updates: Partial<GameRow>
 ) {
   const { error } = await supabase.from('games').update(updates).eq('id', gameId);
   if (error) throw error;
