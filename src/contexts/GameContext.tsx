@@ -916,53 +916,44 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
               const payouts = calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
 
-
               // Send each player their share — host sends ALL pot money out
               for (const [playerWallet, amountSol] of Object.entries(payouts)) {
                 if (amountSol <= 0) continue;
                 const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
-                  // Route split payouts through MagicBlock ER
                   try {
                     await distributeViaMagicBlock(wallet, playerPubkey, lamports);
                   } catch (mbErr) {
                     console.warn('[MagicBlock] ER split payout failed, falling back:', mbErr);
+                    // Direct SOL transfer fallback (gamePDA is unused in distributeOnChain)
                     await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
                   }
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
                 }
               }
-            }
-            // Broadcast payout info to all players
-            if (channelRef.current) {
-              if (gameState.payoutMode === 'winner-takes-all') {
+
+              // Broadcast split results — computed once, used for broadcast
+              if (channelRef.current) {
                 channelRef.current.send({
                   type: 'broadcast',
                   event: 'payout_distributed',
-                  payload: {
-                    mode: 'winner-takes-all',
-                    payouts: { [winnerWallet]: gameState.currentPot },
-                  },
-                });
-              } else if (gameState.payoutMode === 'split-pot') {
-                const playerScoresForBroadcast: Record<string, any> = {};
-                const allScoresForBroadcast = gameState.scores ?? {};
-                for (const [w, s] of Object.entries(allScoresForBroadcast)) {
-                  if (w !== hostWallet) playerScoresForBroadcast[w] = s;
-                }
-                const totalRoundsForBroadcast = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
-                const payoutsForBroadcast = calculateSplitPayouts(playerScoresForBroadcast, gameState.buyInAmount, totalRoundsForBroadcast);
-                channelRef.current.send({
-                  type: 'broadcast',
-                  event: 'payout_distributed',
-                  payload: {
-                    mode: 'split-pot',
-                    payouts: payoutsForBroadcast,
-                  },
+                  payload: { mode: 'split-pot', payouts },
                 });
               }
+            }
+
+            // Broadcast winner-takes-all payout
+            if (gameState.payoutMode === 'winner-takes-all' && channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'payout_distributed',
+                payload: {
+                  mode: 'winner-takes-all',
+                  payouts: { [winnerWallet]: gameState.currentPot },
+                },
+              });
             }
           } catch (chainErr) {
             console.warn('On-chain distribution failed (non-fatal):', chainErr);
@@ -1405,7 +1396,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     } catch (err: any) {
       console.error('Ready up failed:', err);
-      setError(err?.message || 'Failed to ready up');
+      const msg = err?.message || 'Failed to ready up';
+      setError(msg);
+      // Re-throw so the UI can show the error and re-enable the button
+      throw new Error(msg);
     }
   }, []);
 

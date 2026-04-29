@@ -11,7 +11,7 @@ import {
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
-import { PRIVY_APP_ID, SOLANA_RPC } from '../lib/config';
+import { PRIVY_APP_ID, SOLANA_RPC, SOLANA_NETWORK } from '../lib/config';
 
 // ============================================================
 // Privy v3 Solana Integration
@@ -48,6 +48,7 @@ function WalletInner({ children }: { children: ReactNode }) {
   const { wallets } = useSolanaWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
   const [walletStabilized, setWalletStabilized] = useState(false);
+  const walletStabilizedRef = useRef(false); // mirrors walletStabilized state for use inside async closures
   const walletWarmupRef = useRef<Promise<void> | null>(null);
 
   const activeWallet = useMemo(() => {
@@ -76,17 +77,30 @@ function WalletInner({ children }: { children: ReactNode }) {
     }
 
     let cancelled = false;
+    walletStabilizedRef.current = false;
 
     const warmup = (async () => {
       try {
-        // Give Privy a short window to finish provisioning the embedded wallet
-        // before we expose transaction actions to the user.
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        await connection.getLatestBlockhash('confirmed');
+        // Give Privy a longer window to finish provisioning the embedded wallet.
+        // Privy's key-derivation for embedded wallets can take 800–1500ms after
+        // the wallet object first appears in `useWallets()`. Without this wait,
+        // the first signAndSendTransaction call hits the key-provider before it
+        // is ready and fails — forcing a second attempt.
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+
+        // Pre-warm both the Privy RPC and the MagicBlock router in parallel.
+        // This primes their HTTP connections so the first real transaction
+        // doesn't pay the TCP/TLS setup cost.
+        const { getMagicBlockConnection } = await import('../lib/magicblock');
+        await Promise.allSettled([
+          connection.getLatestBlockhash('confirmed'),
+          getMagicBlockConnection().getLatestBlockhash('confirmed'),
+        ]);
       } catch {
         // Ignore warmup failures. Transaction send path still has retry protection.
       } finally {
         if (!cancelled) {
+          walletStabilizedRef.current = true;
           setWalletStabilized(true);
         }
       }
@@ -96,6 +110,7 @@ function WalletInner({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      walletStabilizedRef.current = false;
       setWalletStabilized(false);
       walletWarmupRef.current = null;
     };
@@ -105,12 +120,35 @@ function WalletInner({ children }: { children: ReactNode }) {
   const sendTransaction = useMemo(() => {
     if (!activeWallet || !publicKey) return null;
     return async (tx: Transaction): Promise<string> => {
-      await walletWarmupRef.current?.catch(() => undefined);
+      // Wait for wallet to fully stabilize before any transaction.
+      // Two-layer guard:
+      //   1. walletWarmupRef.current — the running warmup promise (null during the
+      //      brief window between effect cleanup and new effect setup)
+      //   2. walletStabilizedRef — a ref that stays false until warmup completes,
+      //      safe to read from inside async closures without stale closure issues.
+      // Awaiting the warmup promise handles the common case; the polling loop
+      // handles the edge case where walletWarmupRef is still null (race window).
+      if (walletWarmupRef.current) {
+        await walletWarmupRef.current.catch(() => undefined);
+      } else if (!walletStabilizedRef.current) {
+        // warmupRef not set yet — poll until stabilized (max 5s)
+        await new Promise<void>((resolve, reject) => {
+          const deadline = Date.now() + 5000;
+          const check = setInterval(() => {
+            if (walletStabilizedRef.current) { clearInterval(check); resolve(); return; }
+            if (Date.now() > deadline) { clearInterval(check); reject(new Error('Wallet warmup timed out')); }
+          }, 100);
+        });
+      }
 
       const serializeForPrivy = async () => {
+        // Always fetch a fresh blockhash immediately before serialising so
+        // it can't expire between warmup and the actual signing call.
         const { blockhash } = await connection.getLatestBlockhash('confirmed');
         tx.recentBlockhash = blockhash;
         tx.feePayer = publicKey;
+        // Clear any stale signatures from a previous (failed) attempt so
+        // Privy doesn't reject the transaction as already-partially-signed.
         tx.signatures = [];
 
         return tx.serialize({
@@ -119,26 +157,27 @@ function WalletInner({ children }: { children: ReactNode }) {
         });
       };
 
+      const MAX_ATTEMPTS = 3;
+      const RETRY_DELAYS = [0, 1200, 2000]; // ms before each attempt
       let lastError: unknown = null;
 
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+        if (attempt > 0) {
+          console.warn(`[privy] Transaction attempt ${attempt} failed, retrying in ${RETRY_DELAYS[attempt]}ms:`, lastError);
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[attempt]));
+        }
         try {
           const serialized = await serializeForPrivy();
+          const chain = SOLANA_NETWORK === 'mainnet-beta' ? 'solana:mainnet-beta' : 'solana:devnet';
           const result = await signAndSendTransaction({
             transaction: serialized,
             wallet: activeWallet,
-            chain: 'solana:devnet',
+            chain,
           } as any);
 
           return result.signature;
         } catch (err) {
           lastError = err;
-          if (attempt === 1) {
-            break;
-          }
-
-          console.warn('[privy] First transaction attempt failed, retrying once:', err);
-          await new Promise((resolve) => setTimeout(resolve, 900));
         }
       }
 
@@ -205,7 +244,7 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
               rpc: createSolanaRpc(SOLANA_RPC),
               rpcSubscriptions: createSolanaRpcSubscriptions(wssUrl),
             },
-            'solana:mainnet': {
+            'solana:mainnet-beta': {
               rpc: createSolanaRpc(SOLANA_RPC),
               rpcSubscriptions: createSolanaRpcSubscriptions(wssUrl),
             },

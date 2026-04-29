@@ -31,26 +31,35 @@ async function buildAndSend(
   wallet: WalletAdapter,
   tx: Transaction,
 ): Promise<string> {
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  // wallet.sendTransaction is the Privy bridge.
+  // It fetches a fresh blockhash from the configured RPC and sets it on the
+  // transaction before signing — so we must NOT pre-set recentBlockhash here
+  // or the confirm call will use a stale/mismatched value.
+  //
+  // We still set feePayer so Privy knows who pays, but leave blockhash blank
+  // and let the bridge fill it in.
   tx.feePayer = wallet.publicKey;
-  tx.recentBlockhash = blockhash;
 
-  // Privy wallet.sendTransaction signs + sends using our Connection
   const sig = await wallet.sendTransaction(tx);
 
-  // Wait for confirmation with timeout (devnet can be slow)
+  // Confirm using a signature-status poll so we don't need the blockhash.
   try {
-    const confirmPromise = connection.confirmTransaction(
-      { signature: sig, blockhash, lastValidBlockHeight },
-      'confirmed',
-    );
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Confirmation timeout')), 30000)
-    );
-    await Promise.race([confirmPromise, timeoutPromise]);
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const status = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+      const cs = status?.value?.confirmationStatus;
+      if (cs === 'confirmed' || cs === 'finalized') {
+        if (status?.value?.err) {
+          throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.value.err)}`);
+        }
+        break;
+      }
+      // Wait before polling again
+      await new Promise(r => setTimeout(r, 1500));
+    }
   } catch (err) {
     console.warn('[anchor] Confirmation warning (tx may still succeed):', err);
-    // Don't throw — the tx was already sent successfully
+    // Don't throw — the tx was already sent
   }
 
   return sig;

@@ -3,11 +3,15 @@
 // Keys loaded from .env file (never commit .env to git)
 // ============================================================
 
-/** Solana network — 'devnet' for testing, 'mainnet-beta' for production */
-export const SOLANA_NETWORK = 'devnet' as const;
+/** Solana network — set VITE_SOLANA_NETWORK=mainnet-beta for production */
+export const SOLANA_NETWORK = (import.meta.env.VITE_SOLANA_NETWORK || 'devnet') as 'devnet' | 'mainnet-beta';
 
 /** RPC endpoint for Solana */
-export const SOLANA_RPC = import.meta.env.VITE_SOLANA_RPC || 'https://api.devnet.solana.com';
+export const SOLANA_RPC = import.meta.env.VITE_SOLANA_RPC || (
+  SOLANA_NETWORK === 'mainnet-beta'
+    ? 'https://api.mainnet-beta.solana.com'
+    : 'https://api.devnet.solana.com'
+);
 
 /** MagicBlock Ephemeral Rollups — Magic Router endpoint (devnet)
  *  Routes game transactions through Ephemeral Rollups for faster confirmations.

@@ -117,10 +117,17 @@ export const WaitingRoomPage: React.FC = () => {
     if (ok) { setPlaced(true); setSelectedPlayer(null); }
   };
 
+  const [readyError, setReadyError] = useState<string | null>(null);
   const handleReadyUp = async () => {
     setReadying(true);
-    await readyUp();
-    setReadying(false);
+    setReadyError(null);
+    try {
+      await readyUp();
+    } catch (err: any) {
+      setReadyError(err?.message || 'Transaction failed — tap to retry');
+    } finally {
+      setReadying(false);
+    }
   };
 
   const handleLeave = async () => {
@@ -680,20 +687,29 @@ export const WaitingRoomPage: React.FC = () => {
             </p>
           </>
         ) : !meReady ? (
-          <motion.button
-            className="btn btn-primary"
-            onClick={handleReadyUp}
-            disabled={readying}
-            whileTap={{ scale: 0.96 }}
-            whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
-            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-          >
-            {readying
-              ? gameState.buyInAmount > 0 ? 'Paying & readying…' : 'Readying up…'
-              : gameState.buyInAmount > 0
-                ? `Ready Up & Pay ${gameState.buyInAmount} SOL`
-                : 'Ready Up ✓'}
-          </motion.button>
+          <>
+            <motion.button
+              className="btn btn-primary"
+              onClick={handleReadyUp}
+              disabled={readying}
+              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            >
+              {readying
+                ? gameState.buyInAmount > 0 ? 'Paying & readying…' : 'Readying up…'
+                : readyError
+                  ? 'Retry'
+                  : gameState.buyInAmount > 0
+                    ? `Ready Up & Pay ${gameState.buyInAmount} SOL`
+                    : 'Ready Up ✓'}
+            </motion.button>
+            {readyError && (
+              <p style={{ color: '#ff6b6b', fontSize: 13, textAlign: 'center', marginTop: 8 }}>
+                ⚠ {readyError}
+              </p>
+            )}
+          </>
         ) : (
           <motion.div
             style={{ textAlign: 'center', padding: '18px 0', background: 'var(--glass)', backdropFilter: 'blur(10px)', borderRadius: 'var(--r)', border: '1px solid var(--lime-border)' }}
