@@ -59,6 +59,7 @@ function AnimatedRoutes() {
         <Routes location={location} key={location.pathname}>
           <Route path="/"         element={<PageWrap><HomePage /></PageWrap>} />
           <Route path="/join"     element={<PageWrap><JoinGamePage /></PageWrap>} />
+          <Route path="/join/:code" element={<PageWrap><JoinGamePage /></PageWrap>} />
           <Route path="/create"   element={<PageWrap><CreateGamePage /></PageWrap>} />
           <Route path="/created"  element={<PageWrap><GameCreatedPage /></PageWrap>} />
           <Route path="/waiting"  element={<PageWrap><WaitingRoomPage /></PageWrap>} />

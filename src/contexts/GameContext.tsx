@@ -18,6 +18,7 @@ import {
   settlePredictions,
   subscribeToGame,
   unsubscribeFromGame,
+  upsertPlayerStats,
   GameRow,
   PlayerRow,
   VoteRow,
@@ -208,6 +209,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
               // Clear votes for all clients when round or player changes
               ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
+              // Restore storyteller choice from DB so hot-seat player can't cheat by refreshing
+              ...(game.storyteller_choice ? { storytellerChoice: game.storyteller_choice } : {}),
             };
           });
         },
@@ -965,6 +968,37 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setGameState((prev) =>
           prev ? { ...prev, gameStatus: 'gameover', winner: winnerWallet } : null,
         );
+
+        // Record persistent player stats (non-fatal)
+        try {
+          const allScores = gameState.scores ?? {};
+          const hostW = (gameState as any).hostWallet ?? '';
+          const isSplit = gameState.payoutMode === 'split-pot';
+          const totalR = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+          const playerScoresForCalc: Record<string, any> = {};
+          for (const [w, s] of Object.entries(allScores)) {
+            if (w !== hostW) playerScoresForCalc[w] = s;
+          }
+          const payoutsMap = isSplit
+            ? calculateSplitPayouts(playerScoresForCalc, gameState.buyInAmount, totalR)
+            : { [winnerWallet]: gameState.currentPot };
+
+          for (const player of gameState.players) {
+            if (player.id === hostW) continue; // host isn't a player
+            const score = allScores[player.id] ?? { transparent: 0, fake: 0, rounds: 0 };
+            const payout = payoutsMap[player.id] ?? 0;
+            const net = payout - gameState.buyInAmount;
+            await upsertPlayerStats(player.id, player.name, {
+              games: 1,
+              solWon: Math.max(0, net),
+              solLost: Math.max(0, -net),
+              transparentVotes: score.transparent,
+              fakeVotes: score.fake,
+            });
+          }
+        } catch (statsErr) {
+          console.warn('[stats] Failed to record game stats:', statsErr);
+        }
       } catch (err: any) {
         console.error('Distribute error:', err);
         setError(err.message || 'Failed to distribute winnings');
@@ -1139,13 +1173,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const storytellerChoose = useCallback(async (choice: 'truth' | 'fake') => {
     if (!gameState) return;
     const gid = gameState.gameId;
-    
-    // Store the choice (only hot-seat player sees this until reveal)
+
     setGameState(prev => prev ? { ...prev, storytellerChoice: choice, gamePhase: 'storyteller-telling' } : null);
-    
+
     if (gid) {
-      // Store choice encrypted/hidden server-side — for now just advance phase
-      await updateGameStatus(gid, { game_phase: 'storyteller-telling' });
+      try {
+        await updateGameStatus(gid, { game_phase: 'storyteller-telling', storyteller_choice: choice });
+      } catch {
+        // Column may not exist in older deploys — just advance the phase
+        await updateGameStatus(gid, { game_phase: 'storyteller-telling' });
+      }
     }
   }, [gameState]);
 
@@ -1197,6 +1234,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             current_round: nextRound,
             current_hot_seat_player: nextPlayer,
             game_phase: 'storyteller-prep',
+            storyteller_choice: null,
           });
         }
       }

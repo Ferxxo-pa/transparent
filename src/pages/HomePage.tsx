@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { MagicBlockBadge } from '../components/MagicBlockBadge';
+import { getPlayerStats, PlayerStatsRow } from '../lib/supabase';
 
 const pop = {
   initial: { opacity: 0, y: 24, scale: 0.93 },
@@ -12,6 +13,49 @@ const pop = {
 };
 
 const btnTap = { scale: 0.95 };
+
+function PlayerStatsCard({ walletAddress }: { walletAddress: string | null }) {
+  const [stats, setStats] = useState<PlayerStatsRow | null>(null);
+
+  useEffect(() => {
+    if (!walletAddress) return;
+    getPlayerStats(walletAddress).then(setStats);
+  }, [walletAddress]);
+
+  if (!stats || stats.games_played === 0) return null;
+
+  const totalVotes = stats.total_transparent_votes + stats.total_fake_votes;
+  const honesty = totalVotes > 0 ? Math.round((stats.total_transparent_votes / totalVotes) * 100) : null;
+  const netSol = stats.sol_won - stats.sol_lost;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.25, type: 'spring', stiffness: 280, damping: 24 }}
+      style={{
+        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
+        padding: 0, width: '100%',
+      }}
+    >
+      {[
+        { label: 'Games', value: `${stats.games_played}` },
+        { label: 'Net', value: `${netSol >= 0 ? '+' : ''}${netSol.toFixed(3)}`, unit: 'SOL', color: netSol >= 0 ? 'var(--lime)' : '#ff5050' },
+        { label: 'Honesty', value: honesty !== null ? `${honesty}%` : '—' },
+      ].map(s => (
+        <div key={s.label} style={{
+          textAlign: 'center', padding: '10px 6px',
+          background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
+        }}>
+          <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{s.label}</p>
+          <p style={{ fontWeight: 800, fontSize: 16, color: s.color ?? 'var(--lime)', letterSpacing: '-0.02em', lineHeight: 1 }}>
+            {s.value}
+            {s.unit && <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 500, marginLeft: 2 }}>{s.unit}</span>}
+          </p>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
 
 // ── Desktop layout (≥1024px) ─────────────────────────────────
 function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
@@ -179,7 +223,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 }
 
 // ── Mobile layout (<1024px) ──────────────────────────────────
-function MobileHome({ connected, login, logout, displayName, navigate }: any) {
+function MobileHome({ connected, login, logout, displayName, navigate, walletAddress }: any) {
   return (
     <div className="page" style={{ position: 'relative' }}>
       {/* Top spacing — clear wallet pill */}
@@ -213,6 +257,7 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
               <motion.button className="btn btn-secondary" onClick={() => navigate('/join')} whileTap={btnTap} whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
                 Join a Game
               </motion.button>
+              <PlayerStatsCard walletAddress={walletAddress} />
             </>
           )}
         </motion.div>
@@ -283,8 +328,9 @@ function MobileHome({ connected, login, logout, displayName, navigate }: any) {
 // ── Root component ───────────────────────────────────────────
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { connected, login, displayName, logout } = usePrivyWallet();
-  const props = { connected, login, logout, displayName, navigate };
+  const { connected, login, displayName, logout, publicKey } = usePrivyWallet();
+  const walletAddress = publicKey?.toBase58() ?? null;
+  const props = { connected, login, logout, displayName, navigate, walletAddress };
 
   return (
     <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }}>

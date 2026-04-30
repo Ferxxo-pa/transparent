@@ -27,6 +27,7 @@ export interface GameRow {
   current_pot?: number | null;
   question_options?: string[] | null;
   question_pick_votes?: Record<string, number> | null;
+  storyteller_choice?: 'truth' | 'fake' | null;
   created_at: string;
 }
 
@@ -252,6 +253,62 @@ export async function settlePredictions(gameId: string): Promise<void> {
     .update({ settled: true })
     .eq('game_id', gameId);
   if (error) throw error;
+}
+
+// ── Player Stats ───────────────────────────────────────────
+
+export interface PlayerStatsRow {
+  wallet_address: string;
+  display_name: string;
+  games_played: number;
+  sol_won: number;
+  sol_lost: number;
+  total_transparent_votes: number;
+  total_fake_votes: number;
+  updated_at: string;
+}
+
+export async function getPlayerStats(walletAddress: string): Promise<PlayerStatsRow | null> {
+  try {
+    const { data, error } = await supabase
+      .from('player_stats')
+      .select('*')
+      .eq('wallet_address', walletAddress)
+      .single();
+    if (error) return null;
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function upsertPlayerStats(
+  walletAddress: string,
+  displayName: string,
+  delta: { games: number; solWon: number; solLost: number; transparentVotes: number; fakeVotes: number },
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('player_stats')
+      .select('*')
+      .eq('wallet_address', walletAddress)
+      .single();
+
+    const c = existing ?? { games_played: 0, sol_won: 0, sol_lost: 0, total_transparent_votes: 0, total_fake_votes: 0 };
+
+    await supabase.from('player_stats').upsert({
+      wallet_address: walletAddress,
+      display_name: displayName,
+      games_played: c.games_played + delta.games,
+      sol_won: c.sol_won + delta.solWon,
+      sol_lost: c.sol_lost + delta.solLost,
+      total_transparent_votes: c.total_transparent_votes + delta.transparentVotes,
+      total_fake_votes: c.total_fake_votes + delta.fakeVotes,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'wallet_address' });
+  } catch (err) {
+    console.warn('[stats] upsertPlayerStats failed:', err);
+  }
 }
 
 // ── Real-Time Subscriptions ─────────────────────────────────

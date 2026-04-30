@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
@@ -8,9 +8,14 @@ import { usePrivyWallet } from '../contexts/PrivyContext';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
+  const { code: codeParam } = useParams<{ code?: string }>();
   const { joinGame, loading, error } = useGame();
   const { displayName, walletReady } = usePrivyWallet();
-  const [code, setCode]         = useState('');
+  const [code, setCode] = useState(() => {
+    if (!codeParam) return '';
+    const digits = codeParam.replace(/[^0-9]/g, '').slice(0, 6);
+    return digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
+  });
   const [nickname, setNickname] = useState('');
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {

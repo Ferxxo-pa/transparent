@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { calculateSplitPayouts } from '../types/game';
@@ -66,6 +66,39 @@ export const GameOverPage: React.FC = () => {
   const activeWinner = selected ?? ranked[0]?.p.id ?? null;
   const winnerPlayer = gameState.players.find(p => p.id === activeWinner);
 
+  const shareResult = () => {
+    const myWallet = publicKey?.toBase58() ?? '';
+    const myScore = scores[myWallet];
+    const honesty = myScore && (myScore.transparent + myScore.fake) > 0
+      ? Math.round((myScore.transparent / (myScore.transparent + myScore.fake)) * 100)
+      : null;
+
+    let text = '';
+    if (isSplitPot && gameState.buyInAmount > 0) {
+      const myPayout = splitPayouts[myWallet] ?? 0;
+      const net = myPayout - gameState.buyInAmount;
+      text = net > 0.0001
+        ? `Just won ${net.toFixed(3)} SOL on Transparent 💰${honesty !== null ? ` — ${honesty}% transparent rating` : ''}`
+        : net < -0.0001
+        ? `Lost ${Math.abs(net).toFixed(3)} SOL on Transparent 😅 — couldn't fool anyone`
+        : `Broke even on Transparent${honesty !== null ? ` — ${honesty}% transparent` : ''}`;
+    } else if (!isSplitPot) {
+      const isWinner = activeWinner === myWallet;
+      text = isWinner
+        ? `Just won ${gameState.currentPot.toFixed(2)} SOL on Transparent 🏆 — they couldn't read me`
+        : `Got caught on Transparent 😅${honesty !== null ? ` — only ${honesty}% believed me` : ''}`;
+    } else {
+      text = honesty !== null
+        ? `${honesty}% transparent on Transparent 👀 — can you beat me?`
+        : `Just played Transparent — can you stay honest under pressure?`;
+    }
+
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text + '\n\ntransparent.gg')}`,
+      '_blank',
+    );
+  };
+
   const distribute = async () => {
     if (!activeWinner) return;
     setDistributing(true);
@@ -105,40 +138,79 @@ export const GameOverPage: React.FC = () => {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>
 
         {/* Winner / Pot hero */}
-        <motion.div
-          style={{
-            textAlign: 'center', padding: '28px 18px',
-            background: 'linear-gradient(135deg, rgba(196,255,60,0.1), rgba(196,255,60,0.03))',
-            border: '1px solid var(--lime-border)', borderRadius: 'var(--r)',
-          }}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-        >
+        <AnimatePresence mode="wait">
           {confirmed ? (
-            isSplitPot ? (
-              <>
-                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Distributed</p>
-                <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  Split Pot Complete
-                </p>
-                <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 8 }}>
-                  Each player received their honesty-adjusted share
-                </p>
-              </>
-            ) : (
-              <>
-                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Winner</p>
-                <p style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 36px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                  {winnerPlayer?.name}
-                </p>
-                <p style={{ color: 'var(--lime)', fontSize: 18, fontWeight: 700, marginTop: 8 }}>
-                  +{gameState.currentPot.toFixed(2)} SOL
-                </p>
-              </>
-            )
+            <motion.div
+              key="confirmed"
+              style={{
+                textAlign: 'center', padding: '32px 18px',
+                background: 'linear-gradient(135deg, rgba(196,255,60,0.14), rgba(196,255,60,0.04))',
+                border: '1px solid var(--lime-border)', borderRadius: 'var(--r)',
+                position: 'relative', overflow: 'hidden',
+              }}
+              initial={{ opacity: 0, scale: 0.88, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+            >
+              {isSplitPot ? (
+                <>
+                  <motion.div
+                    initial={{ scale: 0 }} animate={{ scale: 1 }}
+                    transition={{ delay: 0.15, type: 'spring', stiffness: 400, damping: 18 }}
+                    style={{ fontSize: 42, marginBottom: 10 }}
+                  >🤝</motion.div>
+                  <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Pot Distributed</p>
+                  <motion.p
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                    style={{ fontWeight: 800, fontSize: 'clamp(26px, 7vw, 34px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}
+                  >
+                    Split Complete
+                  </motion.p>
+                  <motion.p
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.35 }}
+                    style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}
+                  >
+                    {gameState.currentPot.toFixed(2)} SOL distributed by honesty score
+                  </motion.p>
+                </>
+              ) : (
+                <>
+                  <motion.div
+                    initial={{ scale: 0, rotate: -20 }} animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 380, damping: 16 }}
+                    style={{ fontSize: 48, marginBottom: 10 }}
+                  >🏆</motion.div>
+                  <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Winner</p>
+                  <motion.p
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+                    style={{ fontWeight: 800, fontSize: 'clamp(28px, 8vw, 42px)', color: 'var(--lime)', letterSpacing: '-0.03em', lineHeight: 1 }}
+                  >
+                    {winnerPlayer?.name}
+                  </motion.p>
+                  {gameState.buyInAmount > 0 && (
+                    <motion.p
+                      initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35, type: 'spring', stiffness: 300 }}
+                      style={{ color: 'var(--lime)', fontSize: 22, fontWeight: 800, marginTop: 8, letterSpacing: '-0.02em' }}
+                    >
+                      +{gameState.currentPot.toFixed(3)} SOL
+                    </motion.p>
+                  )}
+                </>
+              )}
+            </motion.div>
           ) : (
-            <>
+            <motion.div
+              key="pending"
+              style={{
+                textAlign: 'center', padding: '28px 18px',
+                background: 'linear-gradient(135deg, rgba(196,255,60,0.08), rgba(196,255,60,0.02))',
+                border: '1px solid var(--lime-border)', borderRadius: 'var(--r)',
+              }}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+            >
               <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 8 }}>Total Pot</p>
               <p style={{ fontWeight: 800, fontSize: 'clamp(42px, 11vw, 56px)', color: 'var(--lime)', letterSpacing: '-0.04em', lineHeight: 1 }}>
                 {gameState.currentPot.toFixed(2)}
@@ -149,9 +221,9 @@ export const GameOverPage: React.FC = () => {
                   Fake votes cost you · honest players keep more
                 </p>
               )}
-            </>
+            </motion.div>
           )}
-        </motion.div>
+        </AnimatePresence>
 
         {/* Leaderboard */}
         <div>
@@ -287,6 +359,7 @@ export const GameOverPage: React.FC = () => {
             }
           </motion.button>
         )}
+
         {/* Player view: show their payout and waiting status */}
         {!isHost && gameState.buyInAmount > 0 && (() => {
           const myWallet = publicKey?.toBase58() ?? '';
@@ -314,24 +387,42 @@ export const GameOverPage: React.FC = () => {
               <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
                 {isSplitPot
                   ? `Payout: ${myPayout.toFixed(3)} SOL (bought in ${gameState.buyInAmount.toFixed(3)})`
-                  : isWinner ? `You won the pot! 🏆` : `Better luck next time`
+                  : isWinner ? `You won the pot!` : `Better luck next time`
                 }
               </p>
               {!confirmed && (
                 <p style={{ fontSize: 11, color: 'var(--lavender)', marginTop: 10, fontWeight: 600 }}>
-                  ⏳ Waiting for host to distribute…
+                  Waiting for host to distribute…
                 </p>
               )}
               {confirmed && (
                 <p style={{ fontSize: 11, color: 'var(--lime)', marginTop: 10, fontWeight: 600 }}>
-                  ✅ Funds sent to your wallet
+                  Funds sent to your wallet
                 </p>
               )}
             </motion.div>
           );
         })()}
 
-        {/* Return Home — host sees after distributing, players always can leave */}
+        {/* Share result — visible to everyone after game ends */}
+        {(confirmed || !isHost) && (
+          <motion.button
+            onClick={shareResult}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            whileTap={{ scale: 0.96 }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              padding: '12px 20px', borderRadius: 'var(--r-sm)',
+              background: 'rgba(29,161,242,0.1)', border: '1px solid rgba(29,161,242,0.3)',
+              color: '#1DA1F2', fontWeight: 700, fontSize: 14,
+              cursor: 'pointer', fontFamily: 'Space Grotesk',
+            }}
+          >
+            Share Result on X
+          </motion.button>
+        )}
+
+        {/* Return Home */}
         {(confirmed || !isHost) && (
           <motion.button
             className="btn btn-primary"
@@ -339,19 +430,7 @@ export const GameOverPage: React.FC = () => {
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             whileTap={{ scale: 0.96 }}
           >
-            Return Home
-          </motion.button>
-        )}
-
-        {/* Players in free games can always go home */}
-        {!isHost && gameState.buyInAmount === 0 && (
-          <motion.button
-            className="btn btn-primary"
-            onClick={() => { resetGame(); navigate('/'); }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            whileTap={{ scale: 0.96 }}
-          >
-            Return Home
+            {confirmed ? 'Play Again' : 'Return Home'}
           </motion.button>
         )}
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Link } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
@@ -10,6 +10,7 @@ export const GameCreatedPage: React.FC = () => {
   const { gameState, startGame, loading, predictions, predictionPot, placePrediction } = useGame();
   const { publicKey, displayName } = usePrivyWallet();
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [selectedPlayer, setSelected] = useState<string | null>(null);
   const [betAmount, setBetAmount] = useState(0.01);
   const [placing, setPlacing] = useState(false);
@@ -44,6 +45,13 @@ export const GameCreatedPage: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const copyLink = () => {
+    const link = `${window.location.origin}/join/${gameState.roomCode}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
   const pot = (gameState.players.length * gameState.buyInAmount).toFixed(2);
 
   return (
@@ -68,19 +76,34 @@ export const GameCreatedPage: React.FC = () => {
         >
           <p className="label-cipher" style={{ marginBottom: 12 }}>Share this code</p>
           <div className="code" style={{ fontSize: 'clamp(44px, 12vw, 58px)' }}>{gameState.roomCode}</div>
-          <button
-            onClick={copy}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              marginTop: 14, background: 'var(--card-2)', border: '1px solid var(--border)',
-              borderRadius: 'var(--r-pill)', padding: '8px 18px', cursor: 'pointer',
-              color: copied ? 'var(--lime)' : 'var(--muted)', fontSize: 13, fontWeight: 600,
-              fontFamily: 'Space Grotesk', transition: 'color 0.2s',
-            }}
-          >
-            {copied ? <Check size={13} /> : <Copy size={13} />}
-            {copied ? 'Copied!' : 'Copy code'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={copy}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--card-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r-pill)', padding: '8px 18px', cursor: 'pointer',
+                color: copied ? 'var(--lime)' : 'var(--muted)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'Space Grotesk', transition: 'color 0.2s',
+              }}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Copied!' : 'Copy code'}
+            </button>
+            <button
+              onClick={copyLink}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--card-2)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r-pill)', padding: '8px 18px', cursor: 'pointer',
+                color: copiedLink ? 'var(--lime)' : 'var(--muted)', fontSize: 13, fontWeight: 600,
+                fontFamily: 'Space Grotesk', transition: 'color 0.2s',
+              }}
+            >
+              {copiedLink ? <Check size={13} /> : <Link size={13} />}
+              {copiedLink ? 'Link copied!' : 'Share link'}
+            </button>
+          </div>
         </motion.div>
 
         {/* Stats row */}

@@ -84,6 +84,26 @@ RETURNS void AS $$
   UPDATE question_submissions SET votes = votes + 1 WHERE id = question_id;
 $$ LANGUAGE sql;
 
+-- Storyteller mode: persist hot-seat player's truth/fake choice
+ALTER TABLE games ADD COLUMN IF NOT EXISTS storyteller_choice TEXT;
+
+-- Player stats — persistent across games
+CREATE TABLE IF NOT EXISTS player_stats (
+  wallet_address TEXT PRIMARY KEY,
+  display_name TEXT NOT NULL DEFAULT 'Anon',
+  games_played INTEGER NOT NULL DEFAULT 0,
+  sol_won NUMERIC NOT NULL DEFAULT 0,
+  sol_lost NUMERIC NOT NULL DEFAULT 0,
+  total_transparent_votes INTEGER NOT NULL DEFAULT 0,
+  total_fake_votes INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE player_stats ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all on player_stats" ON player_stats FOR ALL USING (true) WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_player_stats_wallet ON player_stats(wallet_address);
+
 -- Enable real-time publication
 ALTER PUBLICATION supabase_realtime ADD TABLE games;
 ALTER PUBLICATION supabase_realtime ADD TABLE players;

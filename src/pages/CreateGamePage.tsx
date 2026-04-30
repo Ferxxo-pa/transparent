@@ -6,14 +6,11 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
-import { QuestionMode, PayoutMode, QUESTIONS } from '../types/game';
-import { AIVibeCheck } from '../components/AIVibeCheck';
-
+import { QuestionMode, PayoutMode } from '../types/game';
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
   { id: 'classic',     label: 'Classic',     sub: 'Curated questions from the vault',        emoji: '🎲' },
   { id: 'hot-take',    label: 'Hot Take',    sub: 'Players write, crowd picks best one',     emoji: '🔥' },
   { id: 'storyteller', label: 'Storyteller', sub: 'Tell a story — truth or fake? Group votes', emoji: '🎭' },
-  { id: 'ai',          label: 'AI Mode',     sub: 'AI generates questions based on your group vibe', emoji: '🤖' },
   { id: 'custom',      label: 'Custom',      sub: 'You write every question',                emoji: '✍️' },
 ];
 
@@ -40,32 +37,13 @@ export const CreateGamePage: React.FC = () => {
   const [numQs,        setNumQs]        = useState(3);
   const [customRounds, setCustomRounds] = useState('');
   const [customQs,     setCustomQs]     = useState<string[]>(['', '']);
-  const [aiQuestions,  setAiQuestions]   = useState<string[] | null>(null);
-  const [showVibeCheck, setShowVibeCheck] = useState(false);
-
   const handleCreate = async () => {
     let filtered: string[] | undefined;
-    let actualMode: QuestionMode = mode;
+    const actualMode: QuestionMode = mode;
 
     if (mode === 'custom') {
       filtered = customQs.filter(q => q.trim());
       if (!filtered?.length) return;
-    } else if (mode === 'ai') {
-      if (aiQuestions && aiQuestions.length > 0) {
-        // AI vibe questions first, then shuffle in the curated bank for variety
-        const combined = [...aiQuestions];
-        const shuffledMain = [...QUESTIONS].sort(() => Math.random() - 0.5);
-        // Add curated questions that aren't duplicates
-        for (const q of shuffledMain) {
-          if (!combined.includes(q)) combined.push(q);
-        }
-        filtered = combined;
-        actualMode = 'custom';
-      } else {
-        // No AI questions yet — show vibe check
-        setShowVibeCheck(true);
-        return;
-      }
     }
 
     const ok = await createGame(
@@ -298,50 +276,6 @@ export const CreateGamePage: React.FC = () => {
                     <Plus size={13} /> Add question
                   </button>
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* AI Vibe Check */}
-          <AnimatePresence>
-            {mode === 'ai' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-              >
-                {aiQuestions && aiQuestions.length > 0 ? (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <p className="label-cipher">AI Generated ({aiQuestions.length} questions)</p>
-                      <button
-                        onClick={() => { setAiQuestions(null); setShowVibeCheck(true); }}
-                        style={{ fontSize: 11, color: 'var(--lime)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 600 }}
-                      >
-                        Regenerate
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-                      {aiQuestions.slice(0, 5).map((q, i) => (
-                        <div key={i} style={{ padding: '8px 12px', borderRadius: 'var(--r-sm)', background: 'var(--glass)', border: '1px solid var(--border)', fontSize: 12, color: 'var(--muted)' }}>
-                          "{q}"
-                        </div>
-                      ))}
-                      {aiQuestions.length > 5 && (
-                        <p style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center', padding: 4 }}>
-                          +{aiQuestions.length - 5} more questions ready
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <AIVibeCheck
-                    groupSize={numQs}
-                    onQuestionsGenerated={(qs) => { setAiQuestions(qs); setShowVibeCheck(false); }}
-                    onSkip={() => { setMode('classic'); setShowVibeCheck(false); }}
-                  />
-                )}
               </motion.div>
             )}
           </AnimatePresence>
