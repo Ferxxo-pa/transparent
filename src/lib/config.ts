@@ -38,3 +38,6 @@ export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 /** Privy app ID */
 export const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || '';
+
+/** Trustless escrow mode — PDA-based pot management instead of host-held funds */
+export const USE_ESCROW = import.meta.env.VITE_USE_ESCROW === 'true';

@@ -37,6 +37,13 @@ import {
   buyInViaMagicBlock,
   distributeViaMagicBlock,
 } from '../lib/magicblock';
+import {
+  joinGameEscrow,
+  distributeEscrow,
+  refundPlayerEscrow,
+  deriveGamePDA as deriveEscrowGamePDA,
+} from '../lib/anchor-escrow';
+import { USE_ESCROW } from '../lib/config';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -901,12 +908,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Winner gets entire pot
               const winnerPubkey = new PublicKey(winnerWallet);
               const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
-              // Route payout through MagicBlock Ephemeral Rollups
-              try {
-                await distributeViaMagicBlock(wallet, winnerPubkey, potLamports);
-              } catch (mbErr) {
-                console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
-                await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+              if (USE_ESCROW) {
+                // Trustless: distribute from escrow PDA
+                await distributeEscrow(wallet, gamePDA, winnerPubkey, potLamports);
+              } else {
+                // Direct transfer via MagicBlock with fallback
+                try {
+                  await distributeViaMagicBlock(wallet, winnerPubkey, potLamports);
+                } catch (mbErr) {
+                  console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
+                  await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
+                }
               }
             } else if (gameState.payoutMode === 'split-pot') {
               // Split pot: each player gets payout based on honesty scores
@@ -925,12 +937,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
-                  try {
-                    await distributeViaMagicBlock(wallet, playerPubkey, lamports);
-                  } catch (mbErr) {
-                    console.warn('[MagicBlock] ER split payout failed, falling back:', mbErr);
-                    // Direct SOL transfer fallback (gamePDA is unused in distributeOnChain)
-                    await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                  if (USE_ESCROW) {
+                    await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
+                  } else {
+                    try {
+                      await distributeViaMagicBlock(wallet, playerPubkey, lamports);
+                    } catch (mbErr) {
+                      console.warn('[MagicBlock] ER split payout failed, falling back:', mbErr);
+                      await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                    }
                   }
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
@@ -1414,12 +1429,18 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const hostPubkey = new PublicKey(gs.hostWallet);
         const buyInLamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         if (wallet.publicKey.toBase58() !== gs.hostWallet) {
-          // Route buy-in through MagicBlock Ephemeral Rollups for faster confirmations
-          try {
-            await buyInViaMagicBlock(wallet, hostPubkey, buyInLamports);
-          } catch (mbErr) {
-            console.warn('[MagicBlock] ER buy-in failed, falling back:', mbErr);
-            await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+          if (USE_ESCROW) {
+            // Trustless: buy-in goes to escrow PDA, not host wallet
+            const [gamePDA] = deriveEscrowGamePDA(hostPubkey, gs.roomCode ?? '');
+            await joinGameEscrow(wallet, gamePDA);
+          } else {
+            // Direct transfer: route through MagicBlock for faster confirmations
+            try {
+              await buyInViaMagicBlock(wallet, hostPubkey, buyInLamports);
+            } catch (mbErr) {
+              console.warn('[MagicBlock] ER buy-in failed, falling back:', mbErr);
+              await joinGameOnChainWithAmount(wallet, hostPubkey, buyInLamports);
+            }
           }
         }
       }
@@ -1457,9 +1478,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           );
           for (const player of readiedPlayers) {
             try {
-              const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
               const playerPubkey = new PublicKey(player.id);
-              await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
+              if (USE_ESCROW) {
+                const hostPubkey = new PublicKey(gs.hostWallet!);
+                const [gamePDA] = deriveEscrowGamePDA(hostPubkey, gs.roomCode ?? '');
+                await refundPlayerEscrow(wallet, gamePDA, playerPubkey);
+              } else {
+                const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
+                await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
+              }
             } catch (err) {
               console.warn(`[hostLeave] Failed to refund ${player.name}:`, err);
             }
