@@ -100,18 +100,23 @@ function encodeI64(val: number | bigint): Buffer {
 }
 
 // Anchor discriminators (first 8 bytes of sha256("global:<instruction_name>"))
-// ⚠️ PLACEHOLDER VALUES — recompute after building the program.
-// See ESCROW_MIGRATION.md Step 2 for how to generate real values.
-const DISCRIMINATORS = {
-  create_game: Buffer.from([24, 237, 120, 89, 171, 82, 155, 98]),
-  join_game: Buffer.from([107, 112, 18, 38, 56, 173, 60, 128]),
-  start_game: Buffer.from([249, 47, 252, 172, 184, 162, 245, 14]),
-  distribute: Buffer.from([155, 67, 128, 195, 187, 40, 95, 101]),
-  end_game: Buffer.from([224, 135, 245, 99, 67, 175, 121, 252]),
-  refund_player: Buffer.from([124, 72, 4, 227, 2, 53, 178, 169]),
-  cancel_game: Buffer.from([100, 0, 54, 73, 81, 230, 26, 209]),
-  refund_all_expired: Buffer.from([197, 22, 184, 51, 118, 7, 220, 200]),
-};
+// Lazy-initialized to avoid Buffer-not-defined at module load time.
+let _disc: Record<string, Buffer> | null = null;
+function DISCRIMINATORS() {
+  if (!_disc) {
+    _disc = {
+      create_game: Buffer.from([24, 237, 120, 89, 171, 82, 155, 98]),
+      join_game: Buffer.from([107, 112, 18, 38, 56, 173, 60, 128]),
+      start_game: Buffer.from([249, 47, 252, 172, 184, 162, 245, 14]),
+      distribute: Buffer.from([155, 67, 128, 195, 187, 40, 95, 101]),
+      end_game: Buffer.from([224, 135, 245, 99, 67, 175, 121, 252]),
+      refund_player: Buffer.from([124, 72, 4, 227, 2, 53, 178, 169]),
+      cancel_game: Buffer.from([100, 0, 54, 73, 81, 230, 26, 209]),
+      refund_all_expired: Buffer.from([197, 22, 184, 51, 118, 7, 220, 200]),
+    };
+  }
+  return _disc;
+}
 
 // NOTE: The discriminators above are placeholders.
 // After deploying the program, generate the real IDL and use:
@@ -134,7 +139,7 @@ export async function createGameEscrow(
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
 
   const data = Buffer.concat([
-    DISCRIMINATORS.create_game,
+    DISCRIMINATORS().create_game,
     encodeString(roomCode),
     encodeU64(buyInLamports),
     encodeU8(maxPlayers),
@@ -168,7 +173,7 @@ export async function joinGameEscrow(
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
   const [playerPDA] = derivePlayerPDA(gamePDA, wallet.publicKey);
 
-  const data = DISCRIMINATORS.join_game;
+  const data = DISCRIMINATORS().join_game;
 
   const ix = new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -199,7 +204,7 @@ export async function distributeEscrow(
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
 
   const data = Buffer.concat([
-    DISCRIMINATORS.distribute,
+    DISCRIMINATORS().distribute,
     encodeU64(amountLamports),
   ]);
 
@@ -230,7 +235,7 @@ export async function refundPlayerEscrow(
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
   const [playerPDA] = derivePlayerPDA(gamePDA, playerPubkey);
 
-  const data = DISCRIMINATORS.refund_player;
+  const data = DISCRIMINATORS().refund_player;
 
   const ix = new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -261,7 +266,7 @@ export async function refundExpired(
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
   const [playerPDA] = derivePlayerPDA(gamePDA, playerPubkey);
 
-  const data = DISCRIMINATORS.refund_all_expired;
+  const data = DISCRIMINATORS().refund_all_expired;
 
   const ix = new TransactionInstruction({
     programId: PROGRAM_ID,
@@ -287,7 +292,7 @@ export async function cancelGameEscrow(
   wallet: WalletAdapter,
   gamePDA: PublicKey,
 ): Promise<string> {
-  const data = DISCRIMINATORS.cancel_game;
+  const data = DISCRIMINATORS().cancel_game;
 
   const ix = new TransactionInstruction({
     programId: PROGRAM_ID,
