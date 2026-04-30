@@ -83,10 +83,10 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 // ── Helpers ─────────────────────────────────────────────────
 
-/** Pick a random question index that hasn't been used yet */
-const pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
+/** Pick a random question index that hasn't been used yet (reserved for on-chain mode) */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
   if (used.length >= poolSize) {
-    // All questions used — reset and reshuffle
     return Math.floor(Math.random() * poolSize);
   }
   const available = [];
@@ -302,9 +302,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       // Listen for leave requests via broadcast (host receives these)
-      channel.on('broadcast', { event: 'leave_request' }, (payload: any) => {
-        const wallet = payload?.payload?.wallet;
-        const name = payload?.payload?.name;
+      channel.on('broadcast', { event: 'leave_request' }, (payload: Record<string, unknown>) => {
+        const inner = payload?.payload as Record<string, unknown> | undefined;
+        const wallet = inner?.wallet as string | undefined;
         if (wallet) {
           setLeaveRequests(prev => prev.includes(wallet) ? prev : [...prev, wallet]);
         }
@@ -1037,7 +1037,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── Send Questions to Player Vote ──────────────────────
 
-  const sendQuestionsToVote = useCallback(async (questions: string[], indices: number[]) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const sendQuestionsToVote = useCallback(async (questions: string[], _indices: number[]) => {
     if (!gameState) return;
     const gid = gameState.gameId;
 

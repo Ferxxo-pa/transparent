@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 
 interface Props {
   phase: 'storyteller-prep' | 'storyteller-telling' | 'storyteller-voting' | 'storyteller-reveal';
@@ -205,7 +205,7 @@ export const StorytellerPhase: React.FC<Props> = ({
   // ── REVEAL PHASE: Show if it was truth or fake ──
   if (phase === 'storyteller-reveal') {
     const isTruth = storytellerChoice === 'truth';
-    const correctVoters = Object.entries(votes).filter(([_, v]) => {
+    const correctVoters = Object.entries(votes).filter(([, v]) => {
       if (isTruth) return v === 'transparent';
       return v === 'fake';
     }).length;

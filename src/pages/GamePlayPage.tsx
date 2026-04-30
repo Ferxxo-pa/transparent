@@ -14,7 +14,7 @@ import { StorytellerPhase } from '../components/StorytellerPhase';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, voteForQuestionOption, raisePot, sendQuestionsToVote, storytellerChoose, storytellerAdvance } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const myWallet = publicKey?.toBase58() ?? '';

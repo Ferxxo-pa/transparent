@@ -23,7 +23,7 @@ export interface WalletAdapter {
   sendTransaction: (tx: Transaction) => Promise<string>;
 }
 
-export function deriveGamePDA(hostPubkey: PublicKey, _roomName: string): [PublicKey, number] {
+export function deriveGamePDA(hostPubkey: PublicKey, _roomName?: string): [PublicKey, number] {
   return [hostPubkey, 255];
 }
 
@@ -66,9 +66,9 @@ async function buildAndSend(
 }
 
 export async function createGameOnChain(
-  _wallet: WalletAdapter,
-  _roomName: string,
-  _buyInLamports: number,
+  _wallet?: WalletAdapter,
+  _roomName?: string,
+  _buyInLamports?: number,
 ): Promise<string> {
   return 'game-created-offchain';
 }

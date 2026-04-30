@@ -18,7 +18,6 @@ interface Props {
  */
 export const PlayerQuestionVote: React.FC<Props> = ({
   questions,
-  questionIndices,
   hotSeatPlayerName,
   isHotSeatPlayer,
   onTimerEnd,

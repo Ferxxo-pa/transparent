@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
-import { usePrivyWallet } from '../contexts/PrivyContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 import { QuestionMode, PayoutMode } from '../types/game';
@@ -27,7 +26,6 @@ const field = {
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
-  const { displayName, walletReady } = usePrivyWallet();
   const solPrice = useSolPrice();
 
   const [buyIn,      setBuyIn]      = useState('0');

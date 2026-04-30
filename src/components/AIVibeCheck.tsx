@@ -33,7 +33,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-export const AIVibeCheck: React.FC<Props> = ({ groupSize, onQuestionsGenerated, onSkip }) => {
+export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) => {
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
   const [selectedSpice, setSelectedSpice] = useState<number | null>(null);
 

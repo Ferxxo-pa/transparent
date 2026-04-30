@@ -239,7 +239,7 @@ export const GameOverPage: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {ranked.map(({ p, s, honesty, answered, payout }, i) => {
+            {ranked.map(({ p, s, honesty, payout }, i) => {
               const isWinner = isSplitPot ? (payout > 0) : p.id === activeWinner;
               const canSelect = isHost && !confirmed && !isSplitPot;
               const netGain = payout - gameState.buyInAmount;

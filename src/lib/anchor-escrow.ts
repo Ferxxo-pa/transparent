@@ -14,14 +14,11 @@
  */
 
 import {
-  Connection,
   PublicKey,
   Transaction,
   SystemProgram,
-  LAMPORTS_PER_SOL,
   TransactionInstruction,
 } from '@solana/web3.js';
-import { SOLANA_RPC } from './config';
 import { WalletAdapter, connection } from './anchor';
 
 // ── Program ID (update after deploy) ──────────────────────
@@ -68,7 +65,7 @@ async function buildAndSend(wallet: WalletAdapter, tx: Transaction): Promise<str
       setTimeout(() => reject(new Error('Confirmation timeout')), 30000),
     );
     await Promise.race([confirmPromise, timeoutPromise]);
-  } catch (err) {
+  } catch {
     // tx already sent
   }
 

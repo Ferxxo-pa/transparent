@@ -335,7 +335,7 @@ export function subscribeToGame(
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` },
-      async (payload) => {
+      async () => {
         // Re-fetch all players on any change for consistency
         const players = await getPlayersForGame(gameId);
         onPlayersChange(players);
@@ -370,7 +370,7 @@ export function subscribeToGame(
         onPredictionsChange(predictions);
       },
     )
-    .subscribe((status, err) => {
+    .subscribe(() => {
     });
 
   return channel;

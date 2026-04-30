@@ -58,7 +58,7 @@ function PlayerStatsCard({ walletAddress }: { walletAddress: string | null }) {
 }
 
 // ── Desktop layout (≥1024px) ─────────────────────────────────
-function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
+function DesktopHome({ connected, login, navigate }: { connected: boolean; login: () => void; navigate: (path: string) => void }) {
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column',
@@ -223,7 +223,7 @@ function DesktopHome({ connected, login, logout, displayName, navigate }: any) {
 }
 
 // ── Mobile layout (<1024px) ──────────────────────────────────
-function MobileHome({ connected, login, logout, displayName, navigate, walletAddress }: any) {
+function MobileHome({ connected, login, navigate, walletAddress }: { connected: boolean; login: () => void; navigate: (path: string) => void; walletAddress: string }) {
   return (
     <div className="page" style={{ position: 'relative' }}>
       {/* Top spacing — clear wallet pill */}
