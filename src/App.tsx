@@ -6,6 +6,7 @@ import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
 import { WalletBridge } from './components/WalletBridge';
 import { WalletHeader } from './components/WalletHeader';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Background } from './components/Background';
 import { HomePage } from './pages/HomePage';
 import { JoinGamePage } from './pages/JoinGamePage';
@@ -75,15 +76,17 @@ function AnimatedRoutes() {
 
 function App() {
   return (
-    <PrivyWalletProvider>
-      <GameProvider>
-        <WalletBridge />
-        <Router>
-          <Background />
-          <AnimatedRoutes />
-        </Router>
-      </GameProvider>
-    </PrivyWalletProvider>
+    <ErrorBoundary>
+      <PrivyWalletProvider>
+        <GameProvider>
+          <WalletBridge />
+          <Router>
+            <Background />
+            <AnimatedRoutes />
+          </Router>
+        </GameProvider>
+      </PrivyWalletProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -13,11 +13,19 @@ export const SOLANA_RPC = import.meta.env.VITE_SOLANA_RPC || (
     : 'https://api.devnet.solana.com'
 );
 
-/** MagicBlock Ephemeral Rollups — Magic Router endpoint (devnet)
+/** MagicBlock Ephemeral Rollups — Magic Router endpoint
  *  Routes game transactions through Ephemeral Rollups for faster confirmations.
  *  Falls back to standard Solana RPC if unavailable. */
-export const MAGICBLOCK_ROUTER = import.meta.env.VITE_MAGICBLOCK_ROUTER || 'https://devnet-router.magicblock.app';
-export const MAGICBLOCK_WS = import.meta.env.VITE_MAGICBLOCK_WS || 'wss://devnet-router.magicblock.app';
+export const MAGICBLOCK_ROUTER = import.meta.env.VITE_MAGICBLOCK_ROUTER || (
+  SOLANA_NETWORK === 'mainnet-beta'
+    ? 'https://mainnet-router.magicblock.app'
+    : 'https://devnet-router.magicblock.app'
+);
+export const MAGICBLOCK_WS = import.meta.env.VITE_MAGICBLOCK_WS || (
+  SOLANA_NETWORK === 'mainnet-beta'
+    ? 'wss://mainnet-router.magicblock.app'
+    : 'wss://devnet-router.magicblock.app'
+);
 
 /** Anchor escrow program ID (deployed on devnet) */
 export const PROGRAM_ID = '2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9';

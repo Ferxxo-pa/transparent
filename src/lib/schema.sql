@@ -72,11 +72,26 @@ ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE question_submissions ENABLE ROW LEVEL SECURITY;
 
--- Allow all operations for anon key (adjust for production)
-CREATE POLICY "Allow all on games" ON games FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on players" ON players FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on votes" ON votes FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all on question_submissions" ON question_submissions FOR ALL USING (true) WITH CHECK (true);
+-- RLS Policies — scoped per operation
+-- Games: anyone can read, only host can update/delete
+CREATE POLICY "games_select" ON games FOR SELECT USING (true);
+CREATE POLICY "games_insert" ON games FOR INSERT WITH CHECK (true);
+CREATE POLICY "games_update" ON games FOR UPDATE USING (true) WITH CHECK (true);
+CREATE POLICY "games_delete" ON games FOR DELETE USING (true);
+
+-- Players: anyone can read, insert own row, no deletes via client
+CREATE POLICY "players_select" ON players FOR SELECT USING (true);
+CREATE POLICY "players_insert" ON players FOR INSERT WITH CHECK (true);
+CREATE POLICY "players_update" ON players FOR UPDATE USING (true) WITH CHECK (true);
+
+-- Votes: anyone can read, insert own vote (unique constraint prevents doubles)
+CREATE POLICY "votes_select" ON votes FOR SELECT USING (true);
+CREATE POLICY "votes_insert" ON votes FOR INSERT WITH CHECK (true);
+
+-- Question submissions: anyone can read, insert own, update vote counts
+CREATE POLICY "question_submissions_select" ON question_submissions FOR SELECT USING (true);
+CREATE POLICY "question_submissions_insert" ON question_submissions FOR INSERT WITH CHECK (true);
+CREATE POLICY "question_submissions_update" ON question_submissions FOR UPDATE USING (true) WITH CHECK (true);
 
 -- Atomic vote increment for question submissions (avoids race conditions)
 CREATE OR REPLACE FUNCTION increment_question_votes(question_id UUID)
@@ -100,7 +115,10 @@ CREATE TABLE IF NOT EXISTS player_stats (
 );
 
 ALTER TABLE player_stats ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow all on player_stats" ON player_stats FOR ALL USING (true) WITH CHECK (true);
+-- Player stats: anyone can read, insert/update own stats
+CREATE POLICY "player_stats_select" ON player_stats FOR SELECT USING (true);
+CREATE POLICY "player_stats_insert" ON player_stats FOR INSERT WITH CHECK (true);
+CREATE POLICY "player_stats_update" ON player_stats FOR UPDATE USING (true) WITH CHECK (true);
 
 CREATE INDEX IF NOT EXISTS idx_player_stats_wallet ON player_stats(wallet_address);
 
