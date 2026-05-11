@@ -165,8 +165,10 @@ export const WaitingRoomPage: React.FC = () => {
     : gameState.roomCode;
 
   return (
-    <div className="page page--game fade-in" style={{ position: 'relative' }}>
+    <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
       <Blobs palette="lobby" />
+
+    <div className="page page--game fade-in scroll-no-bar" style={{ position: 'relative', zIndex: 1, overflowY: 'auto' }}>
 
       {/* ─── leave confirmation modal ─── */}
       <AnimatePresence>
@@ -439,6 +441,7 @@ export const WaitingRoomPage: React.FC = () => {
           leave lobby
         </button>
       </div>
+    </div>
     </div>
   );
 };
