@@ -99,6 +99,11 @@ export const CreateGamePage: React.FC = () => {
           </span>
         </div>
 
+        {/* ── Desktop 2-col grid wraps modes (left) + settings (right) ── */}
+        <div className="page-grid--create">
+
+        {/* ── Left column: modes + how it works ──────────────── */}
+        <div>
         {/* ── Mode grid (2x2) ─────────────────────────────────── */}
         <div style={{
           display: 'grid',
@@ -195,6 +200,10 @@ export const CreateGamePage: React.FC = () => {
             {HOW_IT_WORKS[mode]}
           </div>
         )}
+        </div>
+
+        {/* ── Right column: buy-in + rounds + CTA ────────────── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
         {/* ── Buy-in card ─────────────────────────────────────── */}
         <div
@@ -420,6 +429,9 @@ export const CreateGamePage: React.FC = () => {
             )}
           </button>
         </div>
+
+        </div>{/* end right column */}
+        </div>{/* end page-grid--create */}
 
       </div>
     </div>

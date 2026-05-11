@@ -107,25 +107,42 @@ body::before {
 
 /* ─── Desktop layout variants ──────────────────────────── */
 
-/* Mobile-first: grid wrapper stacks vertically */
+/* Mobile-first: grid wrappers stack vertically */
 .page-grid--home {
   display: flex;
   flex-direction: column;
   gap: 16px;
   flex: 1;
 }
+.page-grid--create {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
 @media (min-width: 1024px) {
   .page { padding: 32px 40px; }
 
-  .page--home { max-width: 960px; }
+  .page--home { max-width: 1060px; }
   .page--game { max-width: 640px; }
-  .page--form { max-width: 640px; }
+  .page--form { max-width: 720px; }
 
   .page-grid--home {
     display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 24px;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 28px;
+    align-items: stretch;
+  }
+
+  /* Bigger hero type on desktop */
+  .page--home .display { font-size: 52px !important; }
+  .page--home .italic-serif { font-size: 60px !important; }
+
+  /* Create page: two-column on desktop */
+  .page-grid--create {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
     align-items: start;
   }
 }

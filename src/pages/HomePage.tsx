@@ -274,7 +274,7 @@ export const HomePage: React.FC = () => {
           </div>
 
           {/* ── Right column: Live players + CTAs ────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
 
             {/* ── Live players rail ────────────────────────────────── */}
             <div
