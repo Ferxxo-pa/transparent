@@ -9,10 +9,10 @@ import { Blobs, BackButton, SolMark, WalletChip, parseAmt, usdEstimate } from '.
 /* ── Mode definitions ────────────────────────────────────── */
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'classic',     label: 'classic',     sub: 'curated questions from the vault',          emoji: '🤥' },
-  { id: 'hot-take',    label: 'hot take',    sub: "y'all write the questions. nobody is safe.", emoji: '🌶️' },
-  { id: 'storyteller', label: 'storyteller', sub: 'tell a story — truth or fake? group votes.', emoji: '🎭' },
-  { id: 'custom',      label: 'custom',      sub: 'you write every question before it starts.', emoji: '🛠️' },
+  { id: 'classic',     label: 'classic',     sub: 'pre-loaded prompts. you answer, table calls cap.',                emoji: '🤥' },
+  { id: 'hot-take',    label: 'hot take',    sub: 'players write questions for the hot seat. bid to push yours.',    emoji: '🌶️' },
+  { id: 'storyteller', label: 'storyteller', sub: 'tell a story — real or fake. table votes.',                       emoji: '🎭' },
+  { id: 'custom',      label: 'custom',      sub: 'everyone submits questions before the game starts.',             emoji: '🛠️' },
 ];
 
 /* ── Presets ─────────────────────────────────────────────── */
