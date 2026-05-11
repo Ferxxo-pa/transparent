@@ -106,18 +106,12 @@ export const HowToPlayPage: React.FC = () => {
       <Blobs palette="home" />
 
       <div
-        className="scroll-no-bar"
+        className="page page--form scroll-no-bar"
         style={{
           position: 'relative',
           zIndex: 1,
-          maxWidth: 480,
-          margin: '0 auto',
-          minHeight: '100dvh',
-          padding: '20px 20px 32px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 18,
           overflowY: 'auto',
+          gap: 18,
         }}
       >
         {/* header */}

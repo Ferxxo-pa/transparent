@@ -153,7 +153,7 @@ export const GameOverPage: React.FC = () => {
     <>
       <Blobs palette="win" />
 
-      <div className="page fade-in" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="page page--game fade-in" style={{ position: 'relative', zIndex: 1 }}>
         {/* ── header row ── */}
         <div className="navbar" style={{ marginBottom: 16 }}>
           <BackButton onClick={() => { resetGame(); navigate('/'); }} />

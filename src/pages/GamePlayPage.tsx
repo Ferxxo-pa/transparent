@@ -261,7 +261,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Storyteller Mode ─────────────────────────────────────────
   if (phase && phase.startsWith('storyteller-')) {
     return (
-      <div className="page fade-in" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="page page--game fade-in" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <Blobs palette="story" />
         <TopBar />
         <SubjectCard />
@@ -295,7 +295,7 @@ export const GamePlayPage: React.FC = () => {
         : QUESTIONS;
 
     return (
-      <div className="page fade-in">
+      <div className="page page--game fade-in">
         <Blobs palette="vote" />
         <TopBar />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
@@ -337,7 +337,7 @@ export const GamePlayPage: React.FC = () => {
     };
 
     return (
-      <div className="page fade-in">
+      <div className="page page--game fade-in">
         <Blobs palette="vote" />
         <TopBar />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
@@ -358,7 +358,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Hot-Take: Writing questions ────────────────────────────
   if (isHotTake && phase === 'submitting-questions') {
     return (
-      <div className="page fade-in">
+      <div className="page page--game fade-in">
         <Blobs palette="vote" />
         <TopBar />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
@@ -388,7 +388,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Hot-Take: Voting on questions ──────────────────────────
   if (isHotTake && phase === 'voting-question') {
     return (
-      <div className="page fade-in">
+      <div className="page page--game fade-in">
         <Blobs palette="vote" />
         <TopBar />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
@@ -403,7 +403,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Hot-Take: Answering ────────────────────────────────────
   if (isHotTake && phase === 'answering') {
     return (
-      <div className="page fade-in">
+      <div className="page page--game fade-in">
         <Blobs palette={blobPalette} />
         <TopBar />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>
@@ -424,7 +424,7 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Classic / Custom / Voting-honesty ─────────────────────
   return (
-    <div className="page fade-in">
+    <div className="page page--game fade-in">
       <Blobs palette={blobPalette} />
       <TopBar />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: '100%', flex: 1 }}>

@@ -11,15 +11,10 @@ export const NotFoundPage: React.FC = () => {
       <Blobs palette="home" />
 
       <div
+        className="page"
         style={{
           position: 'relative',
           zIndex: 1,
-          maxWidth: 480,
-          margin: '0 auto',
-          minHeight: '100dvh',
-          padding: '20px 20px 32px',
-          display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
           gap: 16,

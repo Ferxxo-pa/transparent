@@ -104,7 +104,7 @@ export const WaitingRoomPage: React.FC = () => {
   // Host disconnected overlay
   if (hostLeft) {
     return (
-      <div className="page fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="page page--game fade-in" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div style={{ textAlign: 'center', padding: 32 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>&#x1f50c;</div>
           <h2 className="display" style={{ fontSize: 22, marginBottom: 8 }}>host disconnected</h2>
@@ -166,7 +166,7 @@ export const WaitingRoomPage: React.FC = () => {
     : gameState.roomCode;
 
   return (
-    <div className="page fade-in" style={{ position: 'relative' }}>
+    <div className="page page--game fade-in" style={{ position: 'relative' }}>
       <Blobs palette="lobby" />
 
       {/* ─── leave confirmation modal ─── */}

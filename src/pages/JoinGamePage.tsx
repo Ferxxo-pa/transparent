@@ -75,7 +75,7 @@ export const JoinGamePage: React.FC = () => {
 
   return (
     <WalletSetupGate>
-      <div className="page fade-in" style={{ position: 'relative' }}>
+      <div className="page page--form fade-in" style={{ position: 'relative' }}>
         <Blobs palette="join" />
 
         {/* header */}
