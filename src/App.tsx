@@ -16,6 +16,8 @@ import { WaitingRoomPage } from './pages/WaitingRoomPage';
 import { GamePlayPage } from './pages/GamePlayPage';
 import { GameOverPage } from './pages/GameOverPage';
 import { WaitlistPage } from './pages/WaitlistPage';
+import { HowToPlayPage } from './pages/HowToPlayPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 
 export const pageVariants = {
   initial: { opacity: 0, y: 28, scale: 0.97 },
@@ -68,6 +70,8 @@ function AnimatedRoutes() {
           <Route path="/gameover" element={<PageWrap><GameOverPage /></PageWrap>} />
           <Route path="/waitlist" element={<PageWrap><WaitlistPage /></PageWrap>} />
           <Route path="/login"    element={<PageWrap><HomePage /></PageWrap>} />
+          <Route path="/how-to-play" element={<PageWrap><HowToPlayPage /></PageWrap>} />
+          <Route path="*"         element={<PageWrap><NotFoundPage /></PageWrap>} />
         </Routes>
       </AnimatePresence>
     </>

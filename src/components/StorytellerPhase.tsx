@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { Blobs } from './Blobs';
 
 interface Props {
   phase: 'storyteller-prep' | 'storyteller-telling' | 'storyteller-voting' | 'storyteller-reveal';
@@ -17,10 +18,28 @@ interface Props {
   onAdvance: () => void;
 }
 
+/** highlight a middle phrase in pink italic-serif */
+const renderPrompt = (text: string) => {
+  const words = text.split(' ');
+  if (words.length <= 4) return <span className="italic-serif" style={{ color: 'var(--pink)' }}>{text.toLowerCase()}</span>;
+  const mid = Math.floor(words.length / 2);
+  const start = Math.max(mid - 1, 0);
+  const end = Math.min(mid + 2, words.length);
+  return (
+    <>
+      {words.slice(0, start).join(' ').toLowerCase()}{' '}
+      <span className="italic-serif" style={{ color: 'var(--pink)' }}>{words.slice(start, end).join(' ').toLowerCase()}</span>
+      {' '}{words.slice(end).join(' ').toLowerCase()}
+    </>
+  );
+};
+
 export const StorytellerPhase: React.FC<Props> = ({
   phase, prompt, isHotSeat, isHost, playerName, storytellerChoice,
   votes, voteCount, voterCount, myVote, onChoose, onVote, onAdvance,
 }) => {
+  const [doneTelling, setDoneTelling] = useState(false);
+  const [recording, setRecording] = useState(false);
 
   // ── PREP PHASE: Hot-seat player sees prompt, chooses truth/fake ──
   if (phase === 'storyteller-prep') {
@@ -31,42 +50,76 @@ export const StorytellerPhase: React.FC<Props> = ({
           animate={{ opacity: 1, y: 0 }}
           style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', alignItems: 'center', textAlign: 'center' }}
         >
-          <div style={{ fontSize: 40 }}>🎭</div>
-          <p className="label-cipher" style={{ fontSize: 11 }}>YOUR PROMPT</p>
-          <div style={{
-            padding: '24px 20px', borderRadius: 'var(--r)',
-            background: 'linear-gradient(135deg, rgba(196,255,60,0.08), rgba(196,255,60,0.02))',
-            border: '1px solid var(--lime-border)', width: '100%',
-          }}>
-            <p style={{ fontSize: 18, fontWeight: 700, lineHeight: 1.4, color: 'var(--lime)' }}>{prompt}</p>
+          <Blobs palette="story" />
+
+          {/* header */}
+          <span className="chip chip-pink" style={{ fontSize: 11 }}>you're in the chair 🪑</span>
+
+          {/* prompt card */}
+          <div className="glass glass-strong" style={{ padding: 28, borderRadius: 28, textAlign: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+              <span className="sticker sticker-pink">prompt</span>
+              <span className="sticker sticker-tangerine" style={{ transform: 'rotate(2deg)' }}>spicy</span>
+            </div>
+            <p className="display" style={{ fontSize: 30, lineHeight: 1.3 }}>
+              {renderPrompt(prompt)}
+            </p>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 14, maxWidth: 300, margin: '14px auto 0' }}>
+              tell the table out loud. truth or made up — your call.
+            </p>
           </div>
-          
-          <p style={{ color: 'var(--muted)', fontSize: 13, maxWidth: 300 }}>
-            Are you going to tell a <strong>real</strong> story or <strong>make one up</strong>? Choose below — nobody else can see this.
-          </p>
-          
+
+          {/* premium toggle */}
+          <button
+            className="glass-flat"
+            onClick={() => setRecording(!recording)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', textAlign: 'left' }}
+          >
+            <div style={{
+              width: 20, height: 20, borderRadius: '50%',
+              background: recording ? 'var(--pink)' : 'transparent',
+              border: recording ? 'none' : '2px solid var(--glass-stroke-hi)',
+              boxShadow: recording ? '0 0 16px var(--pink-glow)' : 'none',
+              animation: recording ? 'pulseDot 2s ease infinite' : 'none',
+              flexShrink: 0,
+            }} />
+            <div style={{ flex: 1 }}>
+              <p className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink)' }}>record this round</p>
+              <p className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)', marginTop: 2 }}>save the receipt to share later</p>
+            </div>
+            <span className="sticker sticker-acid" style={{ fontSize: 9 }}>premium ✦</span>
+          </button>
+
+          {/* choice buttons */}
           <div style={{ display: 'flex', gap: 12, width: '100%' }}>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => onChoose('truth')}
-              className="btn-primary"
-              style={{ flex: 1, padding: '16px', fontSize: 16, background: 'var(--green)', color: '#000' }}
+              className="vote-btn is-truth"
+              style={{ flex: 1, padding: '18px' }}
             >
-              ✅ Tell the Truth
+              <span style={{ fontSize: 24 }}>😇</span>
+              <span style={{ fontSize: 14, fontWeight: 800 }}>truth</span>
             </motion.button>
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={() => onChoose('fake')}
-              className="btn-primary"
-              style={{ flex: 1, padding: '16px', fontSize: 16, background: '#ef4444', color: '#fff' }}
+              className="vote-btn is-bluff"
+              style={{ flex: 1, padding: '18px' }}
             >
-              🎭 Fake It
+              <span style={{ fontSize: 24 }}>🤥</span>
+              <span style={{ fontSize: 14, fontWeight: 800 }}>bluff</span>
             </motion.button>
           </div>
+
+          {/* footer */}
+          <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textAlign: 'center' }}>
+            the table votes truth or bluff next
+          </p>
         </motion.div>
       );
     }
-    
+
     // Other players wait
     return (
       <motion.div
@@ -74,10 +127,10 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1 }}
         style={{ textAlign: 'center', padding: 40 }}
       >
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🎭</div>
-        <p style={{ fontSize: 18, fontWeight: 700 }}>{playerName} is preparing...</p>
-        <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>
-          They're about to tell a story. Your job: figure out if it's real or fake.
+        <Blobs palette="story" />
+        <p className="display" style={{ fontSize: 18, marginBottom: 8 }}>{playerName.toLowerCase()} is preparing...</p>
+        <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 8 }}>
+          they're about to tell a story. your job: figure out if it's real or fake.
         </p>
         <div className="loading-dots" style={{ marginTop: 20 }}>
           <span>•</span><span>•</span><span>•</span>
@@ -86,7 +139,7 @@ export const StorytellerPhase: React.FC<Props> = ({
     );
   }
 
-  // ── TELLING PHASE: Hot-seat tells the story, host advances when done ──
+  // ── TELLING PHASE: Hot-seat tells the story, shows done button ──
   if (phase === 'storyteller-telling') {
     return (
       <motion.div
@@ -94,46 +147,58 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, y: 0 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
-        <div style={{ fontSize: 40 }}>🎤</div>
-        
-        <div style={{
-          padding: '16px 20px', borderRadius: 'var(--r)',
-          background: 'var(--glass)', border: '1px solid var(--border)', width: '100%',
-        }}>
-          <p className="label-cipher" style={{ marginBottom: 6 }}>THE PROMPT</p>
-          <p style={{ fontSize: 16, fontWeight: 600 }}>{prompt}</p>
+        <Blobs palette="story" />
+
+        {/* prompt card */}
+        <div className="glass glass-strong" style={{ padding: 28, borderRadius: 28, textAlign: 'center', width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+            <span className="sticker sticker-pink">prompt</span>
+          </div>
+          <p className="display" style={{ fontSize: 26, lineHeight: 1.35 }}>
+            {renderPrompt(prompt)}
+          </p>
         </div>
 
-        <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--lime)' }}>
-          {isHotSeat ? "You're telling your story!" : `${playerName} is telling their story...`}
+        <p className="display" style={{ fontSize: 18, color: 'var(--ink)' }}>
+          {isHotSeat ? "you're telling your story!" : `${playerName.toLowerCase()} is telling their story...`}
         </p>
 
-        {isHotSeat && (
-          <p style={{ 
-            fontSize: 12, color: storytellerChoice === 'truth' ? 'var(--green)' : '#ef4444',
-            background: storytellerChoice === 'truth' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-            padding: '6px 14px', borderRadius: 20,
+        {isHotSeat && storytellerChoice && (
+          <span className="chip" style={{
+            background: storytellerChoice === 'truth' ? 'rgba(77,168,255,0.12)' : 'rgba(255,138,42,0.12)',
+            color: storytellerChoice === 'truth' ? 'var(--azure)' : 'var(--tangerine)',
+            borderColor: storytellerChoice === 'truth' ? 'rgba(77,168,255,0.3)' : 'rgba(255,138,42,0.3)',
           }}>
-            {storytellerChoice === 'truth' ? '✅ You chose: TRUTH' : '🎭 You chose: FAKE'}
-          </p>
+            {storytellerChoice === 'truth' ? '😇 you chose: truth' : '🤥 you chose: bluff'}
+          </span>
         )}
 
         {!isHotSeat && (
-          <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-            Listen carefully... is it real or fake?
+          <p style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
+            listen carefully... is it real or fake?
           </p>
         )}
 
-        {isHost && (
+        {/* done button for hot seat player or host */}
+        {(isHotSeat || isHost) && (
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={onAdvance}
-            className="btn-primary"
-            style={{ padding: '14px 32px', marginTop: 12 }}
+            onClick={() => { setDoneTelling(true); onAdvance(); }}
+            className="btn-degen"
+            style={{
+              width: '100%', padding: '16px', marginTop: 8,
+              background: doneTelling ? 'var(--ink)' : undefined,
+              color: doneTelling ? 'var(--bg)' : undefined,
+            }}
           >
-            Story Done → Vote 🗳️
+            {doneTelling ? 'locked in ✓' : 'done telling 🎤'}
           </motion.button>
         )}
+
+        {/* footer */}
+        <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textAlign: 'center' }}>
+          the table votes truth or bluff next
+        </p>
       </motion.div>
     );
   }
@@ -146,44 +211,52 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, y: 0 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
-        <div style={{ fontSize: 40 }}>🗳️</div>
-        <p style={{ fontSize: 20, fontWeight: 700 }}>Was {playerName} being transparent?</p>
+        <Blobs palette={myVote === 'transparent' ? 'truth' : myVote === 'fake' ? 'bluff' : 'vote'} />
+
+        <p className="display" style={{ fontSize: 20 }}>was {playerName.toLowerCase()} being transparent?</p>
 
         {isHotSeat ? (
-          <div style={{ padding: 20 }}>
-            <p style={{ color: 'var(--muted)', fontSize: 14 }}>
-              The group is voting on your story...
+          <div className="glass glass-strong" style={{ padding: 24, borderRadius: 28, width: '100%' }}>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>
+              the group is voting on your story...
             </p>
-            <p style={{ fontSize: 24, fontWeight: 700, marginTop: 12 }}>
-              {voteCount}/{voterCount} votes in
-            </p>
+            <div style={{ marginTop: 14 }}>
+              <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase', marginBottom: 6 }}>
+                {voteCount}/{voterCount} voted
+              </p>
+              <div className="progress" style={{ boxShadow: '0 0 12px var(--acid-glow)' }}>
+                <div className="progress-bar" style={{ width: `${(voteCount / Math.max(voterCount, 1)) * 100}%` }} />
+              </div>
+            </div>
           </div>
         ) : myVote ? (
-          <div style={{ padding: 20 }}>
+          <div className="glass glass-strong" style={{ padding: 24, borderRadius: 28, width: '100%' }}>
             <p style={{ fontSize: 16, fontWeight: 600 }}>
-              You voted: {myVote === 'transparent' ? '✅ Transparent' : '🎭 Fake'}
+              you voted: {myVote === 'transparent' ? '😇 truth' : '🤥 bluff'}
             </p>
-            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>
-              {voteCount}/{voterCount} votes in
+            <p className="mono" style={{ color: 'var(--ink-faint)', fontSize: 10, marginTop: 8, textTransform: 'uppercase' }}>
+              {voteCount}/{voterCount} voted
             </p>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 12, width: '100%' }}>
+          <div className="vote-wrap">
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.93 }}
               onClick={() => onVote('transparent')}
-              className="btn-primary"
-              style={{ flex: 1, padding: '18px', fontSize: 16, background: 'var(--green)', color: '#000' }}
+              className="vote-btn is-truth"
+              style={{ flex: 1, padding: '24px 16px' }}
             >
-              ✅ Transparent
+              <span style={{ fontSize: 28 }}>😇</span>
+              <span style={{ fontSize: 14, fontWeight: 800 }}>truth</span>
             </motion.button>
             <motion.button
-              whileTap={{ scale: 0.95 }}
+              whileTap={{ scale: 0.93 }}
               onClick={() => onVote('fake')}
-              className="btn-primary"
-              style={{ flex: 1, padding: '18px', fontSize: 16, background: '#ef4444', color: '#fff' }}
+              className="vote-btn is-bluff"
+              style={{ flex: 1, padding: '24px 16px' }}
             >
-              🎭 Fake
+              <span style={{ fontSize: 28 }}>🤥</span>
+              <span style={{ fontSize: 14, fontWeight: 800 }}>bluff</span>
             </motion.button>
           </div>
         )}
@@ -192,10 +265,10 @@ export const StorytellerPhase: React.FC<Props> = ({
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={onAdvance}
-            className="btn-primary"
-            style={{ padding: '14px 32px', marginTop: 12 }}
+            className="btn-degen"
+            style={{ padding: '14px 32px', marginTop: 12, width: '100%' }}
           >
-            Reveal Answer 👀
+            reveal answer 👀
           </motion.button>
         )}
       </motion.div>
@@ -217,35 +290,37 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, scale: 1 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
+        <Blobs palette={isTruth ? 'truth' : 'bluff'} />
+
         <motion.div
           animate={{ rotate: [0, -10, 10, -10, 0] }}
           transition={{ duration: 0.5 }}
           style={{ fontSize: 60 }}
         >
-          {isTruth ? '✅' : '🎭'}
+          {isTruth ? '😇' : '🤥'}
         </motion.div>
 
-        <p style={{ fontSize: 28, fontWeight: 800, color: isTruth ? 'var(--green)' : '#ef4444' }}>
-          {isTruth ? 'IT WAS THE TRUTH!' : 'THEY FAKED IT!'}
+        <p className="display" style={{ fontSize: 28, color: isTruth ? 'var(--azure)' : 'var(--tangerine)' }}>
+          {isTruth ? 'it was the truth!' : 'they faked it!'}
         </p>
 
-        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+        <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>
           {correctVoters}/{totalVoters} people guessed correctly
         </p>
 
         {/* Vote breakdown */}
         <div style={{ display: 'flex', gap: 20, padding: '12px 0' }}>
           <div>
-            <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--green)' }}>
+            <span className="money" style={{ fontSize: 24, color: 'var(--azure)' }}>
               {Object.values(votes).filter(v => v === 'transparent').length}
             </span>
-            <p style={{ fontSize: 11, color: 'var(--muted)' }}>voted transparent</p>
+            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase' }}>voted truth</p>
           </div>
           <div>
-            <span style={{ fontSize: 24, fontWeight: 700, color: '#ef4444' }}>
+            <span className="money" style={{ fontSize: 24, color: 'var(--tangerine)' }}>
               {Object.values(votes).filter(v => v === 'fake').length}
             </span>
-            <p style={{ fontSize: 11, color: 'var(--muted)' }}>voted fake</p>
+            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase' }}>voted bluff</p>
           </div>
         </div>
 
@@ -253,10 +328,10 @@ export const StorytellerPhase: React.FC<Props> = ({
           <motion.button
             whileTap={{ scale: 0.95 }}
             onClick={onAdvance}
-            className="btn-primary"
-            style={{ padding: '14px 32px', marginTop: 12 }}
+            className="btn-degen"
+            style={{ padding: '14px 32px', marginTop: 12, width: '100%' }}
           >
-            Next Round →
+            next round →
           </motion.button>
         )}
       </motion.div>

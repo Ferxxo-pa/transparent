@@ -1,317 +1,430 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
-import { WalletSetupGate } from '../components/WalletSetupGate';
-import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
+import { useSolPrice } from '../hooks/useSolPrice';
 import { QuestionMode, PayoutMode } from '../types/game';
+import { Blobs, BackButton, TokenMark, UsdTag, TOKENS, TOKEN_LIST, parseAmt, usdEstimate } from '../components';
+
+/* ── Mode definitions ────────────────────────────────────── */
+
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'classic',     label: 'Classic',     sub: 'Curated questions from the vault',        emoji: '🎲' },
-  { id: 'hot-take',    label: 'Hot Take',    sub: 'Players write, crowd picks best one',     emoji: '🔥' },
-  { id: 'storyteller', label: 'Storyteller', sub: 'Tell a story — truth or fake? Group votes', emoji: '🎭' },
-  { id: 'custom',      label: 'Custom',      sub: 'You write every question',                emoji: '✍️' },
+  { id: 'classic',     label: 'classic',     sub: 'curated questions from the vault',          emoji: '🤥' },
+  { id: 'hot-take',    label: 'hot take',    sub: "y'all write the questions. nobody is safe.", emoji: '🌶️' },
+  { id: 'storyteller', label: 'storyteller', sub: 'tell a story — truth or fake? group votes.', emoji: '🎭' },
+  { id: 'custom',      label: 'custom',      sub: 'you write every question before it starts.', emoji: '🛠️' },
 ];
 
-const PAYOUT_MODES: { id: PayoutMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'split-pot',        label: 'Split Pot',        sub: "Each fake vote costs you a slice of your buy-in. Stay honest, keep your money.", emoji: '🤝' },
-  { id: 'winner-takes-all', label: 'Winner Takes All', sub: 'Most honest player wins the entire pot', emoji: '🏆' },
-];
+/* ── How-it-works blurbs per mode ────────────────────────── */
 
-const field = {
-  initial: { opacity: 0, y: 14 },
-  animate: { opacity: 1, y: 0 },
+const HOW_IT_WORKS: Record<string, string> = {
+  classic:     'one player sits in the hot seat. they answer a prompt. the rest of the table votes: cap or no cap.',
+  'hot-take':  'everyone submits a spicy question. the best one gets picked. the target answers. table votes.',
+  storyteller: 'the storyteller tells a tale. is it real or made up? sell it hard. table calls it.',
+  custom:      'the host writes all prompts before the game starts. full control, your rules.',
 };
+
+/* ── Token chips (icon-only) ─────────────────────────────── */
+
+const TOKEN_CHIPS = ['sol', 'bonk', 'wif', 'popcat', 'pengu'];
+
+/* ── Presets for SOL (default) ───────────────────────────── */
+
+const SOL_PRESETS = ['0', '0.05', '0.1', '0.25', '0.5'];
+const ROUND_PRESETS = [3, 5, 7, 10];
+
+/* ── CreateGamePage ──────────────────────────────────────── */
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
   const solPrice = useSolPrice();
 
-  const [buyIn,      setBuyIn]      = useState('0');
-  const [roomName,   setRoomName]   = useState('');
-  const [mode,       setMode]       = useState<QuestionMode>('classic');
-  const [payoutMode, setPayoutMode] = useState<PayoutMode>('split-pot');
-  const [numQs,        setNumQs]        = useState(3);
+  const [mode, setMode]               = useState<QuestionMode>('classic');
+  const [selectedToken, setToken]      = useState('sol');
+  const [buyInRaw, setBuyInRaw]        = useState('0.1');
+  const [activePreset, setActivePreset] = useState('0.1');
+  const [rounds, setRounds]            = useState(5);
   const [customRounds, setCustomRounds] = useState('');
-  const [customQs,     setCustomQs]     = useState<string[]>(['', '']);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+
+  const buyInNum = parseAmt(buyInRaw);
+  const token = TOKENS[selectedToken] || TOKENS.sol;
+  const presets = selectedToken === 'sol' ? SOL_PRESETS : token.presets.map(String);
+  const usdEst = usdEstimate(buyInNum, selectedToken, solPrice);
+
   const handleCreate = async () => {
-    let filtered: string[] | undefined;
-    const actualMode: QuestionMode = mode;
-
-    if (mode === 'custom') {
-      filtered = customQs.filter(q => q.trim());
-      if (!filtered?.length) return;
-    }
-
     const ok = await createGame(
-      parseFloat(buyIn) || 0,
-      roomName.trim() || 'Game Room',
-      actualMode,
-      filtered,
+      buyInNum,
+      'Game Room',
+      mode,
       undefined,
-      payoutMode,
-      numQs,
+      undefined,
+      'split-pot' as PayoutMode,
+      rounds,
     );
     if (ok) navigate('/waiting');
   };
 
   return (
-    <WalletSetupGate>
-    <div className="page fade-in">
-      {/* Top spacing */}
-      <div style={{ width: '100%', paddingTop: 16, marginBottom: 8 }}>
-        <motion.button
-          onClick={() => navigate('/')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <ArrowLeft size={15} /> Back
-        </motion.button>
-      </div>
+    <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
 
-      <motion.div
-        style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', flex: 1 }}
-        initial="initial" animate="animate"
-        variants={{ animate: { transition: { staggerChildren: 0.07 } } }}
+      {/* Background */}
+      <Blobs palette="create" />
+
+      {/* Content */}
+      <div
+        className="scroll-no-bar"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 480,
+          margin: '0 auto',
+          minHeight: '100dvh',
+          padding: '20px 20px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          overflowY: 'auto',
+        }}
       >
-        <motion.div variants={field}>
-          <div className="heading">Create a room</div>
-          <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>Set the rules, share the code</p>
-        </motion.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Room name */}
-          <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 8 }}>Room Name</p>
-            <input className="input" type="text" value={roomName} onChange={e => setRoomName(e.target.value)} placeholder="Squad Night" maxLength={24} />
-          </motion.div>
+        {/* ── Header ──────────────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <BackButton onClick={() => navigate('/')} />
+          <div className="chip">new room</div>
+        </div>
 
-          {/* Buy-in */}
-          <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 8 }}>Entry fee (SOL)</p>
-            {/* Presets */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
-              {['0', '0.01', '0.05', '0.1', '0.5', '1'].map(preset => {
-                const usd = preset !== '0' ? solToUsd(parseFloat(preset), solPrice) : '';
-                return (
-                  <button
-                    key={preset}
-                    onClick={() => setBuyIn(preset)}
-                    style={{
-                      padding: '5px 14px',
-                      borderRadius: 'var(--r-pill)',
-                      border: `1px solid ${buyIn === preset ? 'var(--lime)' : 'var(--border)'}`,
-                      background: buyIn === preset ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                      color: buyIn === preset ? 'var(--lime)' : 'var(--muted)',
-                      fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      fontFamily: 'Space Grotesk',
-                      transition: 'all 0.15s',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, flexShrink: 0,
-                    }}
-                  >
-                    <span>{preset === '0' ? 'Free' : `${preset} SOL`}</span>
-                    {usd && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.7 }}>{usd}</span>}
-                  </button>
-                );
-              })}
+        {/* ── Title ───────────────────────────────────────────── */}
+        <div style={{ marginBottom: 4 }}>
+          <span className="display" style={{ fontSize: 36, lineHeight: 1.05, color: 'var(--ink)' }}>
+            set the{' '}
+          </span>
+          <span className="italic-serif" style={{ fontSize: 36, color: 'var(--pink)' }}>
+            vibe.
+          </span>
+        </div>
+
+        {/* ── Mode grid (2x2) ─────────────────────────────────── */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: 10,
+        }}>
+          {MODES.map(m => {
+            const isActive = mode === m.id;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className="glass"
+                style={{
+                  padding: '16px 14px',
+                  borderRadius: 20,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 6,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  border: isActive ? '1px solid var(--acid)' : '1px solid var(--glass-stroke)',
+                  background: isActive ? 'rgba(196,255,60,0.06)' : 'var(--glass-bg)',
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span style={{ fontSize: 28, lineHeight: 1 }}>{m.emoji}</span>
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                    color: isActive ? 'var(--acid)' : 'var(--ink-soft)',
+                    transition: 'color 0.15s',
+                  }}
+                >
+                  {m.label}
+                </span>
+                <span style={{
+                  fontSize: 11,
+                  color: 'var(--ink-faint)',
+                  lineHeight: 1.35,
+                }}>
+                  {m.sub}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ── How it works toggle ─────────────────────────────── */}
+        <button
+          onClick={() => setShowHowItWorks(!showHowItWorks)}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <span
+            className="mono"
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-soft)',
+            }}
+          >
+            + how it works
+          </span>
+        </button>
+
+        {showHowItWorks && (
+          <div
+            className="glass-flat"
+            style={{
+              padding: '14px 16px',
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.55,
+            }}
+          >
+            {HOW_IT_WORKS[mode]}
+          </div>
+        )}
+
+        {/* ── Buy-in card ─────────────────────────────────────── */}
+        <div
+          className="glass"
+          style={{ padding: 14, borderRadius: 20 }}
+        >
+          {/* Header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-faint)',
+              }}
+            >
+              buy-in
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="money" style={{ fontSize: 18, color: 'var(--acid)' }}>
+                <TokenMark token={selectedToken} size={16} />
+                {' '}{buyInNum > 0 ? buyInRaw : 'free'}
+              </span>
+              {buyInNum > 0 && usdEst && (
+                <UsdTag amount={buyInNum} token={selectedToken} />
+              )}
             </div>
+          </div>
+
+          {/* Token row */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {TOKEN_CHIPS.map(tid => {
+              const isActive = selectedToken === tid;
+              return (
+                <button
+                  key={tid}
+                  onClick={() => {
+                    setToken(tid);
+                    // Reset to first preset of new token
+                    const newPresets = tid === 'sol' ? SOL_PRESETS : (TOKENS[tid]?.presets.map(String) || ['0']);
+                    setBuyInRaw(newPresets[1] || newPresets[0]);
+                    setActivePreset(newPresets[1] || newPresets[0]);
+                  }}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    border: isActive ? '1px solid var(--acid)' : '1px solid var(--glass-stroke)',
+                    background: isActive ? 'rgba(196,255,60,0.08)' : 'var(--glass-bg)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s',
+                    flexShrink: 0,
+                  }}
+                >
+                  <TokenMark token={tid} size={20} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Preset row */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {presets.map(p => {
+              const isActive = activePreset === p && buyInRaw === p;
+              return (
+                <button
+                  key={p}
+                  onClick={() => { setBuyInRaw(p); setActivePreset(p); }}
+                  style={{
+                    flex: 1,
+                    padding: '8px 0',
+                    borderRadius: 100,
+                    border: 'none',
+                    background: isActive ? 'var(--acid)' : 'var(--glass-bg)',
+                    color: isActive ? '#0A0810' : 'var(--ink-soft)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s',
+                    fontFamily: "'JetBrains Mono', monospace",
+                  }}
+                >
+                  {p === '0' ? 'free' : p}
+                </button>
+              );
+            })}
+            {/* Custom input */}
             <input
-              className="input"
-              type="number" min="0" step="0.01"
-              value={buyIn}
-              onChange={e => setBuyIn(e.target.value)}
-              placeholder="or enter custom amount"
+              type="text"
+              inputMode="decimal"
+              value={activePreset === buyInRaw ? '' : buyInRaw}
+              onChange={e => {
+                setBuyInRaw(e.target.value);
+                setActivePreset('');
+              }}
+              placeholder="custom"
+              style={{
+                width: 64,
+                padding: '8px 8px',
+                borderRadius: 100,
+                border: '1px solid var(--glass-stroke)',
+                background: 'var(--glass-bg)',
+                color: 'var(--ink)',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'center',
+                outline: 'none',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
             />
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-              {parseFloat(buyIn) > 0
-                ? `Each player puts in ${buyIn} SOL${solToUsd(parseFloat(buyIn), solPrice) ? ` ${solToUsd(parseFloat(buyIn), solPrice)}` : ''} · ${payoutMode === 'split-pot' ? "fake votes cost you" : 'winner takes everything'}`
-                : 'Free game · no entry fee'}
-            </p>
-          </motion.div>
+          </div>
+        </div>
 
-          {/* Mode */}
-          <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 10 }}>Question Mode</p>
-            <div className="mode-pills">
-              {MODES.map(m => (
-                <motion.button
-                  key={m.id}
-                  className={`mode-pill ${mode === m.id ? 'active' : ''}`}
-                  onClick={() => setMode(m.id)}
-                  whileTap={{ scale: 0.95 }}
-                  layout
-                >
-                  {m.emoji} {m.label}
-                </motion.button>
-              ))}
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={mode}
-                style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-              >
-                {MODES.find(m => m.id === mode)?.sub}
-              </motion.p>
-            </AnimatePresence>
-          </motion.div>
+        {/* ── Rounds card ─────────────────────────────────────── */}
+        <div
+          className="glass"
+          style={{ padding: '12px 14px', borderRadius: 20 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-faint)',
+              }}
+            >
+              rounds
+            </span>
+            <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+              {rounds}
+            </span>
+          </div>
 
-          {/* Payout Mode */}
-          <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 10 }}>Payout Mode</p>
-            <div className="mode-pills">
-              {PAYOUT_MODES.map(m => (
-                <motion.button
-                  key={m.id}
-                  className={`mode-pill ${payoutMode === m.id ? 'active' : ''}`}
-                  onClick={() => setPayoutMode(m.id)}
-                  whileTap={{ scale: 0.95 }}
-                  layout
-                >
-                  {m.emoji} {m.label}
-                </motion.button>
-              ))}
-            </div>
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={payoutMode}
-                style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.15 }}
-              >
-                {PAYOUT_MODES.find(m => m.id === payoutMode)?.sub}
-              </motion.p>
-            </AnimatePresence>
-          </motion.div>
-
-          {/* Number of questions */}
-          <motion.div variants={field}>
-            <p className="label-cipher" style={{ marginBottom: 8 }}>How many rounds?</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-              {[2, 3, 4, 5].map(n => (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {ROUND_PRESETS.map(n => {
+              const isActive = rounds === n && !customRounds;
+              return (
                 <button
                   key={n}
-                  onClick={() => { setNumQs(n); setCustomRounds(''); }}
+                  onClick={() => { setRounds(n); setCustomRounds(''); }}
                   style={{
-                    padding: '6px 16px',
-                    borderRadius: 'var(--r-pill)',
-                    border: `1px solid ${numQs === n && !customRounds ? 'var(--lime)' : 'var(--border)'}`,
-                    background: numQs === n && !customRounds ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                    color: numQs === n && !customRounds ? 'var(--lime)' : 'var(--muted)',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    fontFamily: 'Space Grotesk',
+                    flex: 1,
+                    padding: '8px 0',
+                    borderRadius: 100,
+                    border: 'none',
+                    background: isActive ? 'var(--acid)' : 'var(--glass-bg)',
+                    color: isActive ? '#0A0810' : 'var(--ink-soft)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer',
                     transition: 'all 0.15s',
+                    fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
                   {n}
                 </button>
-              ))}
-              <input
-                className="input"
-                type="number"
-                min="1"
-                max="30"
-                value={customRounds}
-                onChange={e => {
-                  setCustomRounds(e.target.value);
-                  const v = parseInt(e.target.value);
-                  if (v > 0) setNumQs(v);
-                }}
-                placeholder="Custom"
-                style={{ width: 80, height: 34, fontSize: 13, textAlign: 'center' }}
-              />
-            </div>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-              {numQs} round{numQs !== 1 ? 's' : ''} — hot seat cycles through players
-            </p>
-          </motion.div>
-
-          {/* Custom questions */}
-          <AnimatePresence>
-            {mode === 'custom' && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-              >
-                <p className="label-cipher" style={{ marginBottom: 10 }}>Your Questions</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {customQs.map((q, i) => (
-                    <motion.div
-                      key={i}
-                      style={{ display: 'flex', gap: 8 }}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                    >
-                      <input
-                        className="input"
-                        value={q}
-                        onChange={e => { const u = [...customQs]; u[i] = e.target.value; setCustomQs(u); }}
-                        placeholder={`Question ${i + 1}…`}
-                      />
-                      {customQs.length > 2 && (
-                        <button
-                          onClick={() => setCustomQs(customQs.filter((_, j) => j !== i))}
-                          style={{ width: 46, height: 46, flexShrink: 0, background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <X size={14} />
-                        </button>
-                      )}
-                    </motion.div>
-                  ))}
-                  <button
-                    onClick={() => setCustomQs([...customQs, ''])}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--lavender)', fontSize: 13, fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0' }}
-                  >
-                    <Plus size={13} /> Add question
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Summary chips */}
-          <motion.div variants={field} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <span className="chip chip-lime">
-              {parseFloat(buyIn) > 0 ? `${buyIn} SOL` : 'Free'} game
-            </span>
-            <span className="chip chip-lavender">{MODES.find(m => m.id === mode)?.label} mode</span>
-            <span className="chip chip-muted">{PAYOUT_MODES.find(m => m.id === payoutMode)?.emoji} {PAYOUT_MODES.find(m => m.id === payoutMode)?.label}</span>
-          </motion.div>
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-              style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-sm)', padding: '12px 14px', color: 'var(--red)', fontSize: 13 }}
-            >
-              {error}
-            </motion.div>
-          )}
+              );
+            })}
+            <input
+              type="number"
+              min="1"
+              max="30"
+              value={customRounds}
+              onChange={e => {
+                setCustomRounds(e.target.value);
+                const v = parseInt(e.target.value);
+                if (v > 0) setRounds(v);
+              }}
+              placeholder="custom"
+              style={{
+                width: 64,
+                padding: '8px 8px',
+                borderRadius: 100,
+                border: '1px solid var(--glass-stroke)',
+                background: 'var(--glass-bg)',
+                color: 'var(--ink)',
+                fontSize: 12,
+                fontWeight: 600,
+                textAlign: 'center',
+                outline: 'none',
+                fontFamily: "'JetBrains Mono', monospace",
+              }}
+            />
+          </div>
         </div>
-      </motion.div>
 
-      {/* Sticky CTA */}
-      <div style={{ width: '100%', paddingTop: 10 }}>
-        <motion.button
-          className="btn btn-primary"
-          onClick={handleCreate}
-          disabled={loading}
-          whileTap={{ scale: 0.96 }}
-          whileHover={!loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
-          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-        >
-          {loading ? 'Creating…' : 'Create Game →'}
-        </motion.button>
+        {/* ── Error ───────────────────────────────────────────── */}
+        {error && (
+          <div
+            style={{
+              background: 'rgba(255,92,92,0.10)',
+              border: '1px solid rgba(255,92,92,0.28)',
+              borderRadius: 16,
+              padding: '12px 14px',
+              color: 'var(--coral)',
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {/* ── CTA ─────────────────────────────────────────────── */}
+        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+          <button
+            className="btn btn-degen"
+            onClick={handleCreate}
+            disabled={loading}
+            style={{ width: '100%' }}
+          >
+            {loading ? 'creating...' : (
+              <>
+                spin it up · <TokenMark token={selectedToken} size={16} />
+                {' '}{buyInNum > 0 ? buyInRaw : 'free'}
+                {usdEst ? ` (${usdEst})` : ''}
+              </>
+            )}
+          </button>
+        </div>
+
       </div>
     </div>
-    </WalletSetupGate>
   );
 };

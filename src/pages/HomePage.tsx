@@ -1,347 +1,409 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { AnimatedBackground } from '../components/AnimatedBackground';
-import { MagicBlockBadge } from '../components/MagicBlockBadge';
-import { getPlayerStats, PlayerStatsRow } from '../lib/supabase';
+import { Blobs, TokenMark } from '../components';
+import { useWalletBalance } from '../hooks/useWalletBalance';
+import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 
-const pop = {
-  initial: { opacity: 0, y: 24, scale: 0.93 },
-  animate: { opacity: 1, y: 0, scale: 1,
-    transition: { type: 'spring', stiffness: 400, damping: 28 } },
-};
+/* ── Game modes ──────────────────────────────────────────── */
 
-const btnTap = { scale: 0.95 };
-
-function PlayerStatsCard({ walletAddress }: { walletAddress: string | null }) {
-  const [stats, setStats] = useState<PlayerStatsRow | null>(null);
-
-  useEffect(() => {
-    if (!walletAddress) return;
-    getPlayerStats(walletAddress).then(setStats);
-  }, [walletAddress]);
-
-  if (!stats || stats.games_played === 0) return null;
-
-  const totalVotes = stats.total_transparent_votes + stats.total_fake_votes;
-  const honesty = totalVotes > 0 ? Math.round((stats.total_transparent_votes / totalVotes) * 100) : null;
-  const netSol = stats.sol_won - stats.sol_lost;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.25, type: 'spring', stiffness: 280, damping: 24 }}
-      style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8,
-        padding: 0, width: '100%',
-      }}
-    >
-      {[
-        { label: 'Games', value: `${stats.games_played}` },
-        { label: 'Net', value: `${netSol >= 0 ? '+' : ''}${netSol.toFixed(3)}`, unit: 'SOL', color: netSol >= 0 ? 'var(--lime)' : '#ff5050' },
-        { label: 'Honesty', value: honesty !== null ? `${honesty}%` : '—' },
-      ].map(s => (
-        <div key={s.label} style={{
-          textAlign: 'center', padding: '10px 6px',
-          background: 'var(--glass)', border: '1px solid var(--border)', borderRadius: 'var(--r-sm)',
-        }}>
-          <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 3 }}>{s.label}</p>
-          <p style={{ fontWeight: 800, fontSize: 16, color: s.color ?? 'var(--lime)', letterSpacing: '-0.02em', lineHeight: 1 }}>
-            {s.value}
-            {s.unit && <span style={{ fontSize: 9, color: 'var(--muted)', fontWeight: 500, marginLeft: 2 }}>{s.unit}</span>}
-          </p>
-        </div>
-      ))}
-    </motion.div>
-  );
+interface GameMode {
+  key: string;
+  emoji: string;
+  tag: string;
+  tagAlt: string;
+  accent: string;
+  glowVar: string;
+  title: string;
+  hook: string;
+  sub: string;
 }
 
-// ── Desktop layout (≥1024px) ─────────────────────────────────
-function DesktopHome({ connected, login, navigate }: { connected: boolean; login: () => void; navigate: (path: string) => void }) {
+const MODES: GameMode[] = [
+  {
+    key: 'classic',
+    emoji: '🤥',
+    tag: 'classic',
+    tagAlt: 'OG mode',
+    accent: 'var(--acid)',
+    glowVar: 'var(--acid-glow)',
+    title: 'sit in the hot seat.',
+    hook: 'lie or die.',
+    sub: 'classic. answer the prompt. table calls cap or no cap.',
+  },
+  {
+    key: 'hottake',
+    emoji: '🌶️',
+    tag: 'hot take',
+    tagAlt: 'crowd-sourced',
+    accent: 'var(--pink)',
+    glowVar: 'var(--pink-glow)',
+    title: 'roast each other.',
+    hook: 'no mercy.',
+    sub: "hot take. y'all write the questions. nobody is safe.",
+  },
+  {
+    key: 'story',
+    emoji: '🎭',
+    tag: 'storyteller',
+    tagAlt: 'cap detector',
+    accent: 'var(--tangerine)',
+    glowVar: 'var(--tangerine-glow)',
+    title: 'spin a wild story.',
+    hook: 'cap or no cap?',
+    sub: 'storyteller. true or made up — sell it. table calls it.',
+  },
+  {
+    key: 'custom',
+    emoji: '🛠️',
+    tag: 'custom',
+    tagAlt: "host's rules",
+    accent: 'var(--azure)',
+    glowVar: 'var(--azure-glow)',
+    title: 'host writes the prompts.',
+    hook: 'play your way.',
+    sub: 'custom. you set the questions before the game starts.',
+  },
+];
+
+/* ── Fake live players ───────────────────────────────────── */
+
+const FAKE_PLAYERS = [
+  { emoji: '😈', name: 'degen_kyle', sol: '+0.42', positive: true },
+  { emoji: '🦊', name: 'foxwifhat', sol: '-0.15', positive: false },
+  { emoji: '🐸', name: 'pepemaxxi', sol: '+1.20', positive: true },
+  { emoji: '💀', name: 'skullcap99', sol: '-0.08', positive: false },
+  { emoji: '🔥', name: 'burnttoast', sol: '+0.33', positive: true },
+];
+
+/* ── HomePage ────────────────────────────────────────────── */
+
+export const HomePage: React.FC = () => {
+  const navigate = useNavigate();
+  const { connected, login, publicKey } = usePrivyWallet();
+  const balance = useWalletBalance(publicKey);
+  const solPrice = useSolPrice();
+
+  /* Mode cycling */
+  const [modeIdx, setModeIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setInterval>>();
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setModeIdx(prev => (prev + 1) % MODES.length);
+        setVisible(true);
+      }, 380);
+    }, 3500);
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const mode = MODES[modeIdx];
+
+  /* Balance display */
+  const balStr = balance !== null ? balance.toFixed(3) : '—';
+  const usdStr = balance !== null && solPrice ? solToUsd(balance, solPrice) : '';
+
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
-      padding: '0 60px 48px', maxWidth: 1300, margin: '0 auto', width: '100%',
-      position: 'relative', zIndex: 1,
-    }}>
-      {/* Top spacer */}
-      <div style={{ padding: '28px 0 0' }} />
+    <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
 
-      {/* Main grid */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center', paddingTop: 40 }}>
+      {/* ── Blob background ─────────────────────────────────── */}
+      <Blobs palette="home" />
 
-        {/* Left: hero + how it works */}
-        <motion.div
-          initial={{ opacity: 0, x: -40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.1 }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 40 }}
-        >
-          <div>
-            <div className="display" style={{ fontSize: 'clamp(48px, 5vw, 72px)', lineHeight: 1.05 }}>
-              The party game<br />with real stakes.
+      {/* ── Scrollable content ──────────────────────────────── */}
+      <div
+        className="scroll-no-bar"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 480,
+          margin: '0 auto',
+          minHeight: '100dvh',
+          padding: '20px 20px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          overflowY: 'auto',
+        }}
+      >
+
+        {/* ── Top bar ─────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+        }}>
+          {/* Wordmark */}
+          <span style={{
+            fontWeight: 800,
+            letterSpacing: '-0.02em',
+            fontSize: 17,
+            color: 'var(--ink)',
+          }}>
+            transparent
+          </span>
+
+          {/* Wallet chip */}
+          {connected && balance !== null ? (
+            <div className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <TokenMark token="sol" size={14} />
+              <span>{balStr}</span>
+              {usdStr && (
+                <span style={{ color: 'var(--ink-faint)', fontSize: 10, fontWeight: 500 }}>
+                  {usdStr}
+                </span>
+              )}
             </div>
-            <p style={{ color: 'var(--muted)', fontSize: 17, marginTop: 16, lineHeight: 1.6, fontWeight: 400, maxWidth: 460 }}>
-              Everyone puts in money. Answer honestly. Most transparent player takes the pot.
+          ) : (
+            <button
+              onClick={login}
+              className="chip"
+              style={{ cursor: 'pointer', border: '1px solid var(--glass-stroke-hi)' }}
+            >
+              connect
+            </button>
+          )}
+        </div>
+
+        {/* ── Hero card ───────────────────────────────────────── */}
+        <div
+          className="glass glass-strong"
+          style={{
+            borderRadius: 32,
+            padding: '28px 26px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 14,
+            overflow: 'hidden',
+            position: 'relative',
+          }}
+        >
+          {/* Crossfade wrapper */}
+          <div style={{
+            transition: 'opacity 380ms ease, transform 380ms ease',
+            opacity: visible ? 1 : 0,
+            transform: visible ? 'translateY(0)' : 'translateY(6px)',
+          }}>
+            {/* Sticker row + emoji */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+              {/* Tags */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <span
+                  className="sticker sticker-acid"
+                  style={{ transform: 'rotate(-3deg)' }}
+                >
+                  {mode.tag}
+                </span>
+                <span
+                  className="sticker sticker-pink"
+                  style={{ transform: 'rotate(2deg)' }}
+                >
+                  {mode.tagAlt}
+                </span>
+              </div>
+
+              {/* Emoji with glow */}
+              <span style={{
+                fontSize: 48,
+                filter: `drop-shadow(0 0 18px ${mode.glowVar})`,
+                animation: 'glow 3s ease-in-out infinite',
+                lineHeight: 1,
+              }}>
+                {mode.emoji}
+              </span>
+            </div>
+
+            {/* Title */}
+            <div
+              className="display"
+              style={{
+                fontSize: 44,
+                lineHeight: 0.95,
+                color: 'var(--ink)',
+                marginBottom: 6,
+              }}
+            >
+              {mode.title}
+            </div>
+
+            {/* Hook line */}
+            <div
+              className="italic-serif"
+              style={{
+                fontSize: 52,
+                color: mode.accent,
+                lineHeight: 1.1,
+                marginBottom: 10,
+              }}
+            >
+              {mode.hook}
+            </div>
+
+            {/* Sub-description */}
+            <p style={{
+              fontSize: 13,
+              color: 'var(--ink-soft)',
+              lineHeight: 1.5,
+            }}>
+              {mode.sub}
             </p>
           </div>
 
-          {/* How it works */}
-          <div>
-            <p className="label-cipher" style={{ marginBottom: 14 }}>How it works</p>
-            <div className="card-pixel corner-accent" style={{ padding: '4px 20px' }}>
-              {[
-                ['01', 'Host creates a room',    'Set the entry fee'],
-                ['02', 'Everyone buys in',       'Cash goes into the pot'],
-                ['03', 'Predict the winner',     'Optional side bet — who\'s most honest?'],
-                ['04', 'Hot seat answers',        'One player faces the questions'],
-                ['05', 'Group votes',             'Honest or lying?'],
-                ['06', 'Most honest player wins', 'Pot paid out instantly'],
-              ].map(([num, title, sub], i, arr) => (
-                <React.Fragment key={num}>
-                  <motion.div
-                    style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 0' }}
-                    initial={{ opacity: 0, x: -16 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 + i * 0.06, type: 'spring', stiffness: 300, damping: 28 }}
-                  >
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--lavender)', width: 22, flexShrink: 0, opacity: 0.7 }}>{num}</span>
-                    <div style={{ flex: 1 }}>
-                      <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-                      <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 10 }}>{sub}</span>
-                    </div>
-                  </motion.div>
-                  {i < arr.length - 1 && <hr className="divider-pixel" />}
-                </React.Fragment>
-              ))}
-            </div>
+          {/* Mode dots */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', justifyContent: 'center' }}>
+            {MODES.map((m, i) => {
+              const isActive = i === modeIdx;
+              return (
+                <div
+                  key={m.key}
+                  style={{
+                    width: isActive ? 24 : 8,
+                    height: 8,
+                    borderRadius: 4,
+                    background: isActive ? mode.accent : 'var(--ink-dim)',
+                    boxShadow: isActive ? `0 0 12px ${mode.glowVar}` : 'none',
+                    transition: 'all 380ms ease',
+                  }}
+                />
+              );
+            })}
           </div>
-        </motion.div>
+        </div>
 
-        {/* Right: actions + NFC card */}
-        <motion.div
-          initial={{ opacity: 0, x: 40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 24, delay: 0.2 }}
-          style={{ display: 'flex', flexDirection: 'column', gap: 20 }}
+        {/* ── Live players rail ────────────────────────────────── */}
+        <div
+          className="glass-flat"
+          style={{
+            padding: '14px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
         >
-          {!connected ? (
-            <div className="card" style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 42, marginBottom: 8 }}>🎯</div>
-                <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>Ready to play?</p>
-                <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 6 }}>Free to set up · Takes 30 seconds</p>
-              </div>
-              <motion.button
-                className="btn btn-primary"
-                onClick={login}
-                whileTap={btnTap}
-                whileHover={{ scale: 1.03, boxShadow: '0 0 48px rgba(196,255,60,0.5)' }}
-                style={{ width: '100%', height: 56, fontSize: 17 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              >
-                Play Now
-              </motion.button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <motion.button
-                className="card"
-                onClick={() => navigate('/create')}
-                whileTap={btnTap}
-                whileHover={{ scale: 1.02, borderColor: 'var(--lime-border)' }}
-                style={{
-                  padding: '28px 32px', cursor: 'pointer', background: 'var(--glass)',
-                  border: '1px solid var(--border)', borderRadius: 'var(--r)',
-                  display: 'flex', alignItems: 'center', gap: 20, textAlign: 'left',
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              >
-                <div style={{ fontSize: 40 }}>🎮</div>
-                <div>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Host a Game</p>
-                  <p style={{ fontSize: 13, color: 'var(--muted)' }}>Create a room · Set the entry fee · Invite friends</p>
-                </div>
-              </motion.button>
-              <motion.button
-                className="card"
-                onClick={() => navigate('/join')}
-                whileTap={btnTap}
-                whileHover={{ scale: 1.02, borderColor: 'var(--lavender-border)' }}
-                style={{
-                  padding: '28px 32px', cursor: 'pointer', background: 'var(--glass)',
-                  border: '1px solid var(--border)', borderRadius: 'var(--r)',
-                  display: 'flex', alignItems: 'center', gap: 20, textAlign: 'left',
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              >
-                <div style={{ fontSize: 40 }}>🚀</div>
-                <div>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Join a Game</p>
-                  <p style={{ fontSize: 13, color: 'var(--muted)' }}>Enter a room code from the host</p>
-                </div>
-              </motion.button>
-            </div>
-          )}
-
-          {/* NFC card */}
-          <div className="card" style={{ padding: 24 }}>
-            <p className="label-cipher" style={{ marginBottom: 14 }}>The physical game</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>📲</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Tap to play</p>
-                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>NFC chip launches the game instantly. Tap and you're in.</p>
-                </div>
-              </div>
-              <hr className="divider-pixel" />
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--lavender-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🎁</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Starter funds included</p>
-                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>Second chip drops funds so your first game is on us.</p>
-                </div>
-              </div>
-            </div>
-            <motion.button
-              className="btn btn-secondary"
-              style={{ marginTop: 16, width: '100%', height: 44, fontSize: 13 }}
-              whileTap={btnTap}
-              whileHover={{ scale: 1.02 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              onClick={() => navigate('/waitlist')}
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <div style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: 'var(--mint)',
+              animation: 'pulseDot 2s ease infinite',
+              flexShrink: 0,
+            }} />
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-faint)',
+              }}
             >
-              Get the physical game →
-            </motion.button>
+              live · players online
+            </span>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'var(--mint)',
+                marginLeft: 'auto',
+              }}
+            >
+              {Math.floor(Math.random() * 40 + 80)}
+            </span>
           </div>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
 
-// ── Mobile layout (<1024px) ──────────────────────────────────
-function MobileHome({ connected, login, navigate, walletAddress }: { connected: boolean; login: () => void; navigate: (path: string) => void; walletAddress: string }) {
-  return (
-    <div className="page" style={{ position: 'relative' }}>
-      {/* Top spacing — clear wallet pill */}
-      <div style={{ width: '100%', minHeight: 100, marginBottom: 24 }} />
-
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 32, paddingTop: 0, paddingBottom: 48, width: '100%', position: 'relative', zIndex: 1 }}
-      >
-        <motion.div variants={pop} initial="initial" animate="animate">
-          <div className="display">The party game<br />with real stakes.</div>
-          <p style={{ color: 'var(--muted)', fontSize: 15, marginTop: 12, lineHeight: 1.6, fontWeight: 400 }}>
-            Everyone puts in money. Answer honestly. Most transparent player takes the pot.
-          </p>
-        </motion.div>
-
-        <motion.div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 26, delay: 0.3 }}>
-          {!connected ? (
-            <>
-              <motion.button className="btn btn-primary" onClick={login} whileTap={btnTap} whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
-                Play Now
-              </motion.button>
-              <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Free to set up · Takes 30 seconds</p>
-            </>
-          ) : (
-            <>
-              <motion.button className="btn btn-primary" onClick={() => navigate('/create')} whileTap={btnTap} whileHover={{ scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
-                Host a Game
-              </motion.button>
-              <motion.button className="btn btn-secondary" onClick={() => navigate('/join')} whileTap={btnTap} whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }}>
-                Join a Game
-              </motion.button>
-              <PlayerStatsCard walletAddress={walletAddress} />
-            </>
-          )}
-        </motion.div>
-
-        <motion.div style={{ marginTop: 8 }} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 28, delay: 0.45 }}>
-          <p className="label-cipher" style={{ marginBottom: 14 }}>How it works</p>
-          <div className="card-pixel corner-accent" style={{ padding: '4px 16px' }}>
-            {[
-              ['01', 'Host creates a room',    'Set the entry fee'],
-              ['02', 'Everyone buys in',       'Cash goes into the pot'],
-              ['03', 'Predict the winner',     'Optional side bet — who\'s most honest?'],
-              ['04', 'Hot seat answers',        'One player faces the questions'],
-              ['05', 'Group votes',             'Honest or lying?'],
-              ['06', 'Most honest player wins', 'Pot paid out instantly'],
-            ].map(([num, title, sub], i, arr) => (
-              <React.Fragment key={num}>
-                <motion.div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '13px 0' }} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.06, type: 'spring', stiffness: 300, damping: 28 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--lavender)', letterSpacing: '0.05em', width: 20, flexShrink: 0, opacity: 0.7 }}>{num}</span>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{title}</span>
-                    <span style={{ fontSize: 13, color: 'var(--muted)', marginLeft: 8 }}>{sub}</span>
-                  </div>
-                </motion.div>
-                {i < arr.length - 1 && <hr className="divider-pixel" />}
-              </React.Fragment>
-            ))}
-          </div>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 240, damping: 28, delay: 0.6 }}>
-          <p className="label-cipher" style={{ marginBottom: 14 }}>The physical game</p>
-          <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>Buy the Transparent card deck and get two NFC chips included.</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>📲</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Tap to play</p>
-                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>One NFC chip launches the game instantly — no typing needed.</p>
-                </div>
-              </div>
-              <hr className="divider-pixel" />
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--lavender-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>🎁</div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Starter funds included</p>
-                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>Second chip drops funds so your first game is on us.</p>
-                </div>
-              </div>
+          {/* Player rows */}
+          {FAKE_PLAYERS.map((p) => (
+            <div
+              key={p.name}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '6px 0',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+              }}
+            >
+              <span style={{ fontSize: 18, width: 28, textAlign: 'center', flexShrink: 0 }}>
+                {p.emoji}
+              </span>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: 'var(--ink-soft)',
+                  flex: 1,
+                }}
+              >
+                {p.name}
+              </span>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: p.positive ? 'var(--mint)' : '#FF5C5C',
+                }}
+              >
+                {p.sol} SOL
+              </span>
             </div>
-            <motion.button className="btn btn-secondary" style={{ marginTop: 4, fontSize: 13, height: 44 }} whileTap={btnTap} whileHover={{ scale: 1.02 }} transition={{ type: 'spring', stiffness: 400, damping: 20 }} onClick={() => navigate('/waitlist')}>
-              Get the physical game →
-            </motion.button>
-          </div>
-        </motion.div>
-      </motion.div>
+          ))}
+        </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, paddingBottom: 8, position: 'relative', zIndex: 1 }}>
-        <p style={{ fontSize: 11, color: 'var(--faint)' }}>
-          Powered by Solana · v1.0
-        </p>
-        <MagicBlockBadge compact />
-      </div>
-    </div>
-  );
-}
+        {/* ── CTA stack ────────────────────────────────────────── */}
+        <div style={{
+          marginTop: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          paddingTop: 8,
+        }}>
+          <button
+            className="btn btn-degen"
+            onClick={() => navigate('/join')}
+          >
+            join a game →
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => navigate('/create')}
+          >
+            create a game
+          </button>
+          <button
+            onClick={() => navigate('/how-to-play')}
+            className="mono"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '10px 0',
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase' as const,
+              color: 'var(--ink-faint)',
+              textAlign: 'center' as const,
+            }}
+          >
+            how to play · rules
+          </button>
+        </div>
 
-// ── Root component ───────────────────────────────────────────
-export const HomePage: React.FC = () => {
-  const navigate = useNavigate();
-  const { connected, login, displayName, logout, publicKey } = usePrivyWallet();
-  const walletAddress = publicKey?.toBase58() ?? null;
-  const props = { connected, login, logout, displayName, navigate, walletAddress };
-
-  return (
-    <div style={{ width: '100%', minHeight: '100vh', position: 'relative' }}>
-      <AnimatedBackground />
-      {/* Desktop */}
-      <div className="desktop-only">
-        <DesktopHome {...props} />
-      </div>
-      {/* Mobile */}
-      <div className="mobile-only">
-        <MobileHome {...props} />
       </div>
     </div>
   );

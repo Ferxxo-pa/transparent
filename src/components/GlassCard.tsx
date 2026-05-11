@@ -3,12 +3,48 @@ import React, { ReactNode } from 'react';
 interface GlassCardProps {
   children: ReactNode;
   className?: string;
+  variant?: 'default' | 'strong' | 'flat';
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({ children, className = '' }) => {
+const VARIANT_STYLES: Record<string, React.CSSProperties> = {
+  default: {
+    background: 'var(--glass)',
+    backdropFilter: 'var(--blur)',
+    WebkitBackdropFilter: 'var(--blur)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r)',
+  },
+  strong: {
+    background: 'var(--glass-heavy)',
+    backdropFilter: 'var(--blur)',
+    WebkitBackdropFilter: 'var(--blur)',
+    border: '1px solid var(--border-2)',
+    borderRadius: 'var(--r)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+  },
+  flat: {
+    background: 'var(--glass)',
+    backdropFilter: 'var(--blur-sm)',
+    WebkitBackdropFilter: 'var(--blur-sm)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--r-sm)',
+  },
+};
+
+export const GlassCard: React.FC<GlassCardProps> = ({
+  children,
+  className = '',
+  variant = 'default',
+}) => {
   return (
     <div
-      className={`relative backdrop-blur-md bg-white/5 rounded-[77.92px] p-8 shadow-[inset_10px_10px_2px_-11px_rgba(255,255,255,0.5),inset_6px_6px_3px_-6px_#B3B3B3,inset_-6px_-6px_3px_-6px_#B3B3B3,inset_0_0_0_3px_#999999,inset_0_0_71px_rgba(242,242,242,0.5)] ${className}`}
+      className={className}
+      style={{
+        padding: 20,
+        width: '100%',
+        position: 'relative',
+        ...VARIANT_STYLES[variant],
+      }}
     >
       {children}
     </div>

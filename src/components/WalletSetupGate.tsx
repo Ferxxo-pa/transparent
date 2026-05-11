@@ -1,11 +1,10 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Loader } from 'lucide-react';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 
 /**
  * Pure Privy gate — wallet is auto-created on login.
- * This just shows a brief loading state while Privy provisions the wallet.
+ * Shows a brief loading state while Privy provisions the wallet.
  * Once walletReady = true, renders children.
  */
 export const WalletSetupGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -25,17 +24,19 @@ export const WalletSetupGate: React.FC<{ children: React.ReactNode }> = ({ child
       >
         <div style={{
           width: 56, height: 56, borderRadius: 16,
-          background: 'rgba(196,255,60,0.1)', border: '1px solid var(--lime-border)',
+          background: 'rgba(196,255,60,0.10)', border: '1px solid rgba(196,255,60,0.28)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Loader size={22} color="var(--lime)" style={{ animation: 'spin 1s linear infinite' }} />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--acid)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
         </div>
         <div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em', marginBottom: 8 }}>
-            Setting up your wallet…
+          <h2 className="display" style={{ fontSize: 20, color: 'var(--ink)', letterSpacing: '-0.02em', marginBottom: 8 }}>
+            setting up your wallet…
           </h2>
-          <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6 }}>
-            This only takes a moment. Your Solana wallet is being created automatically.
+          <p style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+            this only takes a moment. your solana wallet is being created automatically.
           </p>
         </div>
       </motion.div>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { Blobs, BackButton } from '../components';
 
 export const WaitlistPage: React.FC = () => {
   const navigate = useNavigate();
@@ -25,99 +25,151 @@ export const WaitlistPage: React.FC = () => {
       if (err) throw err;
       setDone(true);
     } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong — try again');
+      setError(e?.message ?? 'something went wrong — try again');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="page fade-in">
-      {/* Top spacing */}
-      <div style={{ width: '100%', paddingTop: 16, marginBottom: 8 }}>
-        <motion.button
-          onClick={() => navigate('/')}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', fontSize: 14, fontFamily: 'Space Grotesk', fontWeight: 600 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <ArrowLeft size={15} /> Back
-        </motion.button>
-      </div>
+    <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
+      <Blobs palette="lobby" />
 
-      <motion.div
-        style={{ display: 'flex', flexDirection: 'column', gap: 28, width: '100%', flex: 1 }}
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      <div
+        className="scroll-no-bar"
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 480,
+          margin: '0 auto',
+          minHeight: '100dvh',
+          padding: '20px 20px 32px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 18,
+          overflowY: 'auto',
+        }}
       >
-        {/* Header */}
-        <div>
-          <span className="chip chip-lime" style={{ marginBottom: 16, display: 'inline-block' }}>Coming Soon</span>
-          <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 12 }}>
-            Get first access to the physical game.
-          </h1>
-          <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.7 }}>
-            We're building a real card deck with NFC chips and on-chain stakes built in. Sign up and you'll be the first to know when it's ready to ship.
+        {/* header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+          <BackButton onClick={() => navigate('/')} />
+          <span className="chip chip-acid">coming soon</span>
+        </div>
+
+        {/* title */}
+        <div style={{ marginBottom: 4 }}>
+          <span className="display" style={{ fontSize: 36, lineHeight: 1.05, color: 'var(--ink)' }}>
+            get first{' '}
+          </span>
+          <span className="italic-serif" style={{ fontSize: 36, color: 'var(--acid)' }}>
+            access.
+          </span>
+          <p style={{ fontSize: 14, color: 'var(--ink-soft)', lineHeight: 1.6, marginTop: 12 }}>
+            we're building a real card deck with nfc chips and on-chain stakes built in. sign up and you'll be the first to know when it ships.
           </p>
         </div>
 
-        {/* Form */}
+        {/* form / success */}
         <AnimatePresence mode="wait">
           {done ? (
             <motion.div
               key="done"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="card"
-              style={{ padding: '32px 24px', textAlign: 'center', background: 'rgba(196,255,60,0.06)', border: '1px solid var(--lime-border)' }}
+              className="glass glass-strong"
+              style={{ padding: '32px 24px', borderRadius: 28, textAlign: 'center' }}
             >
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(196,255,60,0.15)', border: '1px solid var(--lime-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <Check size={22} color="var(--lime)" />
-              </div>
-              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--lime)', marginBottom: 8 }}>You're in 🎉</p>
-              <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
-                First to know when something drops. We won't spam you.
+              <motion.div
+                initial={{ scale: 0 }} animate={{ scale: 1 }}
+                transition={{ delay: 0.1, type: 'spring', stiffness: 400, damping: 18 }}
+                style={{ fontSize: 48, lineHeight: 1, marginBottom: 14 }}
+              >
+                🎉
+              </motion.div>
+              <p className="display" style={{ fontSize: 22, color: 'var(--acid)', marginBottom: 8 }}>you're in</p>
+              <p style={{ fontSize: 13, color: 'var(--ink-faint)', lineHeight: 1.6 }}>
+                first to know when something drops. we won't spam you.
               </p>
             </motion.div>
           ) : (
-            <motion.div key="form" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <motion.div
+              key="form"
+              className="glass glass-strong"
+              style={{ padding: '24px 20px', borderRadius: 28, display: 'flex', flexDirection: 'column', gap: 14 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+            >
+              <div>
+                <label className="mono" style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>
+                  name (optional)
+                </label>
                 <input
-                  className="input"
+                  className="input-bare"
                   type="text"
-                  placeholder="Your name (optional)"
+                  placeholder="what should we call you?"
                   value={name}
                   onChange={e => setName(e.target.value)}
                 />
+              </div>
+
+              <div>
+                <label className="mono" style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-faint)', display: 'block', marginBottom: 6 }}>
+                  email
+                </label>
                 <input
-                  className="input"
+                  className="input-bare"
                   type="email"
                   placeholder="your@email.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && submit()}
                 />
-                {error && (
-                  <p style={{ fontSize: 12, color: 'var(--red)' }}>{error}</p>
-                )}
               </div>
-              <motion.button
-                className="btn btn-primary"
-                onClick={submit}
-                disabled={!valid || loading}
-                whileTap={{ scale: 0.96 }}
-                whileHover={valid && !loading ? { scale: 1.03, boxShadow: '0 0 40px rgba(196,255,60,0.45)' } : {}}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-              >
-                {loading ? 'Joining…' : 'Join the waitlist →'}
-              </motion.button>
-              <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)' }}>
-                No spam. Unsubscribe anytime.
-              </p>
+
+              {error && (
+                <div style={{
+                  background: 'rgba(255,92,92,0.10)',
+                  border: '1px solid rgba(255,92,92,0.28)',
+                  borderRadius: 16,
+                  padding: '10px 14px',
+                  color: 'var(--coral)',
+                  fontSize: 13,
+                }}>
+                  {error}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-      </motion.div>
+
+        {/* CTA */}
+        {!done && (
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <button
+              className="btn btn-degen"
+              onClick={submit}
+              disabled={!valid || loading}
+            >
+              {loading ? 'joining...' : 'join the waitlist →'}
+            </button>
+            <p className="mono" style={{ textAlign: 'center', fontSize: 10, color: 'var(--ink-faint)', marginTop: 8, letterSpacing: '0.04em' }}>
+              no spam. unsubscribe anytime.
+            </p>
+          </div>
+        )}
+
+        {done && (
+          <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+            <button
+              className="btn btn-ghost"
+              onClick={() => navigate('/')}
+            >
+              back to home
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

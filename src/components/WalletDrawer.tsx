@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Copy, CheckCheck, LogOut, ExternalLink } from 'lucide-react';
+import { Copy, CheckCheck, LogOut, ExternalLink } from 'lucide-react';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useWalletBalance } from '../hooks/useWalletBalance';
+import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
+import { SolMark } from './SolMark';
 
 interface Props {
   open: boolean;
@@ -12,6 +14,7 @@ interface Props {
 export const WalletDrawer: React.FC<Props> = ({ open, onClose }) => {
   const { publicKey, displayName, logout, walletType } = usePrivyWallet();
   const balance = useWalletBalance(publicKey);
+  const solPrice = useSolPrice();
   const [copied, setCopied] = useState(false);
 
   const address = publicKey?.toBase58() ?? '';
@@ -36,149 +39,137 @@ export const WalletDrawer: React.FC<Props> = ({ open, onClose }) => {
     await logout();
   };
 
+  const balStr = balance === null ? '—' : balance.toFixed(4);
+  const usdStr = balance !== null ? solToUsd(balance, solPrice) : '';
+
   return (
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
+          {/* scrim */}
           <motion.div
-            key="backdrop"
+            key="scrim"
+            className="scrim"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 1000 }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1000 }}
           />
 
-          {/* Drawer */}
+          {/* bottom sheet */}
           <motion.div
-            key="drawer"
-            initial={{ x: '100%', opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: '100%', opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 340, damping: 32 }}
+            key="sheet"
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+            className="glass glass-strong"
             style={{
-              position: 'fixed', top: 0, right: 0, bottom: 0,
-              width: 'min(360px, 100vw)',
-              background: '#0D0F0B',
-              borderLeft: '1px solid var(--border)',
+              position: 'fixed', bottom: 0, left: 0, right: 0,
               zIndex: 1001,
-              display: 'flex', flexDirection: 'column',
-              padding: '24px 24px 32px',
+              borderRadius: '24px 24px 0 0',
+              padding: '12px 24px 32px',
+              maxHeight: '85vh',
               overflowY: 'auto',
+              display: 'flex', flexDirection: 'column',
             }}
           >
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <div>
-                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.02em' }}>
-                  Your Wallet
-                </h2>
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {walletType === 'embedded' ? 'Managed by Privy' : walletType === 'external' ? 'Phantom / Solflare' : 'Loading…'}
-                </p>
-              </div>
-              <motion.button
-                onClick={onClose} whileTap={{ scale: 0.9 }}
-                style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--glass)', border: '1px solid var(--border)', cursor: 'pointer', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={16} />
-              </motion.button>
+            {/* drag handle */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
+              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--ink-dim)' }} />
             </div>
 
-            {/* Balance */}
-            <div style={{
-              background: 'var(--glass)', border: '1px solid var(--lime-border)',
-              borderRadius: 'var(--r)', padding: '20px 24px', marginBottom: 16, textAlign: 'center',
-            }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--lime)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>
-                Balance
+            {/* header */}
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>
+                your wallet
+              </h2>
+              <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 2, letterSpacing: '0.04em' }}>
+                {walletType === 'embedded' ? 'managed by privy' : walletType === 'external' ? 'phantom / solflare' : 'loading…'}
               </p>
-              <p style={{ fontSize: 36, fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em', lineHeight: 1 }}>
-                {balance === null ? '—' : balance.toFixed(4)}
-                <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--muted)', marginLeft: 6 }}>SOL</span>
+            </div>
+
+            {/* balance */}
+            <div className="glass-flat" style={{ padding: '20px 24px', borderRadius: 20, marginBottom: 16, textAlign: 'center' }}>
+              <p className="mono" style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--acid)', marginBottom: 6 }}>
+                balance
               </p>
+              <div className="money" style={{ fontSize: 36, color: 'var(--ink)', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <SolMark size={28} tone="acid" />
+                {balStr}
+              </div>
+              {usdStr && (
+                <p className="mono" style={{ fontSize: 12, color: 'var(--ink-faint)', marginTop: 6 }}>
+                  {usdStr}
+                </p>
+              )}
               {balance !== null && balance < 0.01 && (
-                <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
-                  Fund with devnet SOL to play
+                <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', marginTop: 8, lineHeight: 1.5 }}>
+                  fund with devnet sol to play
                 </p>
               )}
             </div>
 
             {/* QR Code */}
             {qrUrl && (
-              <div style={{
-                background: 'var(--glass)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r)', padding: '20px 24px', marginBottom: 16,
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-              }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  Receive SOL
+              <div className="glass-flat" style={{ padding: '20px 24px', borderRadius: 20, marginBottom: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <p className="mono" style={{ fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                  receive sol
                 </p>
                 <div style={{ padding: 10, background: 'white', borderRadius: 12, display: 'inline-flex' }}>
                   <img src={qrUrl} alt="Wallet QR" width={160} height={160} style={{ borderRadius: 4, display: 'block' }} />
                 </div>
-                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.5 }}>
-                  Scan or tap NFC to send SOL · <strong style={{ color: 'var(--text)' }}>devnet</strong>
+                <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', textAlign: 'center', lineHeight: 1.5 }}>
+                  scan or tap nfc to send sol · <strong style={{ color: 'var(--ink)' }}>devnet</strong>
                 </p>
               </div>
             )}
 
-            {/* Address */}
+            {/* address */}
             {address && (
-              <div style={{
-                background: 'var(--glass)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r)', padding: '14px 16px', marginBottom: 12,
-              }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
-                  Address
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', flex: 1, wordBreak: 'break-all', lineHeight: 1.6 }}>
+              <div className="glass-flat" style={{ padding: '14px 16px', borderRadius: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <p className="mono" style={{ fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 4 }}>address</p>
+                  <p className="mono" style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', wordBreak: 'break-all', lineHeight: 1.6 }}>
                     {shortAddr}
                   </p>
-                  <motion.button
-                    onClick={handleCopy} whileTap={{ scale: 0.9 }}
-                    style={{
-                      width: 34, height: 34, flexShrink: 0,
-                      background: copied ? 'rgba(196,255,60,0.12)' : 'var(--glass)',
-                      border: `1px solid ${copied ? 'var(--lime-border)' : 'var(--border)'}`,
-                      borderRadius: 8, cursor: 'pointer',
-                      color: copied ? 'var(--lime)' : 'var(--muted)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
-                  </motion.button>
                 </div>
+                <motion.button
+                  onClick={handleCopy} whileTap={{ scale: 0.9 }}
+                  className="glass-flat"
+                  style={{
+                    width: 34, height: 34, flexShrink: 0, borderRadius: 10,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: copied ? 'var(--acid)' : 'var(--ink-faint)',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {copied ? <CheckCheck size={14} /> : <Copy size={14} />}
+                </motion.button>
               </div>
             )}
 
-            {/* Explorer */}
+            {/* explorer link */}
             {explorerUrl && (
               <a href={explorerUrl} target="_blank" rel="noopener noreferrer"
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, color: 'var(--lavender)', textDecoration: 'none', padding: '8px 0', fontWeight: 600 }}>
-                <ExternalLink size={12} /> View on Solana Explorer
+                className="mono"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  fontSize: 11, color: 'var(--purple)', textDecoration: 'none', padding: '8px 0', fontWeight: 600,
+                }}>
+                <ExternalLink size={12} /> view on solana explorer
               </a>
             )}
 
             <div style={{ flex: 1 }} />
 
-            {/* Logout */}
+            {/* logout */}
             <motion.button
               onClick={handleLogout} whileTap={{ scale: 0.97 }}
-              whileHover={{ borderColor: 'var(--red-border)', color: 'var(--red)' }}
-              style={{
-                marginTop: 16,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                width: '100%', padding: '14px 0',
-                background: 'var(--glass)', border: '1px solid var(--border)',
-                borderRadius: 'var(--r)', cursor: 'pointer',
-                color: 'var(--muted)', fontSize: 14, fontWeight: 600,
-                fontFamily: 'Space Grotesk', transition: 'all 0.2s',
-              }}
+              className="btn btn-ghost"
+              style={{ marginTop: 16, fontSize: 14 }}
             >
-              <LogOut size={15} /> Sign out · {displayName}
+              <LogOut size={15} /> sign out · {displayName}
             </motion.button>
           </motion.div>
         </>

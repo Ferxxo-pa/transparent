@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { SolMark } from './SolMark';
 
 /**
- * Floating button + modal to raise the pot during a round.
+ * Bottom-sheet modal to raise the pot during a round.
  * Any player can add SOL to pressure the hot seat player into answering.
  * Shows during the 'answering' phase.
  */
@@ -43,141 +44,129 @@ export const RaisePot: React.FC = () => {
 
   return (
     <>
-      {/* Floating raise button */}
+      {/* floating raise button */}
       <motion.button
         onClick={() => setOpen(true)}
         whileTap={{ scale: 0.92 }}
+        className="glass-flat"
         style={{
           position: 'fixed',
           bottom: 24,
           right: 24,
-          background: justRaised ? 'var(--lime)' : 'var(--card-2)',
-          color: justRaised ? '#000' : 'var(--text)',
-          border: `1.5px solid ${justRaised ? 'var(--lime)' : 'var(--border-2)'}`,
-          borderRadius: 'var(--r)',
           padding: '12px 20px',
           fontWeight: 700,
-          fontSize: 14,
+          fontSize: 13,
           cursor: 'pointer',
           zIndex: 50,
           display: 'flex',
           alignItems: 'center',
           gap: 8,
+          color: justRaised ? 'var(--bg)' : 'var(--tangerine)',
+          background: justRaised ? 'var(--acid)' : 'rgba(255,138,42,0.08)',
+          borderColor: justRaised ? 'var(--acid)' : 'rgba(255,138,42,0.28)',
           boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
           transition: 'all 0.2s',
         }}
       >
-        {justRaised ? '✓ Raised!' : '🔥 Raise the Pot'}
+        {justRaised ? '✓ raised!' : 'raise +'}
       </motion.button>
 
-      {/* Modal overlay */}
+      {/* scrim + bottom sheet */}
       <AnimatePresence>
         {open && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            className="scrim"
             onClick={() => setOpen(false)}
             style={{
               position: 'fixed',
               inset: 0,
-              background: 'rgba(0,0,0,0.7)',
               zIndex: 100,
               display: 'flex',
               alignItems: 'flex-end',
               justifyContent: 'center',
-              padding: 16,
             }}
           >
             <motion.div
-              initial={{ y: 100, opacity: 0 }}
+              initial={{ y: '100%', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 30 }}
               onClick={e => e.stopPropagation()}
-              className="card"
-              style={{ width: '100%', maxWidth: 380, marginBottom: 16 }}
+              className="glass glass-strong"
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                borderRadius: '32px 32px 0 0',
+                padding: '20px 24px 32px',
+              }}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Header */}
-                <div>
-                  <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>🔥 Raise the Pot</p>
-                  <p style={{ color: 'var(--muted)', fontSize: 13 }}>
-                    Add SOL to pressure {gameState?.players.find(p => p.id === gameState?.currentPlayerInHotSeat)?.name || 'them'} into answering honestly
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {/* drag handle */}
+                <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--glass-stroke-hi)', margin: '0 auto 4px' }} />
+
+                {/* header */}
+                <div style={{ textAlign: 'center' }}>
+                  <span className="sticker sticker-tangerine" style={{ marginBottom: 12, display: 'inline-block' }}>raise</span>
+                  <p className="display" style={{ fontSize: 32, marginTop: 10 }}>
+                    jack the <span className="italic-serif" style={{ color: 'var(--tangerine)' }}>pot.</span>
+                  </p>
+                  <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 8 }}>
+                    10s for everyone to match or fold.
                   </p>
                 </div>
 
-                {/* Current pot */}
-                <div style={{ 
-                  textAlign: 'center', 
-                  padding: '14px',
-                  borderRadius: 'var(--r-sm)',
-                  background: 'var(--card-2)',
-                  border: '1px solid var(--border)',
-                }}>
-                  <p className="label-sm" style={{ marginBottom: 4 }}>Current Pot</p>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: 'var(--lime)' }}>
-                    {(gameState?.currentPot || 0).toFixed(2)} SOL
-                  </p>
-                </div>
-
-                {/* Preset amounts */}
+                {/* preset amounts */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
                   {presets.map(p => (
                     <button
                       key={p}
                       onClick={() => setAmount(p.toString())}
+                      className="glass-flat"
                       style={{
-                        padding: '10px 0',
-                        borderRadius: 'var(--r-sm)',
-                        border: `1.5px solid ${amount === p.toString() ? 'var(--lime-border)' : 'var(--border)'}`,
-                        background: amount === p.toString() ? 'var(--lime-bg)' : 'var(--card)',
+                        padding: '12px 0',
                         cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: 'var(--text)',
+                        fontWeight: 700,
+                        fontSize: 14,
+                        color: amount === p.toString() ? 'var(--bg)' : 'var(--ink)',
+                        background: amount === p.toString() ? 'var(--tangerine)' : undefined,
+                        borderColor: amount === p.toString() ? 'var(--tangerine)' : undefined,
+                        transition: 'all 0.15s',
                       }}
                     >
-                      +{p}
+                      {p}
                     </button>
                   ))}
                 </div>
 
-                {/* Custom amount */}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    className="input"
-                    type="number"
-                    step="0.01"
-                    min="0.001"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    placeholder="Custom amount (SOL)"
-                    style={{ flex: 1 }}
-                  />
-                </div>
-
-                {/* Raise button */}
+                {/* CTA */}
                 <button
-                  className="btn btn-primary"
                   onClick={handleRaise}
                   disabled={!amount || parseFloat(amount) <= 0 || sending}
-                  style={{ width: '100%' }}
-                >
-                  {sending ? 'Sending...' : `Raise +${amount || '0'} SOL`}
-                </button>
-
-                <button
-                  onClick={() => setOpen(false)}
                   style={{
-                    background: 'none',
+                    width: '100%',
+                    padding: '16px',
+                    borderRadius: 16,
                     border: 'none',
-                    color: 'var(--muted)',
-                    fontSize: 13,
+                    background: 'var(--tangerine)',
+                    color: '#0A0810',
+                    fontWeight: 800,
+                    fontSize: 16,
                     cursor: 'pointer',
-                    padding: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    opacity: (!amount || parseFloat(amount) <= 0 || sending) ? 0.4 : 1,
+                    transition: 'opacity 0.15s',
+                    boxShadow: '0 0 24px var(--tangerine-glow)',
                   }}
                 >
-                  Cancel
+                  {sending ? 'sending...' : (
+                    <>raise +<SolMark size={16} tone="dark" /> {amount || '0'}</>
+                  )}
                 </button>
               </div>
             </motion.div>
