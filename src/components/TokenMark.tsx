@@ -106,24 +106,27 @@ interface TokenMarkProps {
   size?: number;
 }
 
-export const TokenMark: React.FC<TokenMarkProps> = ({ token, size = 20 }) => {
+export const TokenMark: React.FC<TokenMarkProps> = ({ token, size = 14 }) => {
   const t = TOKENS[token.toLowerCase()];
   if (!t) return null;
 
   if (token.toLowerCase() === 'sol') {
-    return <SolMark size={size} tone="acid" />;
+    return <SolMark size={size} tone="ink" />;
   }
 
   return (
     <span
       style={{
-        fontSize: size * 0.9,
+        display: 'inline-grid',
+        placeItems: 'center',
+        width: size + 4,
+        height: size + 4,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.14)',
+        fontSize: size - 2,
         lineHeight: 1,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: size,
-        height: size,
+        verticalAlign: '-3px',
         flexShrink: 0,
       }}
       role="img"
@@ -150,15 +153,16 @@ export const UsdTag: React.FC<UsdTagProps> = ({ amount, token, className = '' })
 
   return (
     <span
-      className={className}
+      className={`mono ${className}`}
       style={{
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 500,
-        color: 'var(--muted)',
-        letterSpacing: '-0.01em',
+        color: 'var(--ink-faint)',
+        letterSpacing: '0.04em',
+        marginLeft: 6,
       }}
     >
-      {est}
+      ({est})
     </span>
   );
 };

@@ -93,15 +93,14 @@ export const JoinGamePage: React.FC = () => {
           transition={{ type: 'spring', stiffness: 280, damping: 26 }}
         >
           {/* sticker */}
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'inline-flex', marginBottom: 14 }}>
             <span className="sticker sticker-azure">code</span>
           </div>
 
           {/* title */}
-          <div style={{ marginBottom: 28 }}>
-            <span className="display" style={{ fontSize: 28 }}>drop the </span>
-            <span className="italic-serif" style={{ fontSize: 28, color: 'var(--azure)' }}>digits</span>
-          </div>
+          <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 22, lineHeight: 1 }}>
+            drop the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>digits</span>
+          </h2>
 
           {/* 6 digit inputs */}
           <div
@@ -131,7 +130,7 @@ export const JoinGamePage: React.FC = () => {
                     textAlign: 'center',
                     outline: 'none',
                     caretColor: 'var(--azure)',
-                    transition: 'border-color 0.15s, color 0.15s',
+                    transition: 'all 0.2s',
                     WebkitAppearance: 'none',
                   }}
                 />
@@ -144,8 +143,8 @@ export const JoinGamePage: React.FC = () => {
           </div>
 
           {/* handle field */}
-          <div style={{ textAlign: 'left' }}>
-            <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+          <div style={{ marginTop: 24, textAlign: 'left' }}>
+            <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
               your handle
             </label>
             <input

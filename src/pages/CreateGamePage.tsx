@@ -90,14 +90,9 @@ export const CreateGamePage: React.FC = () => {
         </div>
 
         {/* ── Title ───────────────────────────────────────────── */}
-        <div style={{ marginBottom: 4 }}>
-          <span className="display" style={{ fontSize: 36, lineHeight: 1.05, color: 'var(--ink)' }}>
-            set the{' '}
-          </span>
-          <span className="italic-serif" style={{ fontSize: 36, color: 'var(--pink)' }}>
-            vibe.
-          </span>
-        </div>
+        <h2 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 14, lineHeight: 1 }}>
+          set the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--pink)' }}>vibe.</span>
+        </h2>
 
         {/* ── Desktop 2-col grid wraps modes (left) + settings (right) ── */}
         <div className="page-grid--create">
@@ -162,28 +157,24 @@ export const CreateGamePage: React.FC = () => {
         {/* ── How it works toggle ─────────────────────────────── */}
         <button
           onClick={() => setShowHowItWorks(!showHowItWorks)}
+          className="mono"
           style={{
-            background: 'none',
+            background: 'transparent',
             border: 'none',
-            cursor: 'pointer',
+            color: 'var(--ink-soft)',
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
             padding: '8px 4px 10px',
-            display: 'inline-flex',
+            textAlign: 'left',
+            cursor: 'pointer',
+            fontFamily: "'JetBrains Mono', monospace",
+            display: 'flex',
             alignItems: 'center',
             gap: 6,
           }}
         >
-          <span
-            className="mono"
-            style={{
-              fontSize: 10,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-soft)',
-            }}
-          >
-            {showHowItWorks ? '− hide' : '+ how it works'}
-            <span style={{ color: 'var(--acid)' }}>· {MODES.find(m => m.id === mode)?.label}</span>
-          </span>
+          {showHowItWorks ? '− hide' : '+ how it works'} <span style={{ color: 'var(--acid)' }}>· {MODES.find(m => m.id === mode)?.label}</span>
         </button>
 
         {showHowItWorks && (
@@ -313,10 +304,11 @@ export const CreateGamePage: React.FC = () => {
                 background: 'rgba(255,255,255,0.04)',
                 color: customValue ? 'var(--acid)' : 'var(--ink-soft)',
                 fontSize: 12,
-                fontWeight: 600,
+                fontWeight: 700,
                 textAlign: 'center',
                 outline: 'none',
                 fontFamily: "'JetBrains Mono', monospace",
+                transition: 'all 0.2s',
               }}
             />
           </div>
@@ -388,10 +380,11 @@ export const CreateGamePage: React.FC = () => {
                 background: 'rgba(255,255,255,0.04)',
                 color: 'var(--ink)',
                 fontSize: 10,
-                fontWeight: 600,
+                fontWeight: 700,
                 textAlign: 'center',
                 outline: 'none',
                 fontFamily: "'JetBrains Mono', monospace",
+                transition: 'all 0.2s',
               }}
             />
           </div>
@@ -424,8 +417,8 @@ export const CreateGamePage: React.FC = () => {
             {loading ? 'creating...' : (
               <>
                 spin it up · <TokenMark token={selectedToken} size={14} />
-                {' '}{buyInNum > 0 ? buyInRaw : 'free'}
-                {usdEst ? ` (${usdEst})` : ''}
+                {' '}{buyInNum > 0 ? buyInRaw : '0'}
+                {usdEst && <span className="mono" style={{ fontSize: 10, opacity: 0.6 }}>{usdEst}</span>}
               </>
             )}
           </button>
