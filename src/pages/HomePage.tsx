@@ -165,7 +165,7 @@ export const HomePage: React.FC = () => {
         </div>
 
         {/* ── Two-column grid on desktop ──────────────────────── */}
-        <div className="page-grid--home" style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
+        <div className="page-grid--home">
 
           {/* ── Left column: Hero card ─────────────────────────── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
