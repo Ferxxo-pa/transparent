@@ -52,51 +52,41 @@ interface BlobsProps {
   palette?: BlobPalette;
 }
 
+interface Layer {
+  id: number;
+  palette: BlobPalette;
+  opacity: number;
+}
+
+let layerCounter = 0;
+
 export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
-  const [current, setCurrent] = useState(palette);
-  const [prev, setPrev] = useState<BlobPalette | null>(null);
-  const [fading, setFading] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const [layers, setLayers] = useState<Layer[]>([
+    { id: layerCounter++, palette, opacity: 1 },
+  ]);
+  const prevPalette = useRef(palette);
+  const cleanupRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    if (palette !== current) {
-      setPrev(current);
-      setCurrent(palette);
-      setFading(true);
+    if (palette === prevPalette.current) return;
+    prevPalette.current = palette;
 
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setPrev(null);
-        setFading(false);
-      }, 1800);
-    }
+    // Add new layer on top, fade out old layers
+    setLayers(prev => [
+      ...prev.map(l => ({ ...l, opacity: 0 })),
+      { id: layerCounter++, palette, opacity: 1 },
+    ]);
+
+    // Remove old layers after transition completes
+    if (cleanupRef.current) clearTimeout(cleanupRef.current);
+    cleanupRef.current = setTimeout(() => {
+      setLayers(prev => prev.filter(l => l.opacity > 0));
+    }, 2500);
+
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (cleanupRef.current) clearTimeout(cleanupRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [palette]);
-
-  const renderBlobs = (blobs: BlobDef[], opacity: number) =>
-    blobs.map((b, i) => (
-      <div
-        key={`${b.c}-${i}`}
-        className={`blob ${b.anim}`}
-        style={{
-          position: 'absolute',
-          left: b.x,
-          top: b.y,
-          width: b.s,
-          height: b.s,
-          borderRadius: '50%',
-          background: b.c,
-          opacity: b.a * opacity,
-          filter: 'blur(60px)',
-          willChange: 'transform, opacity',
-          transition: 'opacity 1800ms cubic-bezier(0.4, 0, 0.2, 1)',
-          pointerEvents: 'none' as const,
-        }}
-      />
-    ));
 
   return (
     <div
@@ -109,13 +99,40 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
         pointerEvents: 'none',
       }}
     >
-      {/* Previous palette fading out */}
-      {prev && fading && renderBlobs(BLOB_PALETTES[prev], 0)}
+      {layers.map(layer => (
+        <div
+          key={layer.id}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            opacity: layer.opacity,
+            transition: 'opacity 2200ms cubic-bezier(0.4, 0, 0.2, 1)',
+            pointerEvents: 'none',
+          }}
+        >
+          {(BLOB_PALETTES[layer.palette] || []).map((b, i) => (
+            <div
+              key={i}
+              className={`blob ${b.anim}`}
+              style={{
+                position: 'absolute',
+                left: b.x,
+                top: b.y,
+                width: b.s,
+                height: b.s,
+                borderRadius: '50%',
+                background: b.c,
+                opacity: b.a,
+                filter: 'blur(60px)',
+                willChange: 'transform',
+                pointerEvents: 'none' as const,
+              }}
+            />
+          ))}
+        </div>
+      ))}
 
-      {/* Current palette fading in */}
-      {renderBlobs(BLOB_PALETTES[current], fading ? 0.85 : 1)}
-
-      {/* Vignette — darkens edges, keeps blobs contained */}
+      {/* Vignette */}
       <div style={{
         position: 'absolute',
         inset: 0,
