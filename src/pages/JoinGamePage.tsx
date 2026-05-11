@@ -75,129 +75,134 @@ export const JoinGamePage: React.FC = () => {
 
   return (
     <WalletSetupGate>
-      <div className="page page--form fade-in" style={{ position: 'relative' }}>
+      <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
         <Blobs palette="join" />
 
-        {/* header */}
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 24 }}>
-          <BackButton onClick={() => navigate('/')} />
-          <WalletChip />
-        </div>
-
-        {/* main card — centered vertically */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <motion.div
-          className="glass glass-strong"
-          style={{ width: '100%', padding: '30px 24px', borderRadius: 30, textAlign: 'center' }}
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        <div
+          className="page page--form fade-in scroll-no-bar"
+          style={{ position: 'relative', zIndex: 1, overflowY: 'auto' }}
         >
-          {/* sticker */}
-          <div style={{ display: 'inline-flex', marginBottom: 14 }}>
-            <span className="sticker sticker-azure">code</span>
+          {/* header */}
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <BackButton onClick={() => navigate('/')} />
+            <WalletChip />
           </div>
 
-          {/* title */}
-          <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 22, lineHeight: 1 }}>
-            drop the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>digits</span>
-          </h2>
-
-          {/* 6 digit inputs */}
-          <div
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 28 }}
-            onPaste={handlePaste}
-          >
-            {digits.map((d, i) => (
-              <React.Fragment key={i}>
-                <input
-                  ref={el => { inputRefs.current[i] = el; }}
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={d}
-                  onChange={e => handleDigitChange(i, e.target.value)}
-                  onKeyDown={e => handleKeyDown(i, e)}
-                  style={{
-                    width: 38,
-                    height: 56,
-                    borderRadius: 14,
-                    background: d ? 'rgba(77,168,255,0.15)' : 'rgba(255,255,255,0.04)',
-                    border: d ? '1.5px solid rgba(77,168,255,0.6)' : '1px solid rgba(255,255,255,0.12)',
-                    color: d ? 'var(--azure)' : 'var(--ink)',
-                    fontSize: 26,
-                    fontFamily: "'JetBrains Mono', monospace",
-                    fontWeight: 700,
-                    textAlign: 'center',
-                    outline: 'none',
-                    caretColor: 'var(--azure)',
-                    transition: 'all 0.2s',
-                    WebkitAppearance: 'none',
-                  }}
-                />
-                {/* dot separator after digit 3 */}
-                {i === 2 && (
-                  <div style={{ alignSelf: 'center', color: 'var(--ink-faint)', fontSize: 24, fontWeight: 700 }}>·</div>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-
-          {/* handle field */}
-          <div style={{ marginTop: 24, textAlign: 'left' }}>
-            <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
-              your handle
-            </label>
-            <input
-              className="input-bare"
-              type="text"
-              value={nickname}
-              onChange={e => setNickname(e.target.value)}
-              placeholder="@degen"
-              maxLength={18}
-            />
-          </div>
-        </motion.div>
-        </div>
-
-        {/* error */}
-        {error && (
+          {/* main card — centered vertically */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            style={{
-              width: '100%',
-              marginTop: 16,
-              background: 'rgba(255,92,92,0.08)',
-              border: '1px solid rgba(255,92,92,0.25)',
-              borderRadius: 16,
-              padding: '12px 14px',
-              color: 'var(--coral)',
-              fontSize: 13,
-              textAlign: 'center',
-            }}
+            className="glass glass-strong"
+            style={{ width: '100%', padding: '30px 24px', borderRadius: 30, textAlign: 'center' }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 26 }}
           >
-            {error.includes('TypeError') || error.includes('Failed to fetch')
-              ? 'connection error — check your internet and try again'
-              : error}
-          </motion.div>
-        )}
+            {/* sticker */}
+            <div style={{ display: 'inline-flex', marginBottom: 14 }}>
+              <span className="sticker sticker-azure">code</span>
+            </div>
 
-        {/* CTA */}
-        <div style={{ width: '100%', paddingTop: 20, paddingBottom: 16 }}>
-          <motion.button
-            className="btn btn-degen"
-            onClick={handleJoin}
-            disabled={!allFilled || loading}
-            whileTap={allFilled && !loading ? { scale: 0.96 } : {}}
-            style={{ opacity: !allFilled || loading ? 0.4 : 1, cursor: !allFilled || loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          >
-            {loading ? 'joining...' : (
-              <>
-                ape in · <SolMark size={14} tone="dark" /> 0.1
-              </>
-            )}
-          </motion.button>
+            {/* title */}
+            <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 22, lineHeight: 1 }}>
+              drop the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>digits</span>
+            </h2>
+
+            {/* 6 digit inputs */}
+            <div
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 28 }}
+              onPaste={handlePaste}
+            >
+              {digits.map((d, i) => (
+                <React.Fragment key={i}>
+                  <input
+                    ref={el => { inputRefs.current[i] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={d}
+                    onChange={e => handleDigitChange(i, e.target.value)}
+                    onKeyDown={e => handleKeyDown(i, e)}
+                    style={{
+                      width: 38,
+                      height: 56,
+                      borderRadius: 14,
+                      background: d ? 'rgba(77,168,255,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: d ? '1.5px solid rgba(77,168,255,0.6)' : '1px solid rgba(255,255,255,0.12)',
+                      color: d ? 'var(--azure)' : 'var(--ink)',
+                      fontSize: 26,
+                      fontFamily: "'JetBrains Mono', monospace",
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      outline: 'none',
+                      caretColor: 'var(--azure)',
+                      transition: 'all 0.2s',
+                      WebkitAppearance: 'none',
+                    }}
+                  />
+                  {/* dot separator after digit 3 */}
+                  {i === 2 && (
+                    <div style={{ alignSelf: 'center', color: 'var(--ink-faint)', fontSize: 24, fontWeight: 700 }}>·</div>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* handle field */}
+            <div style={{ marginTop: 24, textAlign: 'left' }}>
+              <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                your handle
+              </label>
+              <input
+                className="input-bare"
+                type="text"
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                placeholder="@degen"
+                maxLength={18}
+              />
+            </div>
+          </motion.div>
+          </div>
+
+          {/* error */}
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              style={{
+                width: '100%',
+                marginTop: 16,
+                background: 'rgba(255,92,92,0.08)',
+                border: '1px solid rgba(255,92,92,0.25)',
+                borderRadius: 16,
+                padding: '12px 14px',
+                color: 'var(--coral)',
+                fontSize: 13,
+                textAlign: 'center',
+              }}
+            >
+              {error.includes('TypeError') || error.includes('Failed to fetch')
+                ? 'connection error — check your internet and try again'
+                : error}
+            </motion.div>
+          )}
+
+          {/* CTA */}
+          <div style={{ width: '100%', paddingTop: 20, paddingBottom: 24 }}>
+            <motion.button
+              className="btn btn-degen"
+              onClick={handleJoin}
+              disabled={!allFilled || loading}
+              whileTap={allFilled && !loading ? { scale: 0.96 } : {}}
+              style={{ opacity: !allFilled || loading ? 0.4 : 1, cursor: !allFilled || loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              {loading ? 'joining...' : (
+                <>
+                  ape in · <SolMark size={14} tone="dark" /> 0.1
+                </>
+              )}
+            </motion.button>
+          </div>
         </div>
       </div>
     </WalletSetupGate>
