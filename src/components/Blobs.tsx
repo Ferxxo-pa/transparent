@@ -21,8 +21,9 @@ export const BLOB_PALETTES: Record<string, BlobDef[]> = {
     { c: '#A968FF', x: '60%', y: '90%', s: 280, a: 0.55, anim: 'blob-3' },
   ],
   join: [
-    { c: '#4DA8FF', x: '-10%', y: '20%', s: 380, a: 0.7, anim: 'blob-1' },
-    { c: '#C4FF3C', x: '75%', y: '70%', s: 340, a: 0.7, anim: 'blob-2' },
+    { c: '#4DA8FF', x: '-10%', y: '10%', s: 420, a: 0.75, anim: 'blob-1' },
+    { c: '#C4FF3C', x: '75%', y: '65%', s: 360, a: 0.7, anim: 'blob-2' },
+    { c: '#A968FF', x: '30%', y: '90%', s: 300, a: 0.5, anim: 'blob-3' },
   ],
   lobby: [
     { c: '#A968FF', x: '50%', y: '0%', s: 380, a: 0.75, anim: 'blob-1' },
