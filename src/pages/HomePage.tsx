@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, TokenMark, SolMark } from '../components';
-import { WalletDrawer } from '../components/WalletDrawer';
-import { useWalletBalance } from '../hooks/useWalletBalance';
-import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
+import { Blobs, SolMark, WalletChip } from '../components';
 
 /* ── Game modes ──────────────────────────────────────────── */
 
@@ -86,11 +82,6 @@ const FAKE_PLAYERS = [
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
-  const { connected, login, publicKey } = usePrivyWallet();
-  const balance = useWalletBalance(publicKey);
-  const solPrice = useSolPrice();
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
 
   /* Mode cycling */
   const [modeIdx, setModeIdx] = useState(0);
@@ -117,10 +108,6 @@ export const HomePage: React.FC = () => {
   };
 
   const mode = MODES[modeIdx];
-
-  /* Balance display */
-  const balStr = balance !== null ? balance.toFixed(3) : '—';
-  const usdStr = balance !== null && solPrice ? solToUsd(balance, solPrice) : '';
 
   const fadeStyle = {
     opacity: visible ? 1 : 0,
@@ -164,29 +151,7 @@ export const HomePage: React.FC = () => {
           </span>
 
           {/* Wallet chip */}
-          {connected && balance !== null ? (
-            <button
-              onClick={() => setDrawerOpen(true)}
-              className="chip"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit' }}
-            >
-              <TokenMark token="sol" size={11} />
-              <span>{balStr}</span>
-              {usdStr && (
-                <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)', marginLeft: 2 }}>
-                  {usdStr}
-                </span>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={login}
-              className="chip"
-              style={{ cursor: 'pointer', border: '1px solid var(--glass-stroke-hi)' }}
-            >
-              connect
-            </button>
-          )}
+          <WalletChip />
         </div>
 
         {/* ── Hero card ──────────────────────────────────────── */}
@@ -404,8 +369,6 @@ export const HomePage: React.FC = () => {
         </div>
 
       </div>
-      {/* Wallet drawer */}
-      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 };

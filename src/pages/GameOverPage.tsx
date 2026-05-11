@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { calculateSplitPayouts } from '../types/game';
-import { Blobs, BackButton, SolMark, usdEstimate } from '../components';
+import { Blobs, BackButton, SolMark, usdEstimate, WalletChip } from '../components';
 import { useSolPrice } from '../hooks/useSolPrice';
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -157,7 +157,10 @@ export const GameOverPage: React.FC = () => {
         {/* ── header row ── */}
         <div className="navbar" style={{ marginBottom: 16 }}>
           <BackButton onClick={() => { resetGame(); navigate('/'); }} />
-          <span className="chip chip-acid">final ✦</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="chip chip-acid">final ✦</span>
+            <WalletChip />
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>

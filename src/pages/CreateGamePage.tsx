@@ -4,7 +4,7 @@ import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice } from '../hooks/useSolPrice';
 import { QuestionMode, PayoutMode } from '../types/game';
-import { Blobs, BackButton, TokenMark, UsdTag, TOKENS, TOKEN_LIST, parseAmt, usdEstimate } from '../components';
+import { Blobs, BackButton, SolMark, WalletChip, parseAmt, usdEstimate } from '../components';
 
 /* ── Mode definitions ────────────────────────────────────── */
 
@@ -15,13 +15,9 @@ const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] =
   { id: 'custom',      label: 'custom',      sub: 'you write every question before it starts.', emoji: '🛠️' },
 ];
 
-/* ── Token chips (icon-only) ─────────────────────────────── */
+/* ── Presets ─────────────────────────────────────────────── */
 
-const TOKEN_CHIPS = ['sol', 'bonk', 'wif', 'popcat', 'pengu'];
-
-/* ── Presets for SOL (default) ───────────────────────────── */
-
-const SOL_PRESETS = ['0', '0.05', '0.1', '0.25', '0.5'];
+const BUY_IN_PRESETS = ['0', '0.05', '0.1', '0.25', '0.5'];
 const ROUND_PRESETS = [3, 5, 7, 10];
 
 /* ── CreateGamePage ──────────────────────────────────────── */
@@ -33,16 +29,13 @@ export const CreateGamePage: React.FC = () => {
   const solPrice = useSolPrice();
 
   const [mode, setMode]               = useState<QuestionMode>('classic');
-  const [selectedToken, setToken]      = useState('sol');
   const [buyInRaw, setBuyInRaw]        = useState('0.1');
   const [activePreset, setActivePreset] = useState('0.1');
   const [rounds, setRounds]            = useState(5);
   const [customRounds, setCustomRounds] = useState('');
 
   const buyInNum = parseAmt(buyInRaw);
-  const token = TOKENS[selectedToken] || TOKENS.sol;
-  const presets = selectedToken === 'sol' ? SOL_PRESETS : token.presets.map(String);
-  const usdEst = usdEstimate(buyInNum, selectedToken, solPrice);
+  const usdEst = usdEstimate(buyInNum, 'sol', solPrice);
   const customValue = activePreset !== buyInRaw ? buyInRaw : '';
 
   const handleCreate = async () => {
@@ -80,7 +73,7 @@ export const CreateGamePage: React.FC = () => {
         }}
       >
 
-        {/* ── Header: back LEFT, chip RIGHT ──────────────────── */}
+        {/* ── Header: back LEFT, wallet RIGHT ─────────────────── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -89,7 +82,7 @@ export const CreateGamePage: React.FC = () => {
           flexShrink: 0,
         }}>
           <BackButton onClick={() => navigate('/')} />
-          <div className="chip">new room</div>
+          <WalletChip />
         </div>
 
         {/* ── Title ───────────────────────────────────────────── */}
@@ -171,50 +164,17 @@ export const CreateGamePage: React.FC = () => {
               buy-in
             </span>
             <span className="money" style={{ fontSize: 22, color: 'var(--acid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <TokenMark token={selectedToken} size={16} />
+              <SolMark size={16} tone="acid" />
               {' '}{buyInNum > 0 ? buyInRaw : '0'}
               {usdEst && (
-                <UsdTag amount={buyInNum} token={selectedToken} />
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600 }}>{usdEst}</span>
               )}
             </span>
           </div>
 
-          {/* Token row */}
-          <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-            {TOKEN_CHIPS.map(tid => {
-              const isActive = selectedToken === tid;
-              return (
-                <button
-                  key={tid}
-                  onClick={() => {
-                    setToken(tid);
-                    const newPresets = tid === 'sol' ? SOL_PRESETS : (TOKENS[tid]?.presets?.map(String) || ['0']);
-                    setBuyInRaw(newPresets[1] || newPresets[0]);
-                    setActivePreset(newPresets[1] || newPresets[0]);
-                  }}
-                  style={{
-                    flex: 1,
-                    height: 30,
-                    borderRadius: 10,
-                    border: isActive ? '1px solid rgba(196,255,60,0.5)' : '1px solid rgba(255,255,255,0.08)',
-                    background: isActive ? 'rgba(196,255,60,0.14)' : 'rgba(255,255,255,0.03)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s',
-                    flexShrink: 0,
-                  }}
-                >
-                  <TokenMark token={tid} size={20} />
-                </button>
-              );
-            })}
-          </div>
-
           {/* Preset row */}
           <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
-            {presets.map(p => {
+            {BUY_IN_PRESETS.map(p => {
               const isActive = activePreset === p && buyInRaw === p;
               return (
                 <button
@@ -373,9 +333,8 @@ export const CreateGamePage: React.FC = () => {
               'connect wallet to create'
             ) : (
               <>
-                spin it up · <TokenMark token={selectedToken} size={14} />
-                {' '}{buyInNum > 0 ? buyInRaw : '0'}
-                {usdEst && <span className="mono" style={{ fontSize: 10, opacity: 0.6 }}>{usdEst}</span>}
+                spin it up · <SolMark size={14} tone="dark" />
+                {' '}{buyInNum > 0 ? buyInRaw : 'FREE'}
               </>
             )}
           </button>

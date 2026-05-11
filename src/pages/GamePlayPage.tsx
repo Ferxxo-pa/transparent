@@ -11,7 +11,7 @@ import { RaisePot } from '../components/RaisePot';
 import { MagicBlockBadge } from '../components/MagicBlockBadge';
 import { QUESTIONS } from '../types/game';
 import { StorytellerPhase } from '../components/StorytellerPhase';
-import { Blobs, BackButton, Avatar, SolMark } from '../components';
+import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
@@ -77,8 +77,10 @@ export const GamePlayPage: React.FC = () => {
   const TopBar = () => (
     <div style={{ width: '100%', paddingTop: 16, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <BackButton onClick={() => navigate(-1)} />
-      <span className="chip" style={{ fontSize: 11 }}>round {round} / {total}</span>
-      <MagicBlockBadge compact />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="chip" style={{ fontSize: 11 }}>round {round} / {total}</span>
+        <WalletChip />
+      </div>
     </div>
   );
 

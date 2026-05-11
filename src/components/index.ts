@@ -10,3 +10,4 @@ export { GlowButton } from './GlowButton';
 export { GlassCard } from './GlassCard';
 export { TransparentLogo } from './TransparentLogo';
 export { BackButton } from './BackButton';
+export { WalletChip } from './WalletChip';

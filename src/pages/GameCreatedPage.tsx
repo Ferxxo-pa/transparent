@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Copy, Check, Link } from 'lucide-react';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, BackButton } from '../components';
+import { Blobs, BackButton, WalletChip } from '../components';
 
 export const GameCreatedPage: React.FC = () => {
   const navigate = useNavigate();
@@ -61,7 +61,10 @@ export const GameCreatedPage: React.FC = () => {
         {/* ── header ── */}
         <div className="navbar" style={{ marginBottom: 16 }}>
           <BackButton onClick={() => navigate('/')} />
-          <span className="chip chip-acid">room created</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="chip chip-acid">room created</span>
+            <WalletChip />
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>

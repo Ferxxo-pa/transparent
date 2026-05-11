@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
-import { Blobs, BackButton, Avatar, SolMark, Ticker } from '../components';
-import { UsdTag } from '../components';
+import { Blobs, BackButton, Avatar, SolMark, Ticker, WalletChip, UsdTag } from '../components';
 
 /* ─── helpers ─────────────────────────────────────────── */
 const LAMPORTS = 1_000_000_000;
@@ -282,10 +281,13 @@ export const WaitingRoomPage: React.FC = () => {
       {/* ─── header ─── */}
       <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 20 }}>
         <BackButton onClick={() => setShowLeaveConfirm(true)} />
-        <span className="chip chip-acid" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acid)', display: 'inline-block' }} />
-          {readyCount}/{gameState.players.length} ready
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="chip chip-acid" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acid)', display: 'inline-block' }} />
+            {readyCount}/{gameState.players.length} ready
+          </span>
+          <WalletChip />
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', flex: 1 }}>

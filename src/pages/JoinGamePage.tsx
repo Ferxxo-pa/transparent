@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, BackButton, SolMark } from '../components';
+import { Blobs, BackButton, SolMark, WalletChip } from '../components';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
@@ -81,7 +81,7 @@ export const JoinGamePage: React.FC = () => {
         {/* header */}
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 16, marginBottom: 24 }}>
           <BackButton onClick={() => navigate('/')} />
-          <span className="chip chip-azure">join</span>
+          <WalletChip />
         </div>
 
         {/* main card — centered vertically */}
@@ -177,7 +177,9 @@ export const JoinGamePage: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            {error}
+            {error.includes('TypeError') || error.includes('Failed to fetch')
+              ? 'connection error — check your internet and try again'
+              : error}
           </motion.div>
         )}
 

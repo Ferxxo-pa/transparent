@@ -68,7 +68,7 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
       timeoutRef.current = setTimeout(() => {
         setPrev(null);
         setFading(false);
-      }, 1100);
+      }, 1800);
     }
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -91,8 +91,8 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
           background: b.c,
           opacity: b.a * opacity,
           filter: 'blur(60px)',
-          willChange: 'transform',
-          transition: 'opacity 1100ms cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'transform, opacity',
+          transition: 'opacity 1800ms cubic-bezier(0.4, 0, 0.2, 1)',
           pointerEvents: 'none' as const,
         }}
       />
@@ -112,8 +112,8 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
       {/* Previous palette fading out */}
       {prev && fading && renderBlobs(BLOB_PALETTES[prev], 0)}
 
-      {/* Current palette */}
-      {renderBlobs(BLOB_PALETTES[current], 1)}
+      {/* Current palette fading in */}
+      {renderBlobs(BLOB_PALETTES[current], fading ? 0.85 : 1)}
 
       {/* Vignette — darkens edges, keeps blobs contained */}
       <div style={{
