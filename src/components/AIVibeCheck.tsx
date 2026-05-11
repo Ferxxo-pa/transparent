@@ -57,7 +57,7 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
       <div style={{ textAlign: 'center' }}>
         <span style={{ fontSize: 28, display: 'block', marginBottom: 8 }}>🤖</span>
         <p style={{ fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>AI Question Bank</p>
-        <p style={{ color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>
+        <p style={{ color: 'var(--ink-faint)', fontSize: 12, marginTop: 4 }}>
           Pick your group vibe. We'll pull questions that hit different.
         </p>
       </div>
@@ -72,9 +72,9 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
               onClick={() => setSelectedVibe(v.key)}
               style={{
                 padding: '10px 12px',
-                borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${selectedVibe === v.key ? 'var(--lime-border)' : 'var(--border)'}`,
-                background: selectedVibe === v.key ? 'var(--lime-bg)' : 'var(--glass)',
+                borderRadius: '16px',
+                border: `1.5px solid ${selectedVibe === v.key ? 'rgba(196,255,60,0.28)' : 'var(--glass-stroke)'}`,
+                background: selectedVibe === v.key ? 'rgba(196,255,60,0.10)' : 'var(--glass-bg)',
                 cursor: 'pointer',
                 textAlign: 'left',
                 display: 'flex',
@@ -87,7 +87,7 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
               <span style={{
                 fontSize: 12,
                 fontWeight: 600,
-                color: selectedVibe === v.key ? 'var(--lime)' : 'var(--text)',
+                color: selectedVibe === v.key ? 'var(--acid)' : 'var(--ink)',
               }}>{v.label}</span>
             </button>
           ))}
@@ -105,9 +105,9 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
               style={{
                 flex: 1,
                 padding: '10px 8px',
-                borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${selectedSpice === s.filter ? 'var(--lime-border)' : 'var(--border)'}`,
-                background: selectedSpice === s.filter ? 'var(--lime-bg)' : 'var(--glass)',
+                borderRadius: '16px',
+                border: `1.5px solid ${selectedSpice === s.filter ? 'rgba(196,255,60,0.28)' : 'var(--glass-stroke)'}`,
+                background: selectedSpice === s.filter ? 'rgba(196,255,60,0.10)' : 'var(--glass-bg)',
                 cursor: 'pointer',
                 textAlign: 'center',
                 transition: 'all 0.15s',
@@ -117,7 +117,7 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
               <span style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: selectedSpice === s.filter ? 'var(--lime)' : 'var(--text)',
+                color: selectedSpice === s.filter ? 'var(--acid)' : 'var(--ink)',
               }}>{s.label}</span>
             </button>
           ))}
@@ -131,10 +131,10 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
           style={{
             flex: 1,
             height: 44,
-            borderRadius: 'var(--r-pill)',
-            background: 'var(--glass)',
-            border: '1px solid var(--border)',
-            color: 'var(--muted)',
+            borderRadius: '100px',
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--glass-stroke)',
+            color: 'var(--ink-faint)',
             fontSize: 13,
             fontWeight: 600,
             cursor: 'pointer',

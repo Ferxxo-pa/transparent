@@ -36,7 +36,9 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
   }, [alreadyVoted, voteForQuestion]);
 
   const questions = gameState?.submittedQuestions ?? [];
-  const winner    = questions.reduce((b, q) => (q.votes > (b?.votes ?? -1) ? q : b), questions[0]);
+  const winner    = questions.length > 0
+    ? questions.reduce((b, q) => (q.votes > (b?.votes ?? -1) ? q : b), questions[0])
+    : null;
 
   return (
     <div className="card fade-in" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -46,7 +48,7 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
           <p className="label-sm" style={{ marginBottom: 2 }}>
             {revealed ? 'Winning question' : 'Vote for best question'}
           </p>
-          <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+          <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--acid)', letterSpacing: '-0.02em' }}>
             for {hotSeatPlayerName}
           </p>
         </div>
@@ -70,20 +72,20 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
               style={{
                 textAlign: 'left',
                 padding: '14px 16px',
-                borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${isWinner ? 'var(--lime-border)' : isMyVote ? 'var(--border-2)' : 'var(--border)'}`,
-                background: isWinner ? 'var(--lime-bg)' : isMyVote ? 'var(--card-2)' : 'var(--card)',
+                borderRadius: '16px',
+                border: `1.5px solid ${isWinner ? 'rgba(196,255,60,0.28)' : isMyVote ? 'var(--glass-stroke-hi)' : 'var(--glass-stroke)'}`,
+                background: isWinner ? 'rgba(196,255,60,0.10)' : isMyVote ? 'var(--glass-bg-hi)' : 'var(--glass-bg)',
                 cursor: alreadyVoted && !revealed ? 'default' : 'pointer',
                 transition: 'border-color 0.1s, background 0.1s',
                 width: '100%',
               }}
             >
-              <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
+              <p style={{ color: 'var(--ink)', fontSize: 14, fontWeight: 500, marginBottom: 6 }}>
                 "{q.text}"
               </p>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, color: 'var(--muted)' }}>Anonymous</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--lime)' : 'var(--muted)' }}>
+                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Anonymous</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--acid)' : 'var(--ink-faint)' }}>
                   {q.votes} vote{q.votes !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -92,14 +94,14 @@ export const QuestionVotePhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerE
         })}
 
         {questions.length === 0 && (
-          <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 14, padding: '16px 0' }}>
+          <p style={{ textAlign: 'center', color: 'var(--ink-faint)', fontSize: 14, padding: '16px 0' }}>
             No questions submitted…
           </p>
         )}
       </div>
 
       {alreadyVoted && !revealed && (
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-faint)' }}>
           ✓ Vote cast — waiting for timer
         </p>
       )}

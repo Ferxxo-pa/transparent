@@ -49,7 +49,7 @@ export const MagicBlockBadge: React.FC<{ compact?: boolean }> = ({ compact = fal
           border: `1px solid ${available ? 'rgba(196, 255, 60, 0.2)' : 'rgba(255, 255, 255, 0.06)'}`,
           fontSize: 10,
           fontWeight: 600,
-          color: available ? 'var(--lime)' : 'var(--muted)',
+          color: available ? 'var(--acid)' : 'var(--ink-faint)',
           cursor: 'default',
         }}
       >
@@ -87,7 +87,7 @@ export const MagicBlockBadge: React.FC<{ compact?: boolean }> = ({ compact = fal
               position: 'absolute',
               inset: 0,
               borderRadius: '50%',
-              background: 'var(--lime)',
+              background: 'var(--acid)',
             }}
           />
         )}
@@ -97,7 +97,7 @@ export const MagicBlockBadge: React.FC<{ compact?: boolean }> = ({ compact = fal
             width: 8,
             height: 8,
             borderRadius: '50%',
-            background: available ? 'var(--lime)' : 'var(--muted)',
+            background: available ? 'var(--acid)' : 'var(--ink-faint)',
           }}
         />
       </div>
@@ -107,7 +107,7 @@ export const MagicBlockBadge: React.FC<{ compact?: boolean }> = ({ compact = fal
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: available ? 'var(--text)' : 'var(--muted)',
+            color: available ? 'var(--ink)' : 'var(--ink-faint)',
             letterSpacing: '0.02em',
           }}
         >
@@ -116,7 +116,7 @@ export const MagicBlockBadge: React.FC<{ compact?: boolean }> = ({ compact = fal
         <span
           style={{
             fontSize: 9,
-            color: available ? 'rgba(196, 255, 60, 0.7)' : 'var(--faint)',
+            color: available ? 'rgba(196, 255, 60, 0.7)' : 'var(--ink-dim)',
             fontWeight: 500,
           }}
         >

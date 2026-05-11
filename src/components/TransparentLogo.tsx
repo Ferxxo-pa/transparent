@@ -28,7 +28,7 @@ export const TransparentLogo: React.FC<TransparentLogoProps> = ({
       {/* 4-point concave-pinch sparkle */}
       <path
         d="M50 0 C52 38, 62 48, 100 50 C62 52, 52 62, 50 100 C48 62, 38 52, 0 50 C38 48, 48 38, 50 0Z"
-        fill="var(--lime, #C4FF3C)"
+        fill="var(--acid, #C4FF3C)"
       />
     </svg>
   </div>

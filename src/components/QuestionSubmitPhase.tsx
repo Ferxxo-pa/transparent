@@ -35,12 +35,12 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
     return (
       <div className="card" style={{ textAlign: 'center', padding: '32px 20px' }}>
         <div style={{ fontSize: 36, marginBottom: 12 }}>✓</div>
-        <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--lime)' }}>Submitted!</p>
-        <p style={{ color: 'var(--muted)', fontSize: 14, marginTop: 6 }}>Waiting for others…</p>
+        <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--acid)' }}>Submitted!</p>
+        <p style={{ color: 'var(--ink-faint)', fontSize: 14, marginTop: 6 }}>Waiting for others…</p>
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
-            <span style={{ color: 'var(--muted)' }}>Submitted</span>
-            <span style={{ color: 'var(--muted)' }}>{submittedCount}/{total}</span>
+            <span style={{ color: 'var(--ink-faint)' }}>Submitted</span>
+            <span style={{ color: 'var(--ink-faint)' }}>{submittedCount}/{total}</span>
           </div>
           <div className="progress">
             <div className="progress-bar" style={{ width: `${(submittedCount / total) * 100}%` }} />
@@ -56,7 +56,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <p className="label-sm" style={{ marginBottom: 2 }}>Write a question for</p>
-          <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+          <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--acid)', letterSpacing: '-0.02em' }}>
             {hotSeatPlayerName}
           </p>
         </div>
@@ -74,7 +74,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
       />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{question.length}/200</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{question.length}/200</span>
         <button
           className="btn btn-primary"
           style={{ width: 'auto', height: 42, padding: '0 20px', fontSize: 14 }}

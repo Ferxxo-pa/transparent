@@ -36,7 +36,7 @@ export const PlayerQuestionVote: React.FC<Props> = ({
   const voteCounts = questions.map((_, idx) =>
     Object.values(picks).filter(v => v === idx).length
   );
-  const winnerIdx = voteCounts.indexOf(Math.max(...voteCounts));
+  const winnerIdx = voteCounts.length > 0 ? voteCounts.indexOf(Math.max(...voteCounts)) : 0;
 
   useEffect(() => {
     if (timeLeft <= 0) {
@@ -64,7 +64,7 @@ export const PlayerQuestionVote: React.FC<Props> = ({
         <p style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>
           They're picking your question...
         </p>
-        <p style={{ color: 'var(--muted)', fontSize: 13 }}>
+        <p style={{ color: 'var(--ink-faint)', fontSize: 13 }}>
           The group is voting on what to ask you
         </p>
         <div className={`timer ${timeLeft <= 5 ? 'urgent' : ''}`} style={{ margin: '16px auto 0', width: 48, height: 48, fontSize: 20 }}>
@@ -82,7 +82,7 @@ export const PlayerQuestionVote: React.FC<Props> = ({
           <p className="label-sm" style={{ marginBottom: 2 }}>
             {revealed ? '🔥 Winning question' : 'Pick a question to ask'}
           </p>
-          <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+          <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--acid)', letterSpacing: '-0.02em' }}>
             {hotSeatPlayerName}
           </p>
         </div>
@@ -105,24 +105,24 @@ export const PlayerQuestionVote: React.FC<Props> = ({
               style={{
                 textAlign: 'left',
                 padding: '14px 16px',
-                borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${isWinner ? 'var(--lime-border)' : isMyVote ? 'var(--border-2)' : 'var(--border)'}`,
-                background: isWinner ? 'var(--lime-bg)' : isMyVote ? 'var(--card-2)' : 'var(--card)',
+                borderRadius: '16px',
+                border: `1.5px solid ${isWinner ? 'rgba(196,255,60,0.28)' : isMyVote ? 'var(--glass-stroke-hi)' : 'var(--glass-stroke)'}`,
+                background: isWinner ? 'rgba(196,255,60,0.10)' : isMyVote ? 'var(--glass-bg-hi)' : 'var(--glass-bg)',
                 cursor: alreadyVoted ? 'default' : 'pointer',
                 transition: 'all 0.15s',
                 width: '100%',
                 opacity: revealed && !isWinner ? 0.4 : 1,
               }}
             >
-              <p style={{ color: 'var(--text)', fontSize: 14, fontWeight: 500, lineHeight: 1.4 }}>
+              <p style={{ color: 'var(--ink)', fontSize: 14, fontWeight: 500, lineHeight: 1.4 }}>
                 "{q}"
               </p>
               {(alreadyVoted || revealed) && (
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                  <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
                     {isMyVote ? '✓ Your pick' : ''}
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--lime)' : 'var(--muted)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: isWinner ? 'var(--acid)' : 'var(--ink-faint)' }}>
                     {voteCounts[idx]} vote{voteCounts[idx] !== 1 ? 's' : ''}
                   </span>
                 </div>
@@ -133,7 +133,7 @@ export const PlayerQuestionVote: React.FC<Props> = ({
       </div>
 
       {alreadyVoted && !revealed && (
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-faint)' }}>
           ✓ Vote cast — waiting for others
         </p>
       )}

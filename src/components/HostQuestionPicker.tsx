@@ -47,19 +47,19 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
       {/* Header */}
       <div>
         <p className="label-sm" style={{ marginBottom: 2 }}>Pick a question for</p>
-        <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--lime)', letterSpacing: '-0.02em' }}>
+        <p style={{ fontWeight: 700, fontSize: 18, color: 'var(--acid)', letterSpacing: '-0.02em' }}>
           {hotSeatPlayerName}
         </p>
       </div>
 
       {/* Mode toggle */}
-      <div style={{ display: 'flex', gap: 6, background: 'var(--card-2)', padding: 4, borderRadius: 'var(--r-sm)' }}>
+      <div style={{ display: 'flex', gap: 6, background: 'var(--glass-bg-hi)', padding: 4, borderRadius: '16px' }}>
         <button
           onClick={() => { setMode('pick'); setSelected([]); }}
           style={{
-            flex: 1, padding: '8px 0', borderRadius: 'var(--r-sm)', border: 'none',
-            background: mode === 'pick' ? 'var(--lime)' : 'transparent',
-            color: mode === 'pick' ? '#000' : 'var(--muted)',
+            flex: 1, padding: '8px 0', borderRadius: '16px', border: 'none',
+            background: mode === 'pick' ? 'var(--acid)' : 'transparent',
+            color: mode === 'pick' ? '#000' : 'var(--ink-faint)',
             fontWeight: 600, fontSize: 12, cursor: 'pointer',
           }}
         >
@@ -68,9 +68,9 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
         <button
           onClick={() => { setMode('vote'); setSelected([]); }}
           style={{
-            flex: 1, padding: '8px 0', borderRadius: 'var(--r-sm)', border: 'none',
-            background: mode === 'vote' ? 'var(--lime)' : 'transparent',
-            color: mode === 'vote' ? '#000' : 'var(--muted)',
+            flex: 1, padding: '8px 0', borderRadius: '16px', border: 'none',
+            background: mode === 'vote' ? 'var(--acid)' : 'transparent',
+            color: mode === 'vote' ? '#000' : 'var(--ink-faint)',
             fontWeight: 600, fontSize: 12, cursor: 'pointer',
           }}
         >
@@ -79,7 +79,7 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
       </div>
 
       {mode === 'vote' && selected.length > 0 && (
-        <div style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
+        <div style={{ fontSize: 12, color: 'var(--ink-faint)', textAlign: 'center' }}>
           Selected {selected.length}/3 — {selected.length < 2 ? 'pick at least 2' : 'ready to send!'}
         </div>
       )}
@@ -107,24 +107,24 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
             </button>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-            <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>or pick from the list</span>
-            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <div style={{ flex: 1, height: 1, background: 'var(--glass-stroke)' }} />
+            <span style={{ fontSize: 10, color: 'var(--ink-faint)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>or pick from the list</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--glass-stroke)' }} />
           </div>
         </>
       )}
 
       {/* Search */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 'var(--r-sm)', background: 'var(--glass)', border: '1px solid var(--border)' }}>
-        <Search size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: '16px', background: 'var(--glass-bg)', border: '1px solid var(--glass-stroke)' }}>
+        <Search size={14} style={{ color: 'var(--ink-faint)', flexShrink: 0 }} />
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search questions..."
-          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--text)', fontSize: 13, fontFamily: 'inherit' }}
+          style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: 'var(--ink)', fontSize: 13, fontFamily: 'inherit' }}
         />
-        <span style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0 }}>{filtered.length} left</span>
+        <span style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}>{filtered.length} left</span>
       </div>
 
       {/* Question list */}
@@ -139,9 +139,9 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
               style={{
                 textAlign: 'left',
                 padding: '12px 14px',
-                borderRadius: 'var(--r-sm)',
-                border: `1.5px solid ${isSelected ? 'var(--lime-border)' : 'var(--border)'}`,
-                background: isSelected ? 'var(--lime-bg)' : 'var(--glass)',
+                borderRadius: '16px',
+                border: `1.5px solid ${isSelected ? 'rgba(196,255,60,0.28)' : 'var(--glass-stroke)'}`,
+                background: isSelected ? 'rgba(196,255,60,0.10)' : 'var(--glass-bg)',
                 cursor: 'pointer',
                 transition: 'all 0.15s',
                 width: '100%',
@@ -151,15 +151,15 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
                 {mode === 'vote' && (
                   <span style={{ 
                     width: 20, height: 20, borderRadius: '50%', flexShrink: 0, marginTop: 1,
-                    border: `2px solid ${isSelected ? 'var(--lime)' : 'var(--border-2)'}`,
-                    background: isSelected ? 'var(--lime)' : 'transparent',
+                    border: `2px solid ${isSelected ? 'var(--acid)' : 'var(--glass-stroke-hi)'}`,
+                    background: isSelected ? 'var(--acid)' : 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 12, color: '#000', fontWeight: 700,
                   }}>
                     {isSelected ? '✓' : ''}
                   </span>
                 )}
-                <p style={{ color: 'var(--text)', fontSize: 13, fontWeight: 500, lineHeight: 1.4 }}>
+                <p style={{ color: 'var(--ink)', fontSize: 13, fontWeight: 500, lineHeight: 1.4 }}>
                   "{q}"
                 </p>
               </div>
@@ -167,12 +167,12 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
           );
         })}
         {filtered.length > 30 && (
-          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--muted)', padding: 8 }}>
+          <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ink-faint)', padding: 8 }}>
             {filtered.length - 30} more — use search to find specific questions
           </p>
         )}
         {filtered.length === 0 && (
-          <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--muted)', padding: 20 }}>
+          <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-faint)', padding: 20 }}>
             {search ? 'No matching questions' : 'All questions have been used!'}
           </p>
         )}

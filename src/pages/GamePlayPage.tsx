@@ -331,8 +331,8 @@ export const GamePlayPage: React.FC = () => {
       const counts = options.map((_, idx) =>
         Object.values(picks).filter(v => v === idx).length
       );
-      const winIdx = counts.indexOf(Math.max(...counts));
-      const winQ = options[winIdx] || options[0];
+      const winIdx = counts.length > 0 ? counts.indexOf(Math.max(...counts)) : 0;
+      const winQ = options[winIdx] || options[0] || '';
       hostPickQuestion(winQ, -1);
     };
 
