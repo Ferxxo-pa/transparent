@@ -84,7 +84,8 @@ export const JoinGamePage: React.FC = () => {
           <span className="chip chip-azure">join</span>
         </div>
 
-        {/* main card */}
+        {/* main card — centered vertically */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <motion.div
           className="glass glass-strong"
           style={{ width: '100%', padding: '30px 24px', borderRadius: 30, textAlign: 'center' }}
@@ -136,7 +137,7 @@ export const JoinGamePage: React.FC = () => {
                 />
                 {/* dot separator after digit 3 */}
                 {i === 2 && (
-                  <span style={{ color: 'var(--ink-faint)', fontSize: 20, fontWeight: 700, lineHeight: 1, userSelect: 'none' }}>·</span>
+                  <div style={{ alignSelf: 'center', color: 'var(--ink-faint)', fontSize: 24, fontWeight: 700 }}>·</div>
                 )}
               </React.Fragment>
             ))}
@@ -157,6 +158,7 @@ export const JoinGamePage: React.FC = () => {
             />
           </div>
         </motion.div>
+        </div>
 
         {/* error */}
         {error && (
@@ -179,9 +181,6 @@ export const JoinGamePage: React.FC = () => {
           </motion.div>
         )}
 
-        {/* spacer */}
-        <div style={{ flex: 1 }} />
-
         {/* CTA */}
         <div style={{ width: '100%', paddingTop: 20, paddingBottom: 16 }}>
           <motion.button
@@ -189,11 +188,11 @@ export const JoinGamePage: React.FC = () => {
             onClick={handleJoin}
             disabled={!allFilled || loading}
             whileTap={allFilled && !loading ? { scale: 0.96 } : {}}
-            style={{ opacity: !allFilled || loading ? 0.4 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, textTransform: 'lowercase' }}
+            style={{ opacity: !allFilled || loading ? 0.4 : 1, cursor: !allFilled || loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             {loading ? 'joining...' : (
               <>
-                ape in · <SolMark size={16} tone="dark" /> 0.1
+                ape in · <SolMark size={14} tone="dark" /> 0.1
               </>
             )}
           </motion.button>

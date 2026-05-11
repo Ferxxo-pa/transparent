@@ -15,6 +15,7 @@ interface GameMode {
   tagAlt: string;
   accent: string;
   glowVar: string;
+  palette: string;
   title: string;
   hook: string;
   sub: string;
@@ -28,6 +29,7 @@ const MODES: GameMode[] = [
     tagAlt: 'OG mode',
     accent: 'var(--acid)',
     glowVar: 'var(--acid-glow)',
+    palette: 'home',
     title: 'sit in the hot seat.',
     hook: 'lie or die.',
     sub: 'classic. answer the prompt. table calls cap or no cap.',
@@ -39,6 +41,7 @@ const MODES: GameMode[] = [
     tagAlt: 'crowd-sourced',
     accent: 'var(--pink)',
     glowVar: 'var(--pink-glow)',
+    palette: 'story',
     title: 'roast each other.',
     hook: 'no mercy.',
     sub: "hot take. y'all write the questions. nobody is safe.",
@@ -50,6 +53,7 @@ const MODES: GameMode[] = [
     tagAlt: 'cap detector',
     accent: 'var(--tangerine)',
     glowVar: 'var(--tangerine-glow)',
+    palette: 'create',
     title: 'spin a wild story.',
     hook: 'cap or no cap?',
     sub: 'storyteller. true or made up — sell it. table calls it.',
@@ -61,6 +65,7 @@ const MODES: GameMode[] = [
     tagAlt: "host's rules",
     accent: 'var(--azure)',
     glowVar: 'var(--azure-glow)',
+    palette: 'join',
     title: 'host writes the prompts.',
     hook: 'play your way.',
     sub: 'custom. you set the questions before the game starts.',
@@ -128,7 +133,7 @@ export const HomePage: React.FC = () => {
     <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
 
       {/* ── Blob background ─────────────────────────────────── */}
-      <Blobs palette="home" />
+      <Blobs palette={mode.palette as any} />
 
       {/* ── Scrollable content ──────────────────────────────── */}
       <div
