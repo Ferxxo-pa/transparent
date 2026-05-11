@@ -128,7 +128,7 @@ export const JoinGamePage: React.FC = () => {
                       borderRadius: 14,
                       background: d ? 'rgba(77,168,255,0.15)' : 'rgba(255,255,255,0.04)',
                       border: d ? '1.5px solid rgba(77,168,255,0.6)' : '1px solid rgba(255,255,255,0.12)',
-                      color: d ? 'var(--azure)' : 'var(--ink)',
+                      color: 'var(--ink)',
                       fontSize: 26,
                       fontFamily: "'JetBrains Mono', monospace",
                       fontWeight: 700,
