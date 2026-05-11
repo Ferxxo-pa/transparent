@@ -142,15 +142,15 @@ export const HomePage: React.FC = () => {
           position: 'relative',
           zIndex: 1,
           overflowY: 'auto',
-          gap: 16,
         }}
       >
 
-        {/* ── Top bar ─────────────────────────────────────────── */}
+        {/* ── Top bar: logo LEFT, wallet RIGHT ────────────────── */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          width: '100%',
           flexShrink: 0,
         }}>
           {/* Wordmark */}
@@ -189,280 +189,220 @@ export const HomePage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Grid: desktop = hero left / side right / CTAs bottom row ── */}
-        <div className="page-grid--home">
-
-          {/* ── Left: Hero card ────────────────────────────────── */}
-          <div className="home-col-hero">
-            <div
-              className="glass glass-strong"
-              style={{
-                borderRadius: 32,
-                padding: '28px 26px',
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              {/* Sticker row + emoji */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, minHeight: 36 }}>
-                <div style={fadeStyle}>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <span className="sticker sticker-acid">{mode.tag}</span>
-                    <span className="sticker sticker-pink" style={{ transform: 'rotate(2deg)' }}>{mode.tagAlt}</span>
-                  </div>
-                </div>
-                <div style={{ ...fadeStyle, fontSize: 36, lineHeight: 1, animation: visible ? 'glow 2.5s ease-in-out infinite' : 'none' }}>
-                  {mode.emoji}
-                </div>
+        {/* ── Hero card ──────────────────────────────────────── */}
+        <div
+          className="glass glass-strong"
+          style={{
+            borderRadius: 32,
+            padding: '28px 26px',
+            overflow: 'hidden',
+            position: 'relative',
+            marginTop: 24,
+            width: '100%',
+          }}
+        >
+          {/* Sticker row + emoji */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, minHeight: 36 }}>
+            <div style={fadeStyle}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <span className="sticker sticker-acid">{mode.tag}</span>
+                <span className="sticker sticker-pink" style={{ transform: 'rotate(2deg)' }}>{mode.tagAlt}</span>
               </div>
-
-              {/* Title + Hook */}
-              <h1
-                className="display"
-                style={{
-                  fontSize: 44,
-                  lineHeight: 0.95,
-                  margin: 0,
-                  minHeight: 84,
-                  ...fadeStyle,
-                }}
-              >
-                {mode.title}<br />
-                <span
-                  className="italic-serif"
-                  style={{
-                    fontSize: 52,
-                    color: mode.accent,
-                    fontWeight: 400,
-                    transition: 'color 380ms ease',
-                  }}
-                >
-                  {mode.hook}
-                </span>
-              </h1>
-
-              {/* Sub-description */}
-              <p style={{
-                fontSize: 13,
-                color: 'var(--ink-soft)',
-                lineHeight: 1.4,
-                margin: '18px 0 0',
-                fontWeight: 500,
-                minHeight: 18,
-                ...fadeStyle,
-              }}>
-                {mode.sub}
-              </p>
-
-              {/* Mode dots — flat bars, clickable */}
-              <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>
-                {MODES.map((m, i) => (
-                  <button
-                    key={m.key}
-                    onClick={() => jumpTo(i)}
-                    aria-label={m.key}
-                    style={{
-                      flex: 1,
-                      height: 3,
-                      padding: 0,
-                      background: i === modeIdx ? mode.accent : 'rgba(255,255,255,0.12)',
-                      border: 'none',
-                      borderRadius: 100,
-                      cursor: 'pointer',
-                      boxShadow: i === modeIdx ? `0 0 12px ${mode.accent}` : 'none',
-                      transition: 'background 380ms ease, box-shadow 380ms ease',
-                    }}
-                  />
-                ))}
-              </div>
+            </div>
+            <div style={{ ...fadeStyle, fontSize: 36, lineHeight: 1, animation: visible ? 'glow 2.5s ease-in-out infinite' : 'none' }}>
+              {mode.emoji}
             </div>
           </div>
 
-          {/* ── Right: Rules + Live players ──────────────────── */}
-          <div className="home-col-side">
-
-            {/* Desktop-only: How it works panel for current mode */}
-            <div
-              className="glass home-rules-desktop"
+          {/* Title + Hook */}
+          <h1
+            className="display"
+            style={{
+              fontSize: 44,
+              lineHeight: 0.95,
+              margin: 0,
+              minHeight: 84,
+              ...fadeStyle,
+            }}
+          >
+            {mode.title}<br />
+            <span
+              className="italic-serif"
               style={{
-                display: 'none',
-                padding: '18px 20px',
-                borderRadius: 22,
+                fontSize: 52,
+                color: mode.accent,
+                fontWeight: 400,
+                transition: 'color 380ms ease',
               }}
             >
-              <div className="mono" style={{
-                fontSize: 10,
-                letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-                color: 'var(--ink-faint)',
-                marginBottom: 10,
-              }}>
-                how it works
-                <span style={{ color: mode.accent, marginLeft: 6, transition: 'color 380ms ease' }}>
-                  {mode.tag}
-                </span>
-              </div>
-              <p style={{
-                fontSize: 13,
-                color: 'var(--ink-soft)',
-                lineHeight: 1.5,
-                margin: 0,
-                fontWeight: 500,
-                ...fadeStyle,
-              }}>
-                {mode.sub}
-              </p>
+              {mode.hook}
+            </span>
+          </h1>
+
+          {/* Sub-description */}
+          <p style={{
+            fontSize: 13,
+            color: 'var(--ink-soft)',
+            lineHeight: 1.4,
+            margin: '18px 0 0',
+            fontWeight: 500,
+            minHeight: 18,
+            ...fadeStyle,
+          }}>
+            {mode.sub}
+          </p>
+
+          {/* Mode dots — flat bars, clickable */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>
+            {MODES.map((m, i) => (
+              <button
+                key={m.key}
+                onClick={() => jumpTo(i)}
+                aria-label={m.key}
+                style={{
+                  flex: 1,
+                  height: 3,
+                  padding: 0,
+                  background: i === modeIdx ? mode.accent : 'rgba(255,255,255,0.12)',
+                  border: 'none',
+                  borderRadius: 100,
+                  cursor: 'pointer',
+                  boxShadow: i === modeIdx ? `0 0 12px ${mode.accent}` : 'none',
+                  transition: 'background 380ms ease, box-shadow 380ms ease',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* ── Live players rail ──────────────────────────────── */}
+        <div
+          className="glass-flat"
+          style={{
+            padding: '14px 16px',
+            borderRadius: 18,
+            marginTop: 16,
+            width: '100%',
+          }}
+        >
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 10,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: 'var(--acid)',
+                boxShadow: '0 0 8px var(--acid)',
+                animation: 'pulseDot 1.4s ease-in-out infinite',
+                flexShrink: 0,
+                display: 'inline-block',
+              }} />
+              <span
+                className="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'var(--ink)',
+                }}
+              >
+                live · players online
+              </span>
             </div>
-
-            {/* Live players rail */}
-            <div
-              className="glass-flat"
+            <span
+              className="mono"
               style={{
-                padding: '14px 16px',
-                borderRadius: 18,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 10,
+                fontSize: 9,
+                color: 'var(--ink-soft)',
+                letterSpacing: '0.08em',
               }}
             >
-              {/* Header */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 10,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: '50%',
-                    background: 'var(--acid)',
-                    boxShadow: '0 0 8px var(--acid)',
-                    animation: 'pulseDot 1.4s ease-in-out infinite',
-                    flexShrink: 0,
-                    display: 'inline-block',
-                  }} />
-                  <span
-                    className="mono"
-                    style={{
-                      fontSize: 9,
-                      letterSpacing: '0.18em',
-                      textTransform: 'uppercase',
-                      color: 'var(--ink)',
-                    }}
-                  >
-                    live · players online
-                  </span>
+              1,284
+            </span>
+          </div>
+
+          {/* Player rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {FAKE_PLAYERS.map((p) => (
+              <div
+                key={p.name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
+                <div style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: 12,
+                  flexShrink: 0,
+                }}>
+                  {p.emoji}
                 </div>
+                <span
+                  style={{
+                    flex: 1,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: '-0.01em',
+                  }}
+                >
+                  {p.name}
+                </span>
                 <span
                   className="mono"
                   style={{
-                    fontSize: 9,
-                    color: 'var(--ink-soft)',
-                    letterSpacing: '0.08em',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: p.positive ? '#5BE584' : '#FF5C5C',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
                   }}
                 >
-                  1,284
+                  <SolMark size={9} tone="ink" /> {p.amt}
                 </span>
               </div>
-
-              {/* Player rows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {FAKE_PLAYERS.map((p) => (
-                  <div
-                    key={p.name}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{
-                      width: 22,
-                      height: 22,
-                      borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      fontSize: 12,
-                      flexShrink: 0,
-                    }}>
-                      {p.emoji}
-                    </div>
-                    <span
-                      style={{
-                        flex: 1,
-                        fontSize: 12,
-                        fontWeight: 700,
-                        letterSpacing: '-0.01em',
-                      }}
-                    >
-                      {p.name}
-                    </span>
-                    <span
-                      className="mono"
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: p.positive ? '#5BE584' : '#FF5C5C',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                      }}
-                    >
-                      <SolMark size={9} tone="ink" /> {p.amt}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
-
-          {/* ── Bottom: CTAs span full width on desktop ────── */}
-          <div className="home-col-cta" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-            marginTop: 'auto',
-            paddingTop: 8,
-          }}>
-            <div className="home-cta-row">
-              <button
-                className="btn btn-degen"
-                onClick={() => navigate('/join')}
-              >
-                join a game →
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => navigate('/create')}
-              >
-                create a game
-              </button>
-            </div>
-            <button
-              onClick={() => navigate('/how-to-play')}
-              className="mono"
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '10px 0',
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase' as const,
-                color: 'var(--ink-faint)',
-                textAlign: 'center' as const,
-              }}
-            >
-              how to play · rules
-            </button>
-          </div>
-
         </div>
+
+        {/* ── CTAs ───────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+          marginTop: 'auto',
+          paddingTop: 16,
+          paddingBottom: 24,
+          width: '100%',
+        }}>
+          <button
+            className="btn btn-degen"
+            onClick={() => navigate('/join')}
+          >
+            join a game →
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => navigate('/create')}
+          >
+            create a game
+          </button>
+        </div>
+
       </div>
       {/* Wallet drawer */}
       <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />

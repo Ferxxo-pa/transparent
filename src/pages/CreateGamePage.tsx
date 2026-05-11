@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
+import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice } from '../hooks/useSolPrice';
 import { QuestionMode, PayoutMode } from '../types/game';
 import { Blobs, BackButton, TokenMark, UsdTag, TOKENS, TOKEN_LIST, parseAmt, usdEstimate } from '../components';
@@ -13,15 +14,6 @@ const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] =
   { id: 'storyteller', label: 'storyteller', sub: 'tell a story — truth or fake? group votes.', emoji: '🎭' },
   { id: 'custom',      label: 'custom',      sub: 'you write every question before it starts.', emoji: '🛠️' },
 ];
-
-/* ── How-it-works blurbs per mode ────────────────────────── */
-
-const HOW_IT_WORKS: Record<string, string> = {
-  classic:     'one player sits in the hot seat. they answer a prompt. the rest of the table votes: cap or no cap.',
-  'hot-take':  'everyone submits a spicy question. the best one gets picked. the target answers. table votes.',
-  storyteller: 'the storyteller tells a tale. is it real or made up? sell it hard. table calls it.',
-  custom:      'the host writes all prompts before the game starts. full control, your rules.',
-};
 
 /* ── Token chips (icon-only) ─────────────────────────────── */
 
@@ -37,6 +29,7 @@ const ROUND_PRESETS = [3, 5, 7, 10];
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { createGame, loading, error } = useGame();
+  const { connected, login } = usePrivyWallet();
   const solPrice = useSolPrice();
 
   const [mode, setMode]               = useState<QuestionMode>('classic');
@@ -45,7 +38,6 @@ export const CreateGamePage: React.FC = () => {
   const [activePreset, setActivePreset] = useState('0.1');
   const [rounds, setRounds]            = useState(5);
   const [customRounds, setCustomRounds] = useState('');
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const buyInNum = parseAmt(buyInRaw);
   const token = TOKENS[selectedToken] || TOKENS.sol;
@@ -54,6 +46,12 @@ export const CreateGamePage: React.FC = () => {
   const customValue = activePreset !== buyInRaw ? buyInRaw : '';
 
   const handleCreate = async () => {
+    // If not connected, trigger wallet connection first
+    if (!connected) {
+      login();
+      return;
+    }
+
     const ok = await createGame(
       buyInNum,
       'Game Room',
@@ -79,32 +77,32 @@ export const CreateGamePage: React.FC = () => {
           position: 'relative',
           zIndex: 1,
           overflowY: 'auto',
-          gap: 18,
         }}
       >
 
-        {/* ── Header ──────────────────────────────────────────── */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        {/* ── Header: back LEFT, chip RIGHT ──────────────────── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          flexShrink: 0,
+        }}>
           <BackButton onClick={() => navigate('/')} />
           <div className="chip">new room</div>
         </div>
 
         {/* ── Title ───────────────────────────────────────────── */}
-        <h2 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 14, lineHeight: 1 }}>
+        <h2 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 14, lineHeight: 1, width: '100%' }}>
           set the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--pink)' }}>vibe.</span>
         </h2>
 
-        {/* ── Desktop 2-col grid wraps modes (left) + settings (right) ── */}
-        <div className="page-grid--create">
-
-        {/* ── Left column: modes + how it works ──────────────── */}
-        <div>
         {/* ── Mode grid (2x2) ─────────────────────────────────── */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 8,
-          marginBottom: 8,
+          width: '100%',
         }}>
           {MODES.map(m => {
             const isActive = mode === m.id;
@@ -154,54 +152,10 @@ export const CreateGamePage: React.FC = () => {
           })}
         </div>
 
-        {/* ── How it works toggle ─────────────────────────────── */}
-        <button
-          onClick={() => setShowHowItWorks(!showHowItWorks)}
-          className="mono"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--ink-soft)',
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            padding: '8px 4px 10px',
-            textAlign: 'left',
-            cursor: 'pointer',
-            fontFamily: "'JetBrains Mono', monospace",
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
-          {showHowItWorks ? '− hide' : '+ how it works'} <span style={{ color: 'var(--acid)' }}>· {MODES.find(m => m.id === mode)?.label}</span>
-        </button>
-
-        {showHowItWorks && (
-          <div
-            className="glass-flat"
-            style={{
-              padding: '14px 16px',
-              fontSize: 12,
-              color: 'var(--ink-soft)',
-              lineHeight: 1.5,
-              borderRadius: 14,
-              marginBottom: 12,
-              fontWeight: 500,
-            }}
-          >
-            {HOW_IT_WORKS[mode]}
-          </div>
-        )}
-        </div>
-
-        {/* ── Right column: buy-in + rounds + CTA ────────────── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
         {/* ── Buy-in card ─────────────────────────────────────── */}
         <div
           className="glass"
-          style={{ padding: 14, borderRadius: 20, marginBottom: 10 }}
+          style={{ padding: 14, borderRadius: 20, marginTop: 14, width: '100%' }}
         >
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -234,8 +188,7 @@ export const CreateGamePage: React.FC = () => {
                   key={tid}
                   onClick={() => {
                     setToken(tid);
-                    // Reset to first preset of new token
-                    const newPresets = tid === 'sol' ? SOL_PRESETS : (TOKENS[tid]?.presets.map(String) || ['0']);
+                    const newPresets = tid === 'sol' ? SOL_PRESETS : (TOKENS[tid]?.presets?.map(String) || ['0']);
                     setBuyInRaw(newPresets[1] || newPresets[0]);
                     setActivePreset(newPresets[1] || newPresets[0]);
                   }}
@@ -317,7 +270,7 @@ export const CreateGamePage: React.FC = () => {
         {/* ── Rounds card ─────────────────────────────────────── */}
         <div
           className="glass"
-          style={{ padding: 12, borderRadius: 18, marginBottom: 14 }}
+          style={{ padding: 12, borderRadius: 18, marginTop: 10, width: '100%' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span
@@ -398,8 +351,10 @@ export const CreateGamePage: React.FC = () => {
               border: '1px solid rgba(255,92,92,0.28)',
               borderRadius: 16,
               padding: '12px 14px',
-              color: 'var(--coral)',
+              color: '#FF5C5C',
               fontSize: 13,
+              marginTop: 10,
+              width: '100%',
             }}
           >
             {error}
@@ -407,14 +362,16 @@ export const CreateGamePage: React.FC = () => {
         )}
 
         {/* ── CTA ─────────────────────────────────────────────── */}
-        <div style={{ marginTop: 'auto', paddingTop: 8 }}>
+        <div style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 24, width: '100%' }}>
           <button
             className="btn btn-degen"
             onClick={handleCreate}
             disabled={loading}
             style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-            {loading ? 'creating...' : (
+            {loading ? 'creating...' : !connected ? (
+              'connect wallet to create'
+            ) : (
               <>
                 spin it up · <TokenMark token={selectedToken} size={14} />
                 {' '}{buyInNum > 0 ? buyInRaw : '0'}
@@ -423,9 +380,6 @@ export const CreateGamePage: React.FC = () => {
             )}
           </button>
         </div>
-
-        </div>{/* end right column */}
-        </div>{/* end page-grid--create */}
 
       </div>
     </div>

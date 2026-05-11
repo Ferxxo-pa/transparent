@@ -82,12 +82,14 @@ body::before {
   margin: 0 auto;
   min-height: 100vh;
   min-height: 100dvh;
-  padding: 20px 24px;
+  padding: 24px 20px;
+  padding-bottom: env(safe-area-inset-bottom, 24px);
   width: 100%;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   overflow-x: hidden;
+  gap: 0;
 }
 
 /* Responsive helpers */
@@ -99,55 +101,11 @@ body::before {
 }
 
 /* ─── Desktop layout variants ──────────────────────────── */
-
-/* Mobile-first: grid wrappers stack vertically */
-.page-grid--home {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-}
-/* Mobile: rules panel hidden, CTAs stack vertically */
-.home-rules-desktop { display: none; }
-.home-cta-row { display: flex; flex-direction: column; gap: 10px; }
-@media (min-width: 1024px) {
-  .home-cta-row { flex-direction: row; }
-  .home-cta-row > .btn { flex: 1; }
-}
-.page-grid--create {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .page { padding: 32px 40px; }
-
-  .page--home { max-width: 1060px; }
-  .page--game { max-width: 640px; }
-  .page--form { max-width: 720px; }
-
-  .page-grid--home {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    grid-template-rows: auto 1fr auto;
-    gap: 20px;
-    flex: 1;
-  }
-  .page-grid--home > .home-col-hero { grid-row: 1 / 3; }
-  .page-grid--home > .home-col-side { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 16px; }
-  .page-grid--home > .home-col-cta  { grid-column: 1 / -1; }
-
-  /* Desktop-only: how-it-works panel visible */
-  .home-rules-desktop { display: block !important; }
-
-  /* Create page: two-column on desktop */
-  .page-grid--create {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    align-items: start;
-  }
+  .page--home { max-width: 560px; }
+  .page--game { max-width: 560px; }
+  .page--form { max-width: 560px; }
 }
 
 /* ─── Typography ─────────────────────────────────────────── */
