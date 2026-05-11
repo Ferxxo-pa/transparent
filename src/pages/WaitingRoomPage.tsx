@@ -286,7 +286,7 @@ export const WaitingRoomPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="chip chip-acid" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--acid)', display: 'inline-block' }} />
-            {readyCount}/{gameState.players.length} ready
+            {readyCount} ready
           </span>
           <WalletChip />
         </div>
