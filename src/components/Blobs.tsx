@@ -81,7 +81,7 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
     if (cleanupRef.current) clearTimeout(cleanupRef.current);
     cleanupRef.current = setTimeout(() => {
       setLayers(prev => prev.filter(l => l.opacity > 0));
-    }, 2500);
+    }, 1000);
 
     return () => {
       if (cleanupRef.current) clearTimeout(cleanupRef.current);
@@ -106,7 +106,7 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
             position: 'absolute',
             inset: 0,
             opacity: layer.opacity,
-            transition: 'opacity 2200ms cubic-bezier(0.4, 0, 0.2, 1)',
+            transition: 'opacity 800ms cubic-bezier(0.4, 0, 0.2, 1)',
             pointerEvents: 'none',
           }}
         >
