@@ -7,10 +7,12 @@ interface Props {
 }
 
 export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerEnd }) => {
-  const { gameState, submitQuestion } = useGame();
+  const { gameState, submitQuestion, bidOnQuestion } = useGame();
   const [question,  setQuestion]  = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft,  setTimeLeft]  = useState(30);
+  const [bidAmount, setBidAmount] = useState('');
+  const buyIn = gameState?.buyInAmount ?? 0;
 
   const handleSubmit = useCallback(async () => {
     if (!question.trim() || submitted) return;
@@ -73,6 +75,27 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
         autoFocus
       />
 
+      {/* Bid to boost (optional) */}
+      {buyIn > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', flexShrink: 0 }}>boost:</span>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={bidAmount}
+            onChange={e => setBidAmount(e.target.value)}
+            placeholder="0 SOL"
+            style={{
+              flex: 1, padding: '8px 12px', borderRadius: 12,
+              border: '1px solid var(--glass-stroke)', background: 'var(--glass-bg)',
+              color: 'var(--acid)', fontSize: 13, fontWeight: 700,
+              fontFamily: "'JetBrains Mono', monospace", outline: 'none',
+            }}
+          />
+          <span style={{ fontSize: 10, color: 'var(--ink-faint)', flexShrink: 0 }}>pay to force it</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{question.length}/200</span>
         <button
@@ -81,7 +104,7 @@ export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTime
           onClick={handleSubmit}
           disabled={!question.trim()}
         >
-          Submit
+          {bidAmount && parseFloat(bidAmount) > 0 ? `Submit + ${bidAmount} SOL` : 'Submit'}
         </button>
       </div>
     </div>

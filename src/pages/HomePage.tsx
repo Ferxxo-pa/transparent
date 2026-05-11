@@ -31,7 +31,7 @@ const MODES: GameMode[] = [
     sub: 'you get asked a question. answer it or dodge it — but if you don\'t answer, you lose money from the pot.',
   },
   {
-    key: 'hottake',
+    key: 'exposer',
     emoji: '🌶️',
     tag: 'exposer',
     tagAlt: 'friends ask',
@@ -43,7 +43,7 @@ const MODES: GameMode[] = [
     sub: 'they write the questions. they bid money to force the worst ones. you\'re in the hot seat and you can\'t skip.',
   },
   {
-    key: 'story',
+    key: 'storyteller',
     emoji: '🎭',
     tag: 'storyteller',
     tagAlt: 'cap detector',
@@ -55,7 +55,7 @@ const MODES: GameMode[] = [
     sub: 'drop your wildest story — real or completely made up. if they believe you, you win. if they call cap, you lose.',
   },
   {
-    key: 'custom',
+    key: 'freeforall',
     emoji: '🔥',
     tag: 'free for all',
     tagAlt: 'no rules',

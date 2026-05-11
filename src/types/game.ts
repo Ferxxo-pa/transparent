@@ -7,7 +7,9 @@ export interface Player {
   isReady?: boolean;
 }
 
-export type QuestionMode = 'classic' | 'custom' | 'hot-take' | 'storyteller';
+export type QuestionMode = 'classic' | 'exposer' | 'storyteller' | 'free-for-all';
+
+export type ClassicSubMode = 'all-or-nothing' | 'chip-away';
 
 export type PayoutMode = 'winner-takes-all' | 'split-pot';
 
@@ -70,13 +72,14 @@ export type GamePhase =
   | 'player-voting'
   | 'submitting-questions'
   | 'voting-question'
+  | 'exposer-bidding'       // Exposer: players bid SOL to boost their question
   | 'picking-question'
   | 'answering'
   | 'voting-honesty'
-  | 'storyteller-prep'     // Hot-seat player sees prompt + chooses truth/fake
-  | 'storyteller-telling'  // Hot-seat player tells their story to the group
-  | 'storyteller-voting'   // Group votes: transparent or fake?
-  | 'storyteller-reveal';  // Reveal if it was truth or fake + update scores
+  | 'storyteller-prep'      // Hot-seat player sees prompt + chooses truth/fake
+  | 'storyteller-telling'   // Hot-seat player tells their story to the group
+  | 'storyteller-voting'    // Group votes with their stake: real or cap?
+  | 'storyteller-reveal';   // Reveal if it was truth or fake + settle stakes
 
 export interface SubmittedQuestion {
   id: string;
@@ -118,11 +121,11 @@ export interface GameState {
   customQuestions?: string[];
   /** Track used question indices to prevent repeats */
   usedQuestionIndices?: number[];
-  /** Questions submitted by players (hot-take mode) */
+  /** Questions submitted by players (exposer mode) */
   submittedQuestions?: SubmittedQuestion[];
   /** Hot-take mode: playerId -> questionId they voted for */
   questionVotes?: Record<string, string>;
-  /** Current game phase (hot-take mode sub-phases) */
+  /** Current game phase sub-phases */
   gamePhase?: GamePhase;
   /** 4 question options for picking-question phase */
   questionOptions?: string[];
@@ -136,6 +139,18 @@ export interface GameState {
   storytellerChoice?: 'truth' | 'fake' | null;
   /** Storyteller mode: the prompt given to the storyteller */
   storytellerPrompt?: string;
+  /** Classic sub-mode: all-or-nothing or chip-away */
+  classicSubMode?: ClassicSubMode;
+  /** Classic mode: whether the hot-seat player skipped this round */
+  hotSeatSkipped?: boolean;
+  /** Exposer mode: bids per question — questionId -> { wallet, amount }[] */
+  questionBids?: Record<string, { wallet: string; amount: number }[]>;
+  /** Storyteller mode: stake-based votes — wallet -> { vote, stakeAmount } */
+  stakeVotes?: Record<string, { vote: 'transparent' | 'fake'; stake: number }>;
+  /** Free-for-all: which mode is active for the current round */
+  currentRoundMode?: 'classic' | 'exposer' | 'storyteller';
+  /** Whether the host controls question author visibility in exposer mode */
+  exposerShowAuthors?: boolean;
 }
 
 // ── 30+ Party Questions ─────────────────────────────────────
@@ -316,6 +331,50 @@ export const STORYTELLER_PROMPTS: string[] = [
   "Tell us about a time you completely overreacted to something minor.",
   "Tell us about something you did that you'd never want your parents to know about.",
 ];
+
+/**
+ * Calculate storyteller payout for a single round.
+ * Storyteller wins money from everyone who guessed wrong.
+ * Correct voters split the storyteller's portion.
+ */
+export function calculateStorytellerRoundPayout(
+  stakeVotes: Record<string, { vote: 'transparent' | 'fake'; stake: number }>,
+  storytellerChoice: 'truth' | 'fake',
+  storytellerWallet: string,
+): Record<string, number> {
+  const correctAnswer = storytellerChoice === 'truth' ? 'transparent' : 'fake';
+  const payouts: Record<string, number> = {};
+
+  let wrongPool = 0;
+  let correctTotalStake = 0;
+  const correctVoters: { wallet: string; stake: number }[] = [];
+
+  for (const [wallet, { vote, stake }] of Object.entries(stakeVotes)) {
+    if (vote === correctAnswer) {
+      correctVoters.push({ wallet, stake });
+      correctTotalStake += stake;
+    } else {
+      wrongPool += stake;
+      payouts[wallet] = -stake; // they lose their stake
+    }
+  }
+
+  // Storyteller wins from wrong guessers
+  if (correctVoters.length === 0) {
+    // Everyone guessed wrong — storyteller wins everything
+    payouts[storytellerWallet] = wrongPool;
+  } else {
+    // Correct voters split the wrong pool proportionally to their stake
+    for (const { wallet, stake } of correctVoters) {
+      const share = correctTotalStake > 0 ? (stake / correctTotalStake) * wrongPool : 0;
+      payouts[wallet] = share; // net gain
+    }
+    // Storyteller gets nothing if people guessed correctly (they already keep their own money)
+    payouts[storytellerWallet] = (payouts[storytellerWallet] ?? 0);
+  }
+
+  return payouts;
+}
 
 export const FAKE_PLAYER_NAMES = [
   'Player1', 'Player2', 'Player3', 'Player4', 'Player5',

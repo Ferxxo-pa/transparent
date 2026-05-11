@@ -13,8 +13,11 @@ interface Props {
   voteCount: number;
   voterCount: number;
   myVote?: 'transparent' | 'fake';
+  buyInAmount: number;
+  stakeVotes?: Record<string, { vote: 'transparent' | 'fake'; stake: number }>;
   onChoose: (choice: 'truth' | 'fake') => void;
   onVote: (vote: 'transparent' | 'fake') => void;
+  onStakeVote: (vote: 'transparent' | 'fake', stake: number) => void;
   onAdvance: () => void;
 }
 
@@ -36,10 +39,12 @@ const renderPrompt = (text: string) => {
 
 export const StorytellerPhase: React.FC<Props> = ({
   phase, prompt, isHotSeat, isHost, playerName, storytellerChoice,
-  votes, voteCount, voterCount, myVote, onChoose, onVote, onAdvance,
+  votes, voteCount, voterCount, myVote, buyInAmount, stakeVotes,
+  onChoose, onVote, onStakeVote, onAdvance,
 }) => {
   const [doneTelling, setDoneTelling] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [stakeAmount, setStakeAmount] = useState(buyInAmount > 0 ? buyInAmount * 0.25 : 0);
 
   // ── PREP PHASE: Hot-seat player sees prompt, chooses truth/fake ──
   if (phase === 'storyteller-prep') {
@@ -232,32 +237,60 @@ export const StorytellerPhase: React.FC<Props> = ({
         ) : myVote ? (
           <div className="glass glass-strong" style={{ padding: 24, borderRadius: 28, width: '100%' }}>
             <p style={{ fontSize: 16, fontWeight: 600 }}>
-              you voted: {myVote === 'transparent' ? '😇 truth' : '🤥 bluff'}
+              you voted: {myVote === 'transparent' ? '😇 real' : '🤥 cap'}
             </p>
             <p className="mono" style={{ color: 'var(--ink-faint)', fontSize: 10, marginTop: 8, textTransform: 'uppercase' }}>
               {voteCount}/{voterCount} voted
             </p>
           </div>
         ) : (
-          <div className="vote-wrap">
-            <motion.button
-              whileTap={{ scale: 0.93 }}
-              onClick={() => onVote('transparent')}
-              className="vote-btn is-truth"
-              style={{ flex: 1, padding: '24px 16px' }}
-            >
-              <span style={{ fontSize: 28 }}>😇</span>
-              <span style={{ fontSize: 14, fontWeight: 800 }}>truth</span>
-            </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.93 }}
-              onClick={() => onVote('fake')}
-              className="vote-btn is-bluff"
-              style={{ flex: 1, padding: '24px 16px' }}
-            >
-              <span style={{ fontSize: 28 }}>🤥</span>
-              <span style={{ fontSize: 14, fontWeight: 800 }}>bluff</span>
-            </motion.button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: '100%' }}>
+            {/* Stake slider */}
+            {buyInAmount > 0 && (
+              <div className="glass" style={{ padding: '14px 16px', borderRadius: 18 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span className="mono" style={{ fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+                    your stake
+                  </span>
+                  <span className="money" style={{ fontSize: 16, color: 'var(--acid)' }}>
+                    {stakeAmount.toFixed(3)} SOL
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={buyInAmount}
+                  step={buyInAmount * 0.05}
+                  value={stakeAmount}
+                  onChange={e => setStakeAmount(parseFloat(e.target.value))}
+                  style={{ width: '100%', accentColor: 'var(--acid)' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                  <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>0</span>
+                  <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>{buyInAmount} SOL</span>
+                </div>
+              </div>
+            )}
+            <div className="vote-wrap">
+              <motion.button
+                whileTap={{ scale: 0.93 }}
+                onClick={() => onStakeVote('transparent', stakeAmount)}
+                className="vote-btn is-truth"
+                style={{ flex: 1, padding: '24px 16px' }}
+              >
+                <span style={{ fontSize: 28 }}>😇</span>
+                <span style={{ fontSize: 14, fontWeight: 800 }}>real</span>
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.93 }}
+                onClick={() => onStakeVote('fake', stakeAmount)}
+                className="vote-btn is-bluff"
+                style={{ flex: 1, padding: '24px 16px' }}
+              >
+                <span style={{ fontSize: 28 }}>🧢</span>
+                <span style={{ fontSize: 14, fontWeight: 800 }}>cap</span>
+              </motion.button>
+            </div>
           </div>
         )}
 
@@ -305,8 +338,30 @@ export const StorytellerPhase: React.FC<Props> = ({
         </p>
 
         <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>
-          {correctVoters}/{totalVoters} people guessed correctly
+          {correctVoters}/{totalVoters} guessed correctly
         </p>
+
+        {/* Stake results */}
+        {stakeVotes && Object.keys(stakeVotes).length > 0 && (
+          <div className="glass" style={{ padding: '12px 16px', borderRadius: 16, width: '100%' }}>
+            <p className="mono" style={{ fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 8 }}>
+              stake results
+            </p>
+            {Object.entries(stakeVotes).map(([wallet, { vote, stake }]) => {
+              const correct = (isTruth && vote === 'transparent') || (!isTruth && vote === 'fake');
+              return (
+                <div key={wallet} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0' }}>
+                  <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                    {wallet.slice(0, 4)}...{wallet.slice(-4)}
+                  </span>
+                  <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: correct ? '#5BE584' : '#FF5C5C' }}>
+                    {correct ? '+' : '-'}{stake.toFixed(3)} SOL
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Vote breakdown */}
         <div style={{ display: 'flex', gap: 20, padding: '12px 0' }}>

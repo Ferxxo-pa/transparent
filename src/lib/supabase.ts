@@ -18,7 +18,7 @@ export interface GameRow {
   status: 'waiting' | 'playing' | 'voting' | 'gameover';
   current_question_index: number;
   current_hot_seat_player: string | null;
-  question_mode: 'classic' | 'custom' | 'hot-take' | 'storyteller' | 'ai';
+  question_mode: 'classic' | 'exposer' | 'storyteller' | 'free-for-all' | 'custom' | 'hot-take' | 'ai';
   custom_questions: string[] | null;
   game_phase: string | null;
   current_round: number;

@@ -15,10 +15,11 @@ import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote } = useGame();
   const { publicKey } = usePrivyWallet();
 
-  const myWallet = publicKey?.toBase58() ?? '';
+  const isTestMode = gameState?.roomCode === '000-000';
+  const myWallet = isTestMode ? 'test-host' : (publicKey?.toBase58() ?? '');
   const isHost   = myWallet === (gameState as any)?.hostWallet;
   const isHotSeat = myWallet === gameState?.currentPlayerInHotSeat;
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -62,7 +63,7 @@ export const GamePlayPage: React.FC = () => {
 
   const player     = gameState.players.find(p => p.id === gameState.currentPlayerInHotSeat);
   const hasVoted   = !!gameState.votes[myWallet];
-  const isHotTake  = gameState.questionMode === 'hot-take';
+  const isExposer  = gameState.questionMode === 'exposer' || (gameState.questionMode === 'free-for-all' && gameState.currentRoundMode === 'exposer');
   const phase      = gameState.gamePhase;
   const round      = (gameState.currentRound ?? 0) + 1;
   const total      = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
@@ -79,6 +80,11 @@ export const GamePlayPage: React.FC = () => {
       <BackButton onClick={() => navigate(-1)} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span className="chip" style={{ fontSize: 11 }}>round {round} / {total}</span>
+        {gameState.questionMode === 'free-for-all' && gameState.currentRoundMode && (
+          <span className="chip" style={{ fontSize: 10, background: 'rgba(255,138,42,0.12)', color: 'var(--tangerine)', borderColor: 'rgba(255,138,42,0.3)' }}>
+            {gameState.currentRoundMode}
+          </span>
+        )}
         <WalletChip />
       </div>
     </div>
@@ -207,6 +213,9 @@ export const GamePlayPage: React.FC = () => {
   );
 
   // ── Hot seat waiting view ──────────────────────────────────
+  const isClassicMode = gameState.questionMode === 'classic' || (gameState.questionMode === 'free-for-all' && gameState.currentRoundMode === 'classic');
+  const subMode = gameState.classicSubMode ?? 'all-or-nothing';
+
   const HotSeatWaiting = () => (
     <div className="glass glass-strong" style={{ textAlign: 'center', padding: '28px 22px', borderRadius: 28, width: '100%' }}>
       <p className="display" style={{ fontSize: 18, marginBottom: 8, color: 'var(--ink-soft)' }}>
@@ -223,6 +232,19 @@ export const GamePlayPage: React.FC = () => {
       <button className="btn-degen" onClick={advance} style={{ marginTop: 20, width: '100%' }}>
         done answering ✓
       </button>
+      {isClassicMode && (
+        <button
+          onClick={skipQuestion}
+          style={{
+            marginTop: 10, width: '100%', padding: '12px 0', borderRadius: 16,
+            background: 'rgba(255,92,92,0.10)', border: '1px solid rgba(255,92,92,0.28)',
+            color: '#FF5C5C', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          skip question · {subMode === 'all-or-nothing' ? 'lose entire buy-in' : 'lose 15%'}
+        </button>
+      )}
     </div>
   );
 
@@ -260,8 +282,9 @@ export const GamePlayPage: React.FC = () => {
     );
   };
 
-  // ── Storyteller Mode ─────────────────────────────────────────
-  if (phase && phase.startsWith('storyteller-')) {
+  // ── Storyteller Mode (pure or free-for-all round) ────────────
+  const isStorytellerRound = phase && phase.startsWith('storyteller-');
+  if (isStorytellerRound) {
     return (
       <div className="page page--game fade-in" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <Blobs palette="story" />
@@ -279,8 +302,11 @@ export const GamePlayPage: React.FC = () => {
             voteCount={votesIn}
             voterCount={voterCount}
             myVote={myVote}
+            buyInAmount={gameState.buyInAmount}
+            stakeVotes={gameState.stakeVotes}
             onChoose={storytellerChoose}
             onVote={castVote}
+            onStakeVote={castStakeVote}
             onAdvance={storytellerAdvance}
           />
         </div>
@@ -292,9 +318,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Host Picking Question ───────────────────────────────────
   if (phase === 'host-picking') {
     const questionPool =
-      gameState.questionMode === 'custom' && gameState.customQuestions?.length
-        ? gameState.customQuestions
-        : QUESTIONS;
+      QUESTIONS;
 
     return (
       <div className="page page--game fade-in">
@@ -358,7 +382,7 @@ export const GamePlayPage: React.FC = () => {
   }
 
   // ── Hot-Take: Writing questions ────────────────────────────
-  if (isHotTake && phase === 'submitting-questions') {
+  if (isExposer && phase === 'submitting-questions') {
     return (
       <div className="page page--game fade-in">
         <Blobs palette="vote" />
@@ -388,7 +412,7 @@ export const GamePlayPage: React.FC = () => {
   }
 
   // ── Hot-Take: Voting on questions ──────────────────────────
-  if (isHotTake && phase === 'voting-question') {
+  if (isExposer && phase === 'voting-question') {
     return (
       <div className="page page--game fade-in">
         <Blobs palette="vote" />
@@ -403,7 +427,7 @@ export const GamePlayPage: React.FC = () => {
   }
 
   // ── Hot-Take: Answering ────────────────────────────────────
-  if (isHotTake && phase === 'answering') {
+  if (isExposer && phase === 'answering') {
     return (
       <div className="page page--game fade-in">
         <Blobs palette={blobPalette} />
@@ -492,6 +516,22 @@ export const GamePlayPage: React.FC = () => {
             )}
 
             <Scores />
+
+            {/* Solo test controls */}
+            {gameState.roomCode === '000-000' && (
+              <button
+                onClick={testAutoVote}
+                className="mono"
+                style={{
+                  fontSize: 10, color: 'var(--tangerine)', background: 'rgba(255,138,42,0.08)',
+                  border: '1px solid rgba(255,138,42,0.2)', borderRadius: 100, cursor: 'pointer',
+                  padding: '8px 0', width: '100%', textTransform: 'uppercase', letterSpacing: '0.08em',
+                  fontWeight: 600,
+                }}
+              >
+                🧪 simulate player votes
+              </button>
+            )}
 
             <button
               onClick={() => setShowEndConfirm(true)}

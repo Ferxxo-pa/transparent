@@ -3,16 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice } from '../hooks/useSolPrice';
-import { QuestionMode, PayoutMode } from '../types/game';
+import { QuestionMode, PayoutMode, ClassicSubMode } from '../types/game';
 import { Blobs, BackButton, SolMark, WalletChip, parseAmt, usdEstimate } from '../components';
 
 /* ── Mode definitions ────────────────────────────────────── */
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'classic',     label: 'classic',     sub: 'answer the question or lose money. no dodging.',              emoji: '🤥' },
-  { id: 'hot-take',    label: 'exposer',     sub: 'your friends write the questions. they bid to force them.',  emoji: '🌶️' },
-  { id: 'storyteller', label: 'storyteller', sub: 'tell your best stories. real or not. table decides.',        emoji: '🎭' },
-  { id: 'custom',      label: 'free for all', sub: 'all modes mixed. questions, stories, anything goes.',      emoji: '🔥' },
+  { id: 'classic',       label: 'classic',       sub: 'answer the question or lose money. no dodging.',              emoji: '🤥' },
+  { id: 'exposer',       label: 'exposer',       sub: 'your friends write the questions. they bid to force them.',  emoji: '🌶️' },
+  { id: 'storyteller',   label: 'storyteller',   sub: 'tell your best stories. real or not. table decides.',        emoji: '🎭' },
+  { id: 'free-for-all',  label: 'free for all',  sub: 'all modes mixed. questions, stories, anything goes.',       emoji: '🔥' },
 ];
 
 /* ── Presets ─────────────────────────────────────────────── */
@@ -24,11 +24,12 @@ const ROUND_PRESETS = [3, 5, 7, 10];
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
-  const { createGame, loading, error } = useGame();
+  const { createGame, createTestGame, loading, error } = useGame();
   const { connected, login } = usePrivyWallet();
   const solPrice = useSolPrice();
 
   const [mode, setMode]               = useState<QuestionMode>('classic');
+  const [classicSub, setClassicSub]   = useState<ClassicSubMode>('all-or-nothing');
   const [buyInRaw, setBuyInRaw]        = useState('0.1');
   const [activePreset, setActivePreset] = useState('0.1');
   const [rounds, setRounds]            = useState(5);
@@ -53,6 +54,7 @@ export const CreateGamePage: React.FC = () => {
       undefined,
       'split-pot' as PayoutMode,
       rounds,
+      mode === 'classic' ? classicSub : undefined,
     );
     if (ok) navigate('/waiting');
   };
@@ -144,6 +146,57 @@ export const CreateGamePage: React.FC = () => {
             );
           })}
         </div>
+
+        {/* ── Classic sub-mode toggle (only when classic selected) ── */}
+        {mode === 'classic' && (
+          <div
+            className="glass"
+            style={{ padding: 10, borderRadius: 18, marginTop: 10, width: '100%' }}
+          >
+            <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,0.04)', padding: 3, borderRadius: 100 }}>
+              {([
+                { id: 'all-or-nothing' as ClassicSubMode, label: 'all or nothing', sub: 'skip = lose entire buy-in' },
+                { id: 'chip-away' as ClassicSubMode, label: 'chip away', sub: 'skip = lose a fraction' },
+              ]).map(s => {
+                const isActive = classicSub === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setClassicSub(s.id)}
+                    className="mono"
+                    style={{
+                      flex: 1,
+                      padding: '8px 6px',
+                      borderRadius: 100,
+                      border: 'none',
+                      background: isActive ? 'var(--acid)' : 'transparent',
+                      color: isActive ? '#0A0810' : 'var(--ink-soft)',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mono" style={{
+              fontSize: 9,
+              color: 'var(--ink-faint)',
+              textAlign: 'center',
+              marginTop: 6,
+              fontWeight: 500,
+            }}>
+              {classicSub === 'all-or-nothing'
+                ? 'skip a question → lose your entire buy-in to the pot'
+                : 'skip a question → lose 15% of your buy-in each time'}
+            </p>
+          </div>
+        )}
 
         {/* ── Buy-in card ─────────────────────────────────────── */}
         <div
@@ -322,7 +375,7 @@ export const CreateGamePage: React.FC = () => {
         )}
 
         {/* ── CTA ─────────────────────────────────────────────── */}
-        <div style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 24, width: '100%' }}>
+        <div style={{ marginTop: 'auto', paddingTop: 16, paddingBottom: 24, width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button
             className="btn btn-degen"
             onClick={handleCreate}
@@ -337,6 +390,21 @@ export const CreateGamePage: React.FC = () => {
                 {' '}{buyInNum > 0 ? buyInRaw : 'FREE'}
               </>
             )}
+          </button>
+          <button
+            onClick={() => {
+              createTestGame(mode, classicSub);
+              navigate('/play');
+            }}
+            className="mono"
+            style={{
+              width: '100%', padding: '10px 0', borderRadius: 100,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+              color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, cursor: 'pointer',
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+            }}
+          >
+            🧪 solo test · no wallet needed
           </button>
         </div>
 

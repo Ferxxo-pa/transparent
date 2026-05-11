@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode, calculateSplitPayouts } from '../types/game';
+import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode, ClassicSubMode, calculateSplitPayouts, calculateStorytellerRoundPayout } from '../types/game';
 import {
   createGameInDB,
   getGameByRoomCode,
@@ -55,7 +55,10 @@ interface GameContextType {
   error: string | null;
   predictions: PredictionRow[];
   predictionPot: number; // total lamports in prediction pot
-  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number) => Promise<boolean>;
+  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number, classicSubMode?: ClassicSubMode) => Promise<boolean>;
+  skipQuestion: () => Promise<void>;
+  bidOnQuestion: (questionId: string, amount: number) => Promise<void>;
+  castStakeVote: (vote: 'transparent' | 'fake', stakeAmount: number) => Promise<void>;
   joinGame: (roomCode: string, playerName?: string) => Promise<boolean>;
   startGame: () => Promise<void>;
   castVote: (vote: 'transparent' | 'fake') => Promise<void>;
@@ -84,6 +87,8 @@ interface GameContextType {
   simulateAutoPlay: () => void;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
   placePrediction: (predictedWallet: string, amountSol: number, bettorName: string) => Promise<boolean>;
+  createTestGame: (questionMode?: QuestionMode, classicSubMode?: ClassicSubMode) => void;
+  testAutoVote: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -194,10 +199,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const questionMode = prev.questionMode;
             let currentQuestion = prev.currentQuestion;
 
-            if (questionMode === 'classic') {
+            if (questionMode === 'classic' || questionMode === 'free-for-all') {
               currentQuestion = QUESTIONS[game.current_question_index] || QUESTIONS[0];
-            } else if (questionMode === 'custom' && prev.customQuestions) {
-              currentQuestion = prev.customQuestions[game.current_question_index] || prev.customQuestions[0] || '';
             }
 
             // Reset votes whenever the round advances (syncs all clients)
@@ -361,7 +364,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Create Game ────────────────────────────────────────
 
   const createGame = useCallback(
-    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0) => {
+    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0, classicSubMode?: ClassicSubMode) => {
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
@@ -390,7 +393,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           host_wallet: wallet.publicKey.toBase58(),
           buy_in_lamports: buyInLamports,
           question_mode: questionMode,
-          custom_questions: questionMode === 'custom' ? (customQuestions ?? null) : null,
+          custom_questions: questionMode === 'free-for-all' ? (customQuestions ?? null) : null,
           payout_mode: payoutMode,
           num_questions: numQuestions > 0 ? numQuestions : null,
         });
@@ -403,11 +406,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 5. Determine first question
         const firstQuestion =
-          questionMode === 'custom' && customQuestions?.length
-            ? customQuestions[0]
-            : questionMode === 'hot-take'
-              ? '' // Will be set during hot-take flow
-              : QUESTIONS[0];
+          questionMode === 'exposer'
+            ? '' // Will be set during exposer flow
+            : QUESTIONS[0];
 
         // 6. Set state
         setGameState({
@@ -428,12 +429,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionMode,
           payoutMode,
           numQuestions: numQuestions > 0 ? numQuestions : 0,
-          customQuestions: questionMode === 'custom' ? customQuestions : undefined,
           submittedQuestions: [],
           questionVotes: {},
           gamePhase: undefined,
           currentRound: 0,
           scores: {},
+          classicSubMode: questionMode === 'classic' ? (classicSubMode ?? 'all-or-nothing') : undefined,
+          stakeVotes: {},
+          questionBids: {},
         });
 
         // 7. Subscribe to real-time updates
@@ -494,14 +497,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // 5. Determine question mode from DB
         const qMode = (game.question_mode as QuestionMode) || 'classic';
-        const customQs = game.custom_questions ?? undefined;
-
         const currentQuestion =
-          qMode === 'custom' && customQs?.length
-            ? customQs[game.current_question_index] || customQs[0]
-            : qMode === 'hot-take'
-              ? ''
-              : QUESTIONS[game.current_question_index] || QUESTIONS[0];
+          qMode === 'exposer'
+            ? ''
+            : QUESTIONS[game.current_question_index] || QUESTIONS[0];
 
         // 6. Set state
         setGameState({
@@ -522,7 +521,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionMode: qMode,
           payoutMode: (game.payout_mode as PayoutMode) || 'winner-takes-all',
           numQuestions: game.num_questions ?? 0,
-          customQuestions: customQs,
           submittedQuestions: [],
           questionVotes: {},
           gamePhase: (game.game_phase as GamePhase) || undefined,
@@ -592,8 +590,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
             : null,
         );
-      } else if (questionMode === 'hot-take') {
-        // Hot-take: start in submitting-questions phase
+      } else if (questionMode === 'exposer') {
+        // Exposer: start in submitting-questions phase
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
@@ -613,11 +611,69 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 currentRound: 0,
                 submittedQuestions: [],
                 questionVotes: {},
+                questionBids: {},
               }
             : null,
         );
+      } else if (questionMode === 'free-for-all') {
+        // Free-for-all: randomly pick a mode for round 1
+        const roundModes: ('classic' | 'exposer' | 'storyteller')[] = ['classic', 'exposer', 'storyteller'];
+        const firstMode = roundModes[Math.floor(Math.random() * roundModes.length)];
+
+        if (firstMode === 'storyteller') {
+          const { STORYTELLER_PROMPTS } = await import('../types/game');
+          const prompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+          await updateGameStatus(gid, {
+            status: 'playing',
+            current_hot_seat_player: firstPlayer,
+            current_question_index: 0,
+            game_phase: 'storyteller-prep',
+            current_round: 0,
+          });
+          setGameState((prev) =>
+            prev ? {
+              ...prev, gameStatus: 'playing', currentPlayerInHotSeat: firstPlayer,
+              currentQuestion: prompt, gamePhase: 'storyteller-prep', currentRound: 0,
+              storytellerChoice: null, storytellerPrompt: prompt,
+              currentRoundMode: 'storyteller',
+            } : null,
+          );
+        } else if (firstMode === 'exposer') {
+          await updateGameStatus(gid, {
+            status: 'playing',
+            current_hot_seat_player: firstPlayer,
+            current_question_index: 0,
+            game_phase: 'submitting-questions',
+            current_round: 0,
+          });
+          setGameState((prev) =>
+            prev ? {
+              ...prev, gameStatus: 'playing', currentPlayerInHotSeat: firstPlayer,
+              currentQuestion: '', gamePhase: 'submitting-questions', currentRound: 0,
+              submittedQuestions: [], questionVotes: {}, questionBids: {},
+              currentRoundMode: 'exposer',
+            } : null,
+          );
+        } else {
+          // classic
+          await updateGameStatus(gid, {
+            status: 'playing',
+            current_hot_seat_player: firstPlayer,
+            current_question_index: -1,
+            game_phase: 'host-picking',
+            current_round: 0,
+          });
+          setGameState((prev) =>
+            prev ? {
+              ...prev, gameStatus: 'playing', currentPlayerInHotSeat: firstPlayer,
+              currentQuestion: '', gamePhase: 'host-picking', currentRound: 0,
+              usedQuestionIndices: [],
+              currentRoundMode: 'classic',
+            } : null,
+          );
+        }
       } else {
-        // Classic or Custom
+        // Classic
         // Start in host-picking phase — host sees question list and picks
         await updateGameStatus(gid, {
           status: 'playing',
@@ -847,10 +903,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
         if (nextRound >= totalRounds) {
-          // All rounds done — game over
           await updateGameStatus(gid, { status: 'gameover' });
           setGameState((prev) => (prev ? { ...prev, gameStatus: 'gameover' } : null));
+        } else if (gameState.questionMode === 'free-for-all') {
+          // Free-for-all: pick random mode for next round
+          const roundModes: ('classic' | 'exposer' | 'storyteller')[] = ['classic', 'exposer', 'storyteller'];
+          const nextMode = roundModes[Math.floor(Math.random() * roundModes.length)];
+
+          if (nextMode === 'storyteller') {
+            const { STORYTELLER_PROMPTS } = await import('../types/game');
+            const prompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+            await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'storyteller-prep', storyteller_choice: null });
+            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: prompt, storytellerPrompt: prompt, storytellerChoice: null, gamePhase: 'storyteller-prep', votes: {}, voteCount: 0, stakeVotes: {}, currentRoundMode: 'storyteller' } : null);
+          } else if (nextMode === 'exposer') {
+            await updateGameStatus(gid, { game_phase: 'submitting-questions', current_hot_seat_player: nextPlayer, current_round: nextRound });
+            setGameState(prev => prev ? { ...prev, gamePhase: 'submitting-questions', currentPlayerInHotSeat: nextPlayer, currentRound: nextRound, currentQuestion: '', submittedQuestions: [], questionVotes: {}, questionBids: {}, votes: {}, voteCount: 0, currentRoundMode: 'exposer' } : null);
+          } else {
+            await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
+            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: '', gamePhase: 'host-picking', votes: {}, voteCount: 0, currentRoundMode: 'classic' } : null);
+          }
         } else {
+          // Pure exposer mode — next round is always exposer
           await updateGameStatus(gid, {
             game_phase: 'submitting-questions',
             current_hot_seat_player: nextPlayer,
@@ -866,6 +939,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   currentQuestion: '',
                   submittedQuestions: [],
                   questionVotes: {},
+                  questionBids: {},
                   votes: {},
                   voteCount: 0,
                 }
@@ -1159,8 +1233,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
         const nextPlayer = gameState.players[nextPlayerIdx];
         const nextRound = (gameState.currentRound ?? 0) + 1;
-        const questionPool = gameState.questionMode === 'custom' && gameState.customQuestions?.length
-          ? gameState.customQuestions : QUESTIONS;
+        const questionPool = QUESTIONS;
         const nextQIdx = Math.floor(Math.random() * questionPool.length);
         await updateGameStatus(gid, {
           current_hot_seat_player: nextPlayer.id,
@@ -1218,6 +1291,28 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (gid) await updateGameStatus(gid, { game_phase: 'storyteller-reveal' });
 
     } else if (currentPhase === 'storyteller-reveal') {
+      // Calculate storyteller stake payouts before advancing
+      const storytellerWallet = gameState.currentPlayerInHotSeat;
+      const choice = gameState.storytellerChoice;
+      const stakes = gameState.stakeVotes ?? {};
+      if (storytellerWallet && choice && Object.keys(stakes).length > 0) {
+        const roundPayouts = calculateStorytellerRoundPayout(stakes, choice, storytellerWallet);
+        // Apply payout adjustments to scores
+        setGameState(prev => {
+          if (!prev) return null;
+          const newScores = { ...(prev.scores ?? {}) };
+          for (const [wallet, payout] of Object.entries(roundPayouts)) {
+            const existing = newScores[wallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+            if (payout > 0) {
+              newScores[wallet] = { ...existing, transparent: existing.transparent + 1, rounds: existing.rounds + 1 };
+            } else if (payout < 0) {
+              newScores[wallet] = { ...existing, fake: existing.fake + 1, rounds: existing.rounds + 1 };
+            }
+          }
+          return { ...prev, scores: newScores };
+        });
+      }
+
       // Score and advance to next round
       const { STORYTELLER_PROMPTS } = await import('../types/game');
       const nextRound = (gameState.currentRound ?? 0) + 1;
@@ -1228,31 +1323,178 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
         if (gid) await updateGameStatus(gid, { status: 'gameover' });
       } else {
-        // Next round — new player, new prompt
         const nextPlayerIndex = nextRound % gameState.players.length;
         const nextPlayer = gameState.players[nextPlayerIndex]?.id ?? null;
-        const nextPrompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
 
-        setGameState(prev => prev ? {
-          ...prev,
-          currentRound: nextRound,
-          currentPlayerInHotSeat: nextPlayer,
-          currentQuestion: nextPrompt,
-          storytellerPrompt: nextPrompt,
-          storytellerChoice: null,
-          gamePhase: 'storyteller-prep',
-          votes: {},
-          voteCount: 0,
-        } : null);
+        // If free-for-all, pick a random mode for the next round
+        if (gameState.questionMode === 'free-for-all') {
+          const roundModes: ('classic' | 'exposer' | 'storyteller')[] = ['classic', 'exposer', 'storyteller'];
+          const nextMode = roundModes[Math.floor(Math.random() * roundModes.length)];
 
-        if (gid) {
-          await updateGameStatus(gid, {
-            current_round: nextRound,
-            current_hot_seat_player: nextPlayer,
-            game_phase: 'storyteller-prep',
-            storyteller_choice: null,
-          });
+          if (nextMode === 'storyteller') {
+            const nextPrompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+            setGameState(prev => prev ? {
+              ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
+              currentQuestion: nextPrompt, storytellerPrompt: nextPrompt, storytellerChoice: null,
+              gamePhase: 'storyteller-prep', votes: {}, voteCount: 0, stakeVotes: {},
+              currentRoundMode: 'storyteller',
+            } : null);
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'storyteller-prep', storyteller_choice: null });
+          } else if (nextMode === 'exposer') {
+            setGameState(prev => prev ? {
+              ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
+              currentQuestion: '', gamePhase: 'submitting-questions', votes: {}, voteCount: 0,
+              submittedQuestions: [], questionVotes: {}, questionBids: {},
+              currentRoundMode: 'exposer',
+            } : null);
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'submitting-questions' });
+          } else {
+            setGameState(prev => prev ? {
+              ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
+              currentQuestion: '', gamePhase: 'host-picking', votes: {}, voteCount: 0,
+              usedQuestionIndices: prev.usedQuestionIndices ?? [],
+              currentRoundMode: 'classic',
+            } : null);
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
+          }
+        } else {
+          // Pure storyteller mode — next round is always storyteller
+          const nextPrompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
+          setGameState(prev => prev ? {
+            ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
+            currentQuestion: nextPrompt, storytellerPrompt: nextPrompt, storytellerChoice: null,
+            gamePhase: 'storyteller-prep', votes: {}, voteCount: 0, stakeVotes: {},
+          } : null);
+          if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'storyteller-prep', storyteller_choice: null });
         }
+      }
+    }
+  }, [gameState]);
+
+  // ── Skip Question (Classic Mode — hot seat player skips) ──
+
+  const skipQuestion = useCallback(async () => {
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    if (!gid) return;
+
+    const hotSeatWallet = gameState.currentPlayerInHotSeat;
+    if (!hotSeatWallet) return;
+
+    const subMode = gameState.classicSubMode ?? 'all-or-nothing';
+    const buyIn = gameState.buyInAmount;
+    let penalty = 0;
+
+    if (subMode === 'all-or-nothing') {
+      penalty = buyIn; // lose entire buy-in
+    } else {
+      penalty = buyIn * 0.15; // chip-away: lose 15% per skip
+    }
+
+    // Update scores to reflect the skip penalty
+    const newScores = { ...(gameState.scores ?? {}) };
+    const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+    newScores[hotSeatWallet] = {
+      transparent: existing.transparent,
+      fake: existing.fake + 1, // count skip as a "fake" vote against them
+      rounds: existing.rounds + 1,
+    };
+
+    // Advance to next round
+    const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
+    const nextRound = (gameState.currentRound ?? 0) + 1;
+    const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+
+    // Penalty goes into the pot
+    const newPot = (gameState.currentPot || 0) + penalty;
+
+    if (nextRound >= totalRounds) {
+      await updateGameStatus(gid, { status: 'gameover', current_pot: newPot });
+      setGameState(prev => prev ? { ...prev, gameStatus: 'gameover', scores: newScores, currentPot: newPot } : null);
+    } else {
+      const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+      const nextPlayer = gameState.players[nextPlayerIdx];
+      await updateGameStatus(gid, {
+        current_hot_seat_player: nextPlayer.id,
+        current_question_index: -1,
+        current_round: nextRound,
+        game_phase: 'host-picking',
+        current_pot: newPot,
+      });
+      setGameState(prev => prev ? {
+        ...prev,
+        currentPlayerInHotSeat: nextPlayer.id,
+        currentQuestion: '',
+        currentRound: nextRound,
+        votes: {}, voteCount: 0,
+        gamePhase: 'host-picking',
+        scores: newScores,
+        currentPot: newPot,
+      } : null);
+    }
+  }, [gameState]);
+
+  // ── Bid on Question (Exposer Mode) ──
+
+  const bidOnQuestion = useCallback(async (questionId: string, amount: number) => {
+    if (!gameState) return;
+    const wallet = walletRef.current;
+    if (!wallet) return;
+
+    const myWallet = wallet.publicKey.toBase58();
+    const currentBids = gameState.questionBids ?? {};
+    const questionBids = currentBids[questionId] ?? [];
+
+    setGameState(prev => {
+      if (!prev) return null;
+      const bids = { ...(prev.questionBids ?? {}) };
+      bids[questionId] = [...(bids[questionId] ?? []), { wallet: myWallet, amount }];
+      return { ...prev, questionBids: bids };
+    });
+
+    // Also increment the question's vote count by bid amount (higher bids = more weight)
+    // The question with highest total bids wins
+    try {
+      await voteForQuestionInDB(questionId);
+    } catch {
+      // non-fatal
+    }
+  }, [gameState]);
+
+  // ── Cast Stake Vote (Storyteller Mode — vote with your money) ──
+
+  const castStakeVote = useCallback(async (vote: 'transparent' | 'fake', stakeAmount: number) => {
+    if (!gameState) return;
+    const wallet = walletRef.current;
+    if (!wallet) return;
+
+    const myWallet = wallet.publicKey.toBase58();
+
+    setGameState(prev => {
+      if (!prev) return null;
+      const newStakeVotes = { ...(prev.stakeVotes ?? {}) };
+      newStakeVotes[myWallet] = { vote, stake: stakeAmount };
+      return {
+        ...prev,
+        stakeVotes: newStakeVotes,
+        votes: { ...prev.votes, [myWallet]: vote },
+        voteCount: Object.keys(prev.votes).length + (prev.votes[myWallet] ? 0 : 1),
+      };
+    });
+
+    // Also record in DB as a regular vote for realtime sync
+    const gid = gameState.gameId;
+    if (gid) {
+      try {
+        const round = gameState.currentRound ?? 0;
+        await insertVote({
+          game_id: gid,
+          round,
+          voter_wallet: myWallet,
+          vote,
+        });
+      } catch (err: any) {
+        console.error('Stake vote error:', err);
       }
     }
   }, [gameState]);
@@ -1336,10 +1578,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Determine question
         let currentQuestion = prev.currentQuestion;
-        if (prev.questionMode === 'classic') {
+        if (prev.questionMode === 'classic' || prev.questionMode === 'free-for-all') {
           currentQuestion = QUESTIONS[game.current_question_index] || QUESTIONS[0];
-        } else if (prev.questionMode === 'custom' && prev.customQuestions) {
-          currentQuestion = prev.customQuestions[game.current_question_index] || prev.customQuestions[0] || '';
         }
 
         // Build vote map
@@ -1589,6 +1829,70 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // ── Reset ──────────────────────────────────────────────
 
+  // ── Solo Test Mode ──────────────────────────────────────
+  // Creates a fully local game with fake players. No wallet, no Supabase.
+  // Use this to test the full game flow by yourself.
+
+  const TEST_PLAYERS: Player[] = [
+    { id: 'test-host', name: 'you (host)', balance: 0, isHost: true, walletAddress: 'test-host', isReady: true },
+    { id: 'test-p1', name: 'alex', balance: 0, isHost: false, walletAddress: 'test-p1', isReady: true },
+    { id: 'test-p2', name: 'jordan', balance: 0, isHost: false, walletAddress: 'test-p2', isReady: true },
+    { id: 'test-p3', name: 'sam', balance: 0, isHost: false, walletAddress: 'test-p3', isReady: true },
+  ];
+
+  const createTestGame = useCallback((questionMode: QuestionMode = 'classic', classicSubMode?: ClassicSubMode) => {
+    const roomCode = '000-000';
+    setGameState({
+      roomCode,
+      roomName: 'Test Room',
+      buyInAmount: 0,
+      players: TEST_PLAYERS,
+      currentPot: 0,
+      gameStatus: 'playing',
+      currentQuestion: '',
+      currentPlayerInHotSeat: 'test-p1',
+      votes: {},
+      voteCount: 0,
+      totalVotes: TEST_PLAYERS.length,
+      winner: null,
+      hostWallet: 'test-host',
+      questionMode,
+      payoutMode: 'split-pot',
+      numQuestions: TEST_PLAYERS.length,
+      submittedQuestions: [],
+      questionVotes: {},
+      gamePhase: questionMode === 'storyteller' ? 'storyteller-prep' : questionMode === 'exposer' ? 'submitting-questions' : 'host-picking',
+      currentRound: 0,
+      scores: {},
+      classicSubMode: questionMode === 'classic' ? (classicSubMode ?? 'all-or-nothing') : undefined,
+      stakeVotes: {},
+      questionBids: {},
+      currentRoundMode: questionMode === 'free-for-all' ? 'classic' : undefined,
+      storytellerPrompt: questionMode === 'storyteller' ? 'Tell us about the craziest thing you\'ve ever done on a dare.' : undefined,
+      storytellerChoice: null,
+    });
+    setError(null);
+  }, []);
+
+  // Auto-vote from fake players after a delay (simulates other players voting)
+  const testAutoVote = useCallback(() => {
+    if (!gameState) return;
+    const hotSeat = gameState.currentPlayerInHotSeat;
+    const fakePlayers = TEST_PLAYERS.filter(p => p.id !== hotSeat && p.id !== 'test-host');
+
+    // Simulate votes from fake players with staggered timing
+    fakePlayers.forEach((fp, i) => {
+      setTimeout(() => {
+        setGameState(prev => {
+          if (!prev) return null;
+          const vote: 'transparent' | 'fake' = Math.random() > 0.4 ? 'transparent' : 'fake';
+          const newVotes = { ...prev.votes, [fp.id]: vote };
+          return { ...prev, votes: newVotes, voteCount: Object.keys(newVotes).length };
+        });
+      }, (i + 1) * 800);
+    });
+  }, [gameState]);
+
   const resetGame = useCallback(() => {
     if (channelRef.current) {
       unsubscribeFromGame(channelRef.current);
@@ -1729,6 +2033,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         endGameNow,
         storytellerChoose,
         storytellerAdvance,
+        skipQuestion,
+        bidOnQuestion,
+        castStakeVote,
         readyUp,
         leaveGame,
         requestLeave,
@@ -1740,6 +2047,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         simulateAutoPlay,
         setWalletAdapter,
         placePrediction,
+        createTestGame,
+        testAutoVote,
       }}
     >
       {children}
