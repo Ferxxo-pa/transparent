@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, TokenMark } from '../components';
+import { Blobs, TokenMark, SolMark } from '../components';
+import { WalletDrawer } from '../components/WalletDrawer';
 import { useWalletBalance } from '../hooks/useWalletBalance';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 
@@ -69,11 +70,11 @@ const MODES: GameMode[] = [
 /* ── Fake live players ───────────────────────────────────── */
 
 const FAKE_PLAYERS = [
-  { emoji: '😈', name: 'degen_kyle', sol: '+0.42', positive: true },
-  { emoji: '🦊', name: 'foxwifhat', sol: '-0.15', positive: false },
-  { emoji: '🐸', name: 'pepemaxxi', sol: '+1.20', positive: true },
-  { emoji: '💀', name: 'skullcap99', sol: '-0.08', positive: false },
-  { emoji: '🔥', name: 'burnttoast', sol: '+0.33', positive: true },
+  { emoji: '🐸', name: 'capdetector', amt: '+1.42', positive: true },
+  { emoji: '🎩', name: 'soljester', amt: '+0.84', positive: true },
+  { emoji: '🦊', name: 'rugged.sol', amt: '-0.62', positive: false },
+  { emoji: '🐧', name: 'pengu_lord', amt: '+0.18', positive: true },
+  { emoji: '🐶', name: 'wifhat', amt: '-0.40', positive: false },
 ];
 
 /* ── HomePage ────────────────────────────────────────────── */
@@ -83,6 +84,8 @@ export const HomePage: React.FC = () => {
   const { connected, login, publicKey } = usePrivyWallet();
   const balance = useWalletBalance(publicKey);
   const solPrice = useSolPrice();
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   /* Mode cycling */
   const [modeIdx, setModeIdx] = useState(0);
@@ -102,11 +105,24 @@ export const HomePage: React.FC = () => {
     };
   }, []);
 
+  const jumpTo = (i: number) => {
+    if (i === modeIdx) return;
+    setVisible(false);
+    setTimeout(() => { setModeIdx(i); setVisible(true); }, 380);
+  };
+
   const mode = MODES[modeIdx];
 
   /* Balance display */
   const balStr = balance !== null ? balance.toFixed(3) : '—';
   const usdStr = balance !== null && solPrice ? solToUsd(balance, solPrice) : '';
+
+  const fadeStyle = {
+    opacity: visible ? 1 : 0,
+    transform: visible ? 'translateY(0)' : 'translateY(6px)',
+    transition: 'opacity 380ms cubic-bezier(0.4, 0, 0.2, 1), transform 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+    willChange: 'opacity, transform' as const,
+  };
 
   return (
     <div style={{ width: '100%', minHeight: '100dvh', position: 'relative' }}>
@@ -144,15 +160,19 @@ export const HomePage: React.FC = () => {
 
           {/* Wallet chip */}
           {connected && balance !== null ? (
-            <div className="chip" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <TokenMark token="sol" size={14} />
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="chip"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <TokenMark token="sol" size={11} />
               <span>{balStr}</span>
               {usdStr && (
-                <span style={{ color: 'var(--ink-faint)', fontSize: 10, fontWeight: 500 }}>
+                <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)', marginLeft: 2 }}>
                   {usdStr}
                 </span>
               )}
-            </div>
+            </button>
           ) : (
             <button
               onClick={login}
@@ -174,102 +194,81 @@ export const HomePage: React.FC = () => {
               style={{
                 borderRadius: 32,
                 padding: '28px 26px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 14,
                 overflow: 'hidden',
                 position: 'relative',
               }}
             >
-              {/* Crossfade wrapper */}
-              <div style={{
-                transition: 'opacity 380ms ease, transform 380ms ease',
-                opacity: visible ? 1 : 0,
-                transform: visible ? 'translateY(0)' : 'translateY(6px)',
-              }}>
-                {/* Sticker row + emoji */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                  {/* Tags */}
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-                    <span
-                      className="sticker sticker-acid"
-                      style={{ transform: 'rotate(-3deg)' }}
-                    >
-                      {mode.tag}
-                    </span>
-                    <span
-                      className="sticker sticker-pink"
-                      style={{ transform: 'rotate(2deg)' }}
-                    >
-                      {mode.tagAlt}
-                    </span>
+              {/* Sticker row + emoji */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, minHeight: 36 }}>
+                <div style={fadeStyle}>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <span className="sticker sticker-acid">{mode.tag}</span>
+                    <span className="sticker sticker-pink" style={{ transform: 'rotate(2deg)' }}>{mode.tagAlt}</span>
                   </div>
-
-                  {/* Emoji with glow */}
-                  <span style={{
-                    fontSize: 48,
-                    filter: `drop-shadow(0 0 18px ${mode.glowVar})`,
-                    animation: 'glow 3s ease-in-out infinite',
-                    lineHeight: 1,
-                  }}>
-                    {mode.emoji}
-                  </span>
                 </div>
-
-                {/* Title */}
-                <div
-                  className="display"
-                  style={{
-                    fontSize: 44,
-                    lineHeight: 0.95,
-                    color: 'var(--ink)',
-                    marginBottom: 6,
-                  }}
-                >
-                  {mode.title}
+                <div style={{ ...fadeStyle, fontSize: 36, lineHeight: 1, animation: visible ? 'glow 2.5s ease-in-out infinite' : 'none' }}>
+                  {mode.emoji}
                 </div>
+              </div>
 
-                {/* Hook line */}
-                <div
+              {/* Title + Hook */}
+              <h1
+                className="display"
+                style={{
+                  fontSize: 44,
+                  lineHeight: 0.95,
+                  margin: 0,
+                  minHeight: 84,
+                  ...fadeStyle,
+                }}
+              >
+                {mode.title}<br />
+                <span
                   className="italic-serif"
                   style={{
                     fontSize: 52,
                     color: mode.accent,
-                    lineHeight: 1.1,
-                    marginBottom: 10,
+                    fontWeight: 400,
+                    transition: 'color 380ms ease',
                   }}
                 >
                   {mode.hook}
-                </div>
+                </span>
+              </h1>
 
-                {/* Sub-description */}
-                <p style={{
-                  fontSize: 13,
-                  color: 'var(--ink-soft)',
-                  lineHeight: 1.5,
-                }}>
-                  {mode.sub}
-                </p>
-              </div>
+              {/* Sub-description */}
+              <p style={{
+                fontSize: 13,
+                color: 'var(--ink-soft)',
+                lineHeight: 1.4,
+                margin: '18px 0 0',
+                fontWeight: 500,
+                minHeight: 18,
+                ...fadeStyle,
+              }}>
+                {mode.sub}
+              </p>
 
-              {/* Mode dots */}
-              <div style={{ display: 'flex', gap: 6, marginTop: 8, alignItems: 'center', justifyContent: 'center' }}>
-                {MODES.map((m, i) => {
-                  const isActive = i === modeIdx;
-                  return (
-                    <div
-                      key={m.key}
-                      style={{
-                        width: isActive ? 24 : 8,
-                        height: 8,
-                        borderRadius: 4,
-                        background: isActive ? mode.accent : 'var(--ink-dim)',
-                        boxShadow: isActive ? `0 0 12px ${mode.glowVar}` : 'none',
-                        transition: 'all 380ms ease',
-                      }}
-                    />
-                  );
-                })}
+              {/* Mode dots — flat bars, clickable */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 18 }}>
+                {MODES.map((m, i) => (
+                  <button
+                    key={m.key}
+                    onClick={() => jumpTo(i)}
+                    aria-label={m.key}
+                    style={{
+                      flex: 1,
+                      height: 3,
+                      padding: 0,
+                      background: i === modeIdx ? mode.accent : 'rgba(255,255,255,0.12)',
+                      border: 'none',
+                      borderRadius: 100,
+                      cursor: 'pointer',
+                      boxShadow: i === modeIdx ? `0 0 12px ${mode.accent}` : 'none',
+                      transition: 'background 380ms ease, box-shadow 380ms ease',
+                    }}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -282,6 +281,7 @@ export const HomePage: React.FC = () => {
               className="glass-flat"
               style={{
                 padding: '14px 16px',
+                borderRadius: 18,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 10,
@@ -290,80 +290,96 @@ export const HomePage: React.FC = () => {
               {/* Header */}
               <div style={{
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: 8,
+                marginBottom: 10,
               }}>
-                <div style={{
-                  width: 7,
-                  height: 7,
-                  borderRadius: '50%',
-                  background: 'var(--mint)',
-                  animation: 'pulseDot 2s ease infinite',
-                  flexShrink: 0,
-                }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    background: 'var(--acid)',
+                    boxShadow: '0 0 8px var(--acid)',
+                    animation: 'pulseDot 1.4s ease-in-out infinite',
+                    flexShrink: 0,
+                    display: 'inline-block',
+                  }} />
+                  <span
+                    className="mono"
+                    style={{
+                      fontSize: 9,
+                      letterSpacing: '0.18em',
+                      textTransform: 'uppercase',
+                      color: 'var(--ink)',
+                    }}
+                  >
+                    live · players online
+                  </span>
+                </div>
                 <span
                   className="mono"
                   style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: '0.06em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink-faint)',
+                    fontSize: 9,
+                    color: 'var(--ink-soft)',
+                    letterSpacing: '0.08em',
                   }}
                 >
-                  live · players online
-                </span>
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: 'var(--mint)',
-                    marginLeft: 'auto',
-                  }}
-                >
-                  {Math.floor(Math.random() * 40 + 80)}
+                  1,284
                 </span>
               </div>
 
               {/* Player rows */}
-              {FAKE_PLAYERS.map((p) => (
-                <div
-                  key={p.name}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '6px 0',
-                    borderTop: '1px solid rgba(255,255,255,0.05)',
-                  }}
-                >
-                  <span style={{ fontSize: 18, width: 28, textAlign: 'center', flexShrink: 0 }}>
-                    {p.emoji}
-                  </span>
-                  <span
-                    className="mono"
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {FAKE_PLAYERS.map((p) => (
+                  <div
+                    key={p.name}
                     style={{
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: 'var(--ink-soft)',
-                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
                     }}
                   >
-                    {p.name}
-                  </span>
-                  <span
-                    className="mono"
-                    style={{
+                    {/* Emoji circle */}
+                    <div style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      background: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      display: 'grid',
+                      placeItems: 'center',
                       fontSize: 12,
-                      fontWeight: 700,
-                      color: p.positive ? 'var(--mint)' : '#FF5C5C',
-                    }}
-                  >
-                    {p.sol} SOL
-                  </span>
-                </div>
-              ))}
+                      flexShrink: 0,
+                    }}>
+                      {p.emoji}
+                    </div>
+                    <span
+                      style={{
+                        flex: 1,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        letterSpacing: '-0.01em',
+                      }}
+                    >
+                      {p.name}
+                    </span>
+                    <span
+                      className="mono"
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: p.positive ? '#5BE584' : '#FF5C5C',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <SolMark size={9} tone="ink" /> {p.amt}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* ── CTA stack ────────────────────────────────────────── */}
@@ -409,6 +425,8 @@ export const HomePage: React.FC = () => {
 
         </div>
       </div>
+      {/* Wallet drawer */}
+      <WalletDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   );
 };

@@ -121,9 +121,9 @@ export const JoinGamePage: React.FC = () => {
                   style={{
                     width: 38,
                     height: 56,
-                    borderRadius: 12,
-                    background: 'var(--glass-bg)',
-                    border: d ? '1.5px solid var(--azure)' : '1px solid var(--glass-stroke)',
+                    borderRadius: 14,
+                    background: d ? 'rgba(77,168,255,0.15)' : 'rgba(255,255,255,0.04)',
+                    border: d ? '1.5px solid rgba(77,168,255,0.6)' : '1px solid rgba(255,255,255,0.12)',
                     color: d ? 'var(--azure)' : 'var(--ink)',
                     fontSize: 26,
                     fontFamily: "'JetBrains Mono', monospace",
@@ -153,7 +153,7 @@ export const JoinGamePage: React.FC = () => {
               type="text"
               value={nickname}
               onChange={e => setNickname(e.target.value)}
-              placeholder="what should people call you?"
+              placeholder="@degen"
               maxLength={18}
             />
           </div>

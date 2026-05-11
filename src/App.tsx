@@ -5,7 +5,8 @@ import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
 import { WalletBridge } from './components/WalletBridge';
-import { WalletHeader } from './components/WalletHeader';
+// WalletHeader removed from global render — each page handles its own top bar
+// WalletDrawer is triggered from individual page wallet chips
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Background } from './components/Background';
 import { HomePage } from './pages/HomePage';
@@ -57,7 +58,6 @@ function AnimatedRoutes() {
   return (
     <>
       <GameRedirect />
-      <WalletHeader />
       <AnimatePresence mode="popLayout">
         <Routes location={location} key={location.pathname}>
           <Route path="/"         element={<PageWrap><HomePage /></PageWrap>} />
