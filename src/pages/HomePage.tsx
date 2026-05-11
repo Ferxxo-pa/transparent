@@ -184,11 +184,11 @@ export const HomePage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Two-column grid on desktop ──────────────────────── */}
+        {/* ── Grid: desktop = hero left / side right / CTAs bottom row ── */}
         <div className="page-grid--home">
 
-          {/* ── Left column: Hero card ─────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* ── Left: Hero card ────────────────────────────────── */}
+          <div className="home-col-hero">
             <div
               className="glass glass-strong"
               style={{
@@ -273,10 +273,43 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* ── Right column: Live players + CTAs ────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, flex: 1, minHeight: 0 }}>
+          {/* ── Right: Rules + Live players ──────────────────── */}
+          <div className="home-col-side">
 
-            {/* ── Live players rail ────────────────────────────────── */}
+            {/* Desktop-only: How it works panel for current mode */}
+            <div
+              className="glass home-rules-desktop"
+              style={{
+                display: 'none',
+                padding: '18px 20px',
+                borderRadius: 22,
+              }}
+            >
+              <div className="mono" style={{
+                fontSize: 10,
+                letterSpacing: '0.14em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-faint)',
+                marginBottom: 10,
+              }}>
+                how it works
+                <span style={{ color: mode.accent, marginLeft: 6, transition: 'color 380ms ease' }}>
+                  {mode.tag}
+                </span>
+              </div>
+              <p style={{
+                fontSize: 13,
+                color: 'var(--ink-soft)',
+                lineHeight: 1.5,
+                margin: 0,
+                fontWeight: 500,
+                ...fadeStyle,
+              }}>
+                {mode.sub}
+              </p>
+            </div>
+
+            {/* Live players rail */}
             <div
               className="glass-flat"
               style={{
@@ -340,7 +373,6 @@ export const HomePage: React.FC = () => {
                       gap: 10,
                     }}
                   >
-                    {/* Emoji circle */}
                     <div style={{
                       width: 22,
                       height: 22,
@@ -381,15 +413,17 @@ export const HomePage: React.FC = () => {
                 ))}
               </div>
             </div>
+          </div>
 
-            {/* ── CTA stack ────────────────────────────────────────── */}
-            <div style={{
-              marginTop: 'auto',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 10,
-              paddingTop: 8,
-            }}>
+          {/* ── Bottom: CTAs span full width on desktop ────── */}
+          <div className="home-col-cta" style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            marginTop: 'auto',
+            paddingTop: 8,
+          }}>
+            <div className="home-cta-row">
               <button
                 className="btn btn-degen"
                 onClick={() => navigate('/join')}
@@ -402,25 +436,25 @@ export const HomePage: React.FC = () => {
               >
                 create a game
               </button>
-              <button
-                onClick={() => navigate('/how-to-play')}
-                className="mono"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '10px 0',
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase' as const,
-                  color: 'var(--ink-faint)',
-                  textAlign: 'center' as const,
-                }}
-              >
-                how to play · rules
-              </button>
             </div>
+            <button
+              onClick={() => navigate('/how-to-play')}
+              className="mono"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                padding: '10px 0',
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase' as const,
+                color: 'var(--ink-faint)',
+                textAlign: 'center' as const,
+              }}
+            >
+              how to play · rules
+            </button>
           </div>
 
         </div>

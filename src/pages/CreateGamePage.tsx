@@ -128,7 +128,9 @@ export const CreateGamePage: React.FC = () => {
                   textAlign: 'left',
                   border: isActive ? '1px solid rgba(196,255,60,0.5)' : '1px solid var(--glass-stroke)',
                   background: isActive ? 'rgba(196,255,60,0.12)' : 'var(--glass-bg)',
-                  transition: 'all 0.15s',
+                  color: 'var(--ink)',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.25s',
                 }}
               >
                 <span style={{ fontSize: 26, lineHeight: 1, marginBottom: 6 }}>{m.emoji}</span>
@@ -208,7 +210,7 @@ export const CreateGamePage: React.FC = () => {
         {/* ── Buy-in card ─────────────────────────────────────── */}
         <div
           className="glass"
-          style={{ padding: 14, borderRadius: 20 }}
+          style={{ padding: 14, borderRadius: 20, marginBottom: 10 }}
         >
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -223,15 +225,13 @@ export const CreateGamePage: React.FC = () => {
             >
               buy-in
             </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="money" style={{ fontSize: 22, color: 'var(--acid)' }}>
-                <TokenMark token={selectedToken} size={16} />
-                {' '}{buyInNum > 0 ? buyInRaw : 'free'}
-              </span>
-              {buyInNum > 0 && usdEst && (
+            <span className="money" style={{ fontSize: 22, color: 'var(--acid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <TokenMark token={selectedToken} size={16} />
+              {' '}{buyInNum > 0 ? buyInRaw : '0'}
+              {usdEst && (
                 <UsdTag amount={buyInNum} token={selectedToken} />
               )}
-            </div>
+            </span>
           </div>
 
           {/* Token row */}
@@ -276,11 +276,12 @@ export const CreateGamePage: React.FC = () => {
                 <button
                   key={p}
                   onClick={() => { setBuyInRaw(p); setActivePreset(p); }}
+                  className="mono"
                   style={{
                     flex: 1,
                     padding: '9px 0',
                     borderRadius: 100,
-                    border: isActive ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                    border: `1px solid ${isActive ? 'var(--acid)' : 'rgba(255,255,255,0.10)'}`,
                     background: isActive ? 'var(--acid)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
                     fontSize: 13,
@@ -290,7 +291,7 @@ export const CreateGamePage: React.FC = () => {
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
-                  {p === '0' ? 'free' : p}
+                  {p === '0' ? 'FREE' : p}
                 </button>
               );
             })}

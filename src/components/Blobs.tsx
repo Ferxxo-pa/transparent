@@ -80,6 +80,7 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
     blobs.map((b, i) => (
       <div
         key={`${b.c}-${i}`}
+        className={`blob ${b.anim}`}
         style={{
           position: 'absolute',
           left: b.x,
@@ -90,9 +91,8 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
           background: b.c,
           opacity: b.a * opacity,
           filter: 'blur(60px)',
-          willChange: 'transform, opacity',
-          animation: `${b.anim} 18s ease-in-out infinite`,
-          transition: 'opacity 1100ms ease',
+          willChange: 'transform',
+          transition: 'opacity 1100ms cubic-bezier(0.4, 0, 0.2, 1)',
           pointerEvents: 'none' as const,
         }}
       />
@@ -115,8 +115,13 @@ export const Blobs: React.FC<BlobsProps> = ({ palette = 'home' }) => {
       {/* Current palette */}
       {renderBlobs(BLOB_PALETTES[current], 1)}
 
-      {/* Grain overlay */}
-      <div className="ab-grain" />
+      {/* Vignette — darkens edges, keeps blobs contained */}
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        background: 'radial-gradient(circle at 50% 50%, transparent 60%, rgba(0,0,0,0.4))',
+        pointerEvents: 'none',
+      }} />
     </div>
   );
 };
