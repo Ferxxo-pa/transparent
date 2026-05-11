@@ -9,8 +9,8 @@ import { Blobs, BackButton, SolMark, WalletChip, parseAmt, usdEstimate } from '.
 /* ── Mode definitions ────────────────────────────────────── */
 
 const MODES: { id: QuestionMode; label: string; sub: string; emoji: string }[] = [
-  { id: 'classic',     label: 'classic',     sub: 'answer the question or lose money. truth or bluff.',          emoji: '🤥' },
-  { id: 'hot-take',    label: 'expose',      sub: 'your friends write the questions. they bid to force them.',  emoji: '🌶️' },
+  { id: 'classic',     label: 'classic',     sub: 'answer the question or lose money. no dodging.',              emoji: '🤥' },
+  { id: 'hot-take',    label: 'exposer',     sub: 'your friends write the questions. they bid to force them.',  emoji: '🌶️' },
   { id: 'storyteller', label: 'storyteller', sub: 'tell your best stories. real or not. table decides.',        emoji: '🎭' },
   { id: 'custom',      label: 'free for all', sub: 'all modes mixed. questions, stories, anything goes.',      emoji: '🔥' },
 ];
