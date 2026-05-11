@@ -183,8 +183,8 @@ export const CreateGamePage: React.FC = () => {
                   className="mono"
                   style={{
                     flex: 1,
-                    padding: '9px 0',
-                    borderRadius: 100,
+                    padding: '9px 4px',
+                    borderRadius: 12,
                     border: `1px solid ${isActive ? 'var(--acid)' : 'rgba(255,255,255,0.10)'}`,
                     background: isActive ? 'var(--acid)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
@@ -212,7 +212,7 @@ export const CreateGamePage: React.FC = () => {
               style={{
                 flex: 1.3,
                 padding: '9px 8px',
-                borderRadius: 100,
+                borderRadius: 12,
                 border: `1px solid ${customValue ? 'rgba(196,255,60,0.5)' : 'rgba(255,255,255,0.10)'}`,
                 background: 'rgba(255,255,255,0.04)',
                 color: customValue ? 'var(--acid)' : 'var(--ink-soft)',
