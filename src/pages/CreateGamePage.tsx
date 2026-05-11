@@ -183,13 +183,13 @@ export const CreateGamePage: React.FC = () => {
                   className="mono"
                   style={{
                     flex: 1,
-                    padding: '9px 4px',
-                    borderRadius: 12,
+                    padding: '6px 0',
+                    borderRadius: 100,
                     border: `1px solid ${isActive ? 'var(--acid)' : 'rgba(255,255,255,0.10)'}`,
                     background: isActive ? 'var(--acid)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
-                    fontSize: 13,
-                    fontWeight: 700,
+                    fontSize: 11,
+                    fontWeight: 800,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     fontFamily: "'JetBrains Mono', monospace",
@@ -211,8 +211,8 @@ export const CreateGamePage: React.FC = () => {
               placeholder="custom"
               style={{
                 flex: 1.3,
-                padding: '9px 8px',
-                borderRadius: 12,
+                padding: '6px 8px',
+                borderRadius: 100,
                 border: `1px solid ${customValue ? 'rgba(196,255,60,0.5)' : 'rgba(255,255,255,0.10)'}`,
                 background: 'rgba(255,255,255,0.04)',
                 color: customValue ? 'var(--acid)' : 'var(--ink-soft)',
@@ -258,13 +258,13 @@ export const CreateGamePage: React.FC = () => {
                   onClick={() => { setRounds(n); setCustomRounds(''); }}
                   style={{
                     flex: 1,
-                    padding: '9px 4px',
-                    borderRadius: 12,
+                    padding: '6px 0',
+                    borderRadius: 100,
                     border: `1px solid ${isActive ? 'var(--ink)' : 'rgba(255,255,255,0.10)'}`,
                     background: isActive ? 'var(--ink)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
-                    fontSize: 13,
-                    fontWeight: 700,
+                    fontSize: 11,
+                    fontWeight: 800,
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     fontFamily: "'JetBrains Mono', monospace",
@@ -286,9 +286,9 @@ export const CreateGamePage: React.FC = () => {
               }}
               placeholder="custom"
               style={{
-                flex: 1.3,
-                padding: '9px 8px',
-                borderRadius: 12,
+                flex: 1.2,
+                padding: '6px 8px',
+                borderRadius: 100,
                 border: `1px solid ${customRounds ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.10)'}`,
                 background: 'rgba(255,255,255,0.04)',
                 color: 'var(--ink)',
