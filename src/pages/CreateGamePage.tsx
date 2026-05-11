@@ -173,7 +173,7 @@ export const CreateGamePage: React.FC = () => {
           </div>
 
           {/* Preset row */}
-          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {BUY_IN_PRESETS.map(p => {
               const isActive = activePreset === p && buyInRaw === p;
               return (
@@ -210,13 +210,13 @@ export const CreateGamePage: React.FC = () => {
               }}
               placeholder="custom"
               style={{
-                flex: 1.3,
-                padding: '6px 8px',
+                flex: 0.8,
+                padding: '6px 4px',
                 borderRadius: 100,
                 border: `1px solid ${customValue ? 'rgba(196,255,60,0.5)' : 'rgba(255,255,255,0.10)'}`,
                 background: 'rgba(255,255,255,0.04)',
                 color: customValue ? 'var(--acid)' : 'var(--ink-soft)',
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: 700,
                 textAlign: 'center',
                 outline: 'none',
@@ -286,8 +286,8 @@ export const CreateGamePage: React.FC = () => {
               }}
               placeholder="custom"
               style={{
-                flex: 1.2,
-                padding: '6px 8px',
+                flex: 0.8,
+                padding: '6px 4px',
                 borderRadius: 100,
                 border: `1px solid ${customRounds ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.10)'}`,
                 background: 'rgba(255,255,255,0.04)',
