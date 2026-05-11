@@ -177,7 +177,7 @@ export const GameOverPage: React.FC = () => {
             <motion.div
               initial={{ scale: 0 }} animate={{ scale: 1 }}
               transition={{ delay: 0.15, type: 'spring', stiffness: 400, damping: 18 }}
-              style={{ fontSize: 72, lineHeight: 1, marginBottom: 10, animation: 'glow 2s ease-in-out infinite' }}
+              style={{ fontSize: 72, lineHeight: 1, marginBottom: 4, animation: 'glow 2s ease-in-out infinite' }}
             >
               {isSplitPot ? '🤝' : '🏆'}
             </motion.div>
@@ -185,7 +185,7 @@ export const GameOverPage: React.FC = () => {
             <motion.p
               className="display"
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              style={{ fontSize: 56, color: 'var(--acid)', lineHeight: 1, marginBottom: 8 }}
+              style={{ fontSize: 56, color: 'var(--acid)', lineHeight: 0.9, marginBottom: 8 }}
             >
               {isSplitPot ? 'split complete' : (winnerPlayer?.name ?? '').toLowerCase()}
             </motion.p>
@@ -194,13 +194,13 @@ export const GameOverPage: React.FC = () => {
               <motion.div
                 className="money"
                 initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35 }}
-                style={{ fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}
+                style={{ fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, marginBottom: 4 }}
               >
-                <SolMark size={22} tone="acid" />
+                <SolMark size={20} tone="acid" />
                 <span style={{ color: 'var(--acid)' }}>
                   {winnerNet >= 0 ? '+' : ''}{winnerNet.toFixed(3)}
                 </span>
-                {usdWinner && <span className="mono" style={{ fontSize: 13, color: 'var(--ink-soft)' }}>({usdWinner})</span>}
+                {usdWinner && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-soft)' }}>({usdWinner})</span>}
               </motion.div>
             )}
 
@@ -212,7 +212,7 @@ export const GameOverPage: React.FC = () => {
           </motion.div>
 
           {/* ── leaderboard ── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {ranked.map(({ p, s, honesty, payout }, i) => {
               const isWinner = isSplitPot ? (payout > 0) : p.id === activeWinner;
               const canSelect = isHost && !confirmed && !isSplitPot;
@@ -225,10 +225,10 @@ export const GameOverPage: React.FC = () => {
                   className="glass-flat"
                   onClick={() => canSelect && setSelected(p.id)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '12px 14px', borderRadius: 16,
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 12px', borderRadius: 16,
                     cursor: canSelect ? 'pointer' : 'default',
-                    ...(isMe ? { background: 'rgba(255,59,139,0.08)', borderColor: 'rgba(255,59,139,0.28)' } : {}),
+                    ...(isMe ? { background: 'rgba(255,59,139,0.10)', borderColor: 'rgba(255,59,139,0.4)' } : {}),
                   }}
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -236,7 +236,7 @@ export const GameOverPage: React.FC = () => {
                   whileTap={canSelect ? { scale: 0.98 } : {}}
                 >
                   {/* rank */}
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', width: 20, flexShrink: 0 }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', width: 16, flexShrink: 0 }}>
                     {String(i + 1).padStart(2, '0')}
                   </span>
 
@@ -309,7 +309,7 @@ export const GameOverPage: React.FC = () => {
         </div>
 
         {/* ── CTAs ── */}
-        <div style={{ width: '100%', paddingTop: 20, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ width: '100%', paddingTop: 14, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {isHost && !confirmed && (
             <motion.button
               className="btn btn-degen"
@@ -379,12 +379,12 @@ export const GameOverPage: React.FC = () => {
                 }}
               >
                 {/* sticker */}
-                <span className="sticker sticker-acid" style={{ marginBottom: 12, display: 'inline-block' }}>
+                <span className="sticker sticker-acid" style={{ marginBottom: 18, display: 'inline-block' }}>
                   + profit
                 </span>
 
                 {/* huge amount */}
-                <div className="money" style={{ fontSize: 64, color: 'var(--acid)', lineHeight: 1, marginBottom: 6, animation: 'glow 2s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <div className="money" style={{ fontSize: 64, color: 'var(--acid)', lineHeight: 1, marginBottom: 6, animation: 'glow 2s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
                   <SolMark size={48} tone="acid" />
                   {payoutAmount.toFixed(3)}
                 </div>
@@ -406,7 +406,7 @@ export const GameOverPage: React.FC = () => {
                   className="btn btn-degen"
                   onClick={() => setShowPayoutPopup(false)}
                   whileTap={{ scale: 0.96 }}
-                  style={{ marginTop: 20 }}
+                  style={{ marginTop: 24 }}
                 >
                   collect
                 </motion.button>

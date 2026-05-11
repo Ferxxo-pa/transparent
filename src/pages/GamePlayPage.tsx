@@ -122,21 +122,21 @@ export const GamePlayPage: React.FC = () => {
     return (
       <motion.div
         className="glass glass-strong"
-        style={{ padding: '28px 22px', borderRadius: 28, textAlign: 'center', width: '100%' }}
+        style={{ padding: 26, borderRadius: 28, textAlign: 'center', width: '100%' }}
         key={question}
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 320, damping: 26 }}
       >
         <p className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 14 }}>the question</p>
-        <p className="display" style={{ fontSize: 26, lineHeight: 1.35 }}>
+        <p className="display" style={{ fontSize: 26, lineHeight: 1.1, fontWeight: 800 }}>
           {renderQuestion(question)}
         </p>
         {answer && (
           <>
-            <div style={{ width: '100%', height: 1, background: 'var(--glass-stroke)', margin: '20px 0' }} />
-            <p className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>their answer</p>
-            <p className="italic-serif" style={{ fontSize: 22, color: 'var(--ink-soft)' }}>{answer.toLowerCase()}</p>
+            <div style={{ width: '100%', borderTop: '1px solid rgba(255,255,255,0.08)', margin: '20px 0' }} />
+            <p className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>their answer</p>
+            <p className="italic-serif" style={{ fontSize: 22, color: 'var(--ink)', lineHeight: 1.3 }}>{answer.toLowerCase()}</p>
           </>
         )}
       </motion.div>
@@ -145,18 +145,18 @@ export const GamePlayPage: React.FC = () => {
 
   // ── Pot + Raise row ────────────────────────────────────────
   const PotRow = () => (
-    <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'stretch' }}>
-      <div className="glass-flat" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 16px' }}>
-        <SolMark size={18} tone="acid" />
+    <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'stretch' }}>
+      <div className="glass-flat" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px' }}>
+        <SolMark size={13} tone="acid" />
         <span className="money" style={{ fontSize: 22, color: 'var(--acid)' }}>{(gameState.currentPot || 0).toFixed(2)}</span>
       </div>
       <button
-        className="glass-flat"
+        className="glass-flat mono"
         onClick={() => setShowRaise(true)}
         style={{
-          padding: '12px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-          color: 'var(--tangerine)', fontWeight: 700, fontSize: 13, border: '1px solid rgba(255,138,42,0.28)',
-          background: 'rgba(255,138,42,0.08)', borderRadius: 16,
+          padding: '10px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+          color: 'var(--tangerine)', fontWeight: 700, fontSize: 11, border: '1px solid rgba(255,138,42,0.4)',
+          background: 'rgba(255,138,42,0.12)', borderRadius: 16, letterSpacing: '0.1em', textTransform: 'uppercase' as const,
         }}
       >
         raise +
@@ -194,7 +194,7 @@ export const GamePlayPage: React.FC = () => {
 
       {/* Vote progress */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+        <span className="mono" style={{ fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
           {votesIn}/{voterCount} voted
         </span>
       </div>

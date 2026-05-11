@@ -51,6 +51,7 @@ export const CreateGamePage: React.FC = () => {
   const token = TOKENS[selectedToken] || TOKENS.sol;
   const presets = selectedToken === 'sol' ? SOL_PRESETS : token.presets.map(String);
   const usdEst = usdEstimate(buyInNum, selectedToken, solPrice);
+  const customValue = activePreset !== buyInRaw ? buyInRaw : '';
 
   const handleCreate = async () => {
     const ok = await createGame(
@@ -102,7 +103,8 @@ export const CreateGamePage: React.FC = () => {
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 10,
+          gap: 8,
+          marginBottom: 8,
         }}>
           {MODES.map(m => {
             const isActive = mode === m.id;
@@ -119,29 +121,29 @@ export const CreateGamePage: React.FC = () => {
                   gap: 6,
                   cursor: 'pointer',
                   textAlign: 'left',
-                  border: isActive ? '1px solid var(--acid)' : '1px solid var(--glass-stroke)',
-                  background: isActive ? 'rgba(196,255,60,0.06)' : 'var(--glass-bg)',
+                  border: isActive ? '1px solid rgba(196,255,60,0.5)' : '1px solid var(--glass-stroke)',
+                  background: isActive ? 'rgba(196,255,60,0.12)' : 'var(--glass-bg)',
                   transition: 'all 0.15s',
                 }}
               >
-                <span style={{ fontSize: 28, lineHeight: 1 }}>{m.emoji}</span>
+                <span style={{ fontSize: 26, lineHeight: 1, marginBottom: 6 }}>{m.emoji}</span>
                 <span
-                  className="mono"
                   style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
+                    fontSize: 15,
+                    fontWeight: 800,
+                    letterSpacing: '-0.02em',
                     textTransform: 'uppercase',
-                    color: isActive ? 'var(--acid)' : 'var(--ink-soft)',
+                    color: isActive ? 'var(--acid)' : 'var(--ink)',
                     transition: 'color 0.15s',
                   }}
                 >
                   {m.label}
                 </span>
                 <span style={{
-                  fontSize: 11,
+                  fontSize: 10,
                   color: 'var(--ink-faint)',
-                  lineHeight: 1.35,
+                  marginTop: 2,
+                  fontWeight: 500,
                 }}>
                   {m.sub}
                 </span>
@@ -157,23 +159,23 @@ export const CreateGamePage: React.FC = () => {
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            padding: 0,
+            padding: '8px 4px 10px',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 6,
           }}
         >
           <span
             className="mono"
             style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.06em',
+              fontSize: 10,
+              letterSpacing: '0.14em',
               textTransform: 'uppercase',
               color: 'var(--ink-soft)',
             }}
           >
-            + how it works
+            {showHowItWorks ? '− hide' : '+ how it works'}
+            <span style={{ color: 'var(--acid)' }}>· {MODES.find(m => m.id === mode)?.label}</span>
           </span>
         </button>
 
@@ -182,9 +184,12 @@ export const CreateGamePage: React.FC = () => {
             className="glass-flat"
             style={{
               padding: '14px 16px',
-              fontSize: 13,
+              fontSize: 12,
               color: 'var(--ink-soft)',
-              lineHeight: 1.55,
+              lineHeight: 1.5,
+              borderRadius: 14,
+              marginBottom: 12,
+              fontWeight: 500,
             }}
           >
             {HOW_IT_WORKS[mode]}
@@ -197,13 +202,12 @@ export const CreateGamePage: React.FC = () => {
           style={{ padding: 14, borderRadius: 20 }}
         >
           {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <span
               className="mono"
               style={{
                 fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
+                letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-faint)',
               }}
@@ -211,7 +215,7 @@ export const CreateGamePage: React.FC = () => {
               buy-in
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span className="money" style={{ fontSize: 18, color: 'var(--acid)' }}>
+              <span className="money" style={{ fontSize: 22, color: 'var(--acid)' }}>
                 <TokenMark token={selectedToken} size={16} />
                 {' '}{buyInNum > 0 ? buyInRaw : 'free'}
               </span>
@@ -222,7 +226,7 @@ export const CreateGamePage: React.FC = () => {
           </div>
 
           {/* Token row */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
             {TOKEN_CHIPS.map(tid => {
               const isActive = selectedToken === tid;
               return (
@@ -236,16 +240,16 @@ export const CreateGamePage: React.FC = () => {
                     setActivePreset(newPresets[1] || newPresets[0]);
                   }}
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    border: isActive ? '1px solid var(--acid)' : '1px solid var(--glass-stroke)',
-                    background: isActive ? 'rgba(196,255,60,0.08)' : 'var(--glass-bg)',
+                    flex: 1,
+                    height: 30,
+                    borderRadius: 10,
+                    border: isActive ? '1px solid rgba(196,255,60,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                    background: isActive ? 'rgba(196,255,60,0.14)' : 'rgba(255,255,255,0.03)',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    transition: 'all 0.15s',
+                    transition: 'all 0.2s',
                     flexShrink: 0,
                   }}
                 >
@@ -256,7 +260,7 @@ export const CreateGamePage: React.FC = () => {
           </div>
 
           {/* Preset row */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
             {presets.map(p => {
               const isActive = activePreset === p && buyInRaw === p;
               return (
@@ -265,15 +269,15 @@ export const CreateGamePage: React.FC = () => {
                   onClick={() => { setBuyInRaw(p); setActivePreset(p); }}
                   style={{
                     flex: 1,
-                    padding: '8px 0',
+                    padding: '9px 0',
                     borderRadius: 100,
-                    border: 'none',
-                    background: isActive ? 'var(--acid)' : 'var(--glass-bg)',
+                    border: isActive ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                    background: isActive ? 'var(--acid)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 700,
                     cursor: 'pointer',
-                    transition: 'all 0.15s',
+                    transition: 'all 0.2s',
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
@@ -292,12 +296,12 @@ export const CreateGamePage: React.FC = () => {
               }}
               placeholder="custom"
               style={{
-                width: 64,
-                padding: '8px 8px',
+                flex: 1.3,
+                padding: '9px 8px',
                 borderRadius: 100,
-                border: '1px solid var(--glass-stroke)',
-                background: 'var(--glass-bg)',
-                color: 'var(--ink)',
+                border: `1px solid ${customValue ? 'rgba(196,255,60,0.5)' : 'rgba(255,255,255,0.10)'}`,
+                background: 'rgba(255,255,255,0.04)',
+                color: customValue ? 'var(--acid)' : 'var(--ink-soft)',
                 fontSize: 12,
                 fontWeight: 600,
                 textAlign: 'center',
@@ -311,27 +315,26 @@ export const CreateGamePage: React.FC = () => {
         {/* ── Rounds card ─────────────────────────────────────── */}
         <div
           className="glass"
-          style={{ padding: '12px 14px', borderRadius: 20 }}
+          style={{ padding: 12, borderRadius: 18, marginBottom: 14 }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span
               className="mono"
               style={{
                 fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
+                letterSpacing: '0.14em',
                 textTransform: 'uppercase',
                 color: 'var(--ink-faint)',
               }}
             >
               rounds
             </span>
-            <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+            <span className="money" style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>
               {rounds}
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
             {ROUND_PRESETS.map(n => {
               const isActive = rounds === n && !customRounds;
               return (
@@ -340,15 +343,15 @@ export const CreateGamePage: React.FC = () => {
                   onClick={() => { setRounds(n); setCustomRounds(''); }}
                   style={{
                     flex: 1,
-                    padding: '8px 0',
+                    padding: '6px 0',
                     borderRadius: 100,
-                    border: 'none',
-                    background: isActive ? 'var(--acid)' : 'var(--glass-bg)',
+                    border: `1px solid ${isActive ? 'var(--ink)' : 'rgba(255,255,255,0.10)'}`,
+                    background: isActive ? 'var(--ink)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#0A0810' : 'var(--ink-soft)',
-                    fontSize: 13,
-                    fontWeight: 700,
+                    fontSize: 11,
+                    fontWeight: 800,
                     cursor: 'pointer',
-                    transition: 'all 0.15s',
+                    transition: 'all 0.2s',
                     fontFamily: "'JetBrains Mono', monospace",
                   }}
                 >
@@ -357,24 +360,24 @@ export const CreateGamePage: React.FC = () => {
               );
             })}
             <input
-              type="number"
-              min="1"
-              max="30"
+              type="text"
+              inputMode="numeric"
               value={customRounds}
               onChange={e => {
-                setCustomRounds(e.target.value);
-                const v = parseInt(e.target.value);
+                const val = e.target.value.replace(/\D/g, '').slice(0, 2);
+                setCustomRounds(val);
+                const v = parseInt(val);
                 if (v > 0) setRounds(v);
               }}
               placeholder="custom"
               style={{
-                width: 64,
-                padding: '8px 8px',
+                flex: 1.2,
+                padding: '6px 8px',
                 borderRadius: 100,
-                border: '1px solid var(--glass-stroke)',
-                background: 'var(--glass-bg)',
+                border: `1px solid ${customRounds ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.10)'}`,
+                background: 'rgba(255,255,255,0.04)',
                 color: 'var(--ink)',
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: 600,
                 textAlign: 'center',
                 outline: 'none',
@@ -406,11 +409,11 @@ export const CreateGamePage: React.FC = () => {
             className="btn btn-degen"
             onClick={handleCreate}
             disabled={loading}
-            style={{ width: '100%' }}
+            style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             {loading ? 'creating...' : (
               <>
-                spin it up · <TokenMark token={selectedToken} size={16} />
+                spin it up · <TokenMark token={selectedToken} size={14} />
                 {' '}{buyInNum > 0 ? buyInRaw : 'free'}
                 {usdEst ? ` (${usdEst})` : ''}
               </>

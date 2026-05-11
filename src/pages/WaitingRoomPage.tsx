@@ -300,41 +300,41 @@ export const WaitingRoomPage: React.FC = () => {
           transition={{ type: 'spring', stiffness: 280, damping: 26 }}
           whileTap={{ scale: 0.98 }}
         >
-          <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+          <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
             tap to copy
           </p>
           <div className="display" style={{ fontSize: 'clamp(48px, 14vw, 76px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, color: 'var(--ink)', marginBottom: 8 }}>
             {formattedCode}
           </div>
-          <p className="mono" style={{ fontSize: 11, color: copied ? 'var(--acid)' : 'var(--ink-faint)', transition: 'color 0.2s' }}>
+          <p className="mono" style={{ fontSize: 12, fontWeight: 600, color: copied ? 'var(--acid)' : 'var(--ink-faint)', transition: 'color 0.3s' }}>
             {copied ? '✓ copied' : 'tap to copy code'}
           </p>
         </motion.div>
 
         {/* ─── pot tracker ─── */}
-        <div className="glass-flat" style={{ padding: '16px 20px', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div className="glass-flat" style={{ marginTop: 12, padding: '14px 18px', borderRadius: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>pot</p>
+            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>pot</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <SolMark size={16} tone="acid" />
-              <span className="money" style={{ fontSize: 22, color: 'var(--acid)' }}>
+              <span className="money" style={{ fontSize: 24, color: 'var(--acid)' }}>
                 <Ticker value={potNum} decimals={3} />
               </span>
             </div>
             <UsdTag amount={potNum} token="sol" className="mono" />
           </div>
           <div style={{ textAlign: 'right' }}>
-            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>buy-in</p>
+            <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>buy-in</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
               <SolMark size={14} tone="ink" />
-              <span className="money" style={{ fontSize: 18, color: 'var(--ink)' }}>{gameState.buyInAmount}</span>
+              <span className="money" style={{ fontSize: 24, color: 'var(--ink)' }}>{gameState.buyInAmount}</span>
             </div>
           </div>
         </div>
 
         {/* ─── player list (squad) ─── */}
         <div>
-          <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+          <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>
             squad
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -350,16 +350,16 @@ export const WaitingRoomPage: React.FC = () => {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ type: 'spring', stiffness: 340, damping: 28, delay: i * 0.06 }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Avatar emoji={av.emoji} color={av.color} size={32} />
                     <span style={{ fontSize: 14, fontWeight: 700 }}>{p.name || `player ${i + 1}`}</span>
                     {isMe && <span className="chip chip-pink" style={{ padding: '2px 8px', fontSize: 9 }}>you</span>}
                   </div>
                   <div>
                     {p.isReady ? (
-                      <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--acid)' }}>● ready</span>
+                      <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--acid)', letterSpacing: '0.06em' }}>● READY</span>
                     ) : (
-                      <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-faint)' }}>○ wait</span>
+                      <span className="mono" style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink-faint)', letterSpacing: '0.06em' }}>○ WAIT</span>
                     )}
                   </div>
                 </motion.div>
