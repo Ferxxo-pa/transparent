@@ -52,7 +52,7 @@ export const WalletHeader: React.FC = () => {
         >
           {walletReady ? (
             <>
-              <SolMark size={14} tone="acid" />
+              <SolMark size={14} tone="ink" />
               <span className="money" style={{ fontSize: 13, color: 'var(--ink)' }}>{balStr}</span>
               {usdStr && <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>({usdStr})</span>}
             </>

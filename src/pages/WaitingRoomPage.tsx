@@ -320,7 +320,7 @@ export const WaitingRoomPage: React.FC = () => {
           <div>
             <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 4 }}>pot</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <SolMark size={16} tone="acid" />
+              <SolMark size={16} tone="ink" />
               <span className="money" style={{ fontSize: 24, color: 'var(--acid)' }}>
                 <Ticker value={potNum} decimals={3} />
               </span>

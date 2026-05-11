@@ -199,7 +199,7 @@ export const GameOverPage: React.FC = () => {
                 initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.35 }}
                 style={{ fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, marginBottom: 4 }}
               >
-                <SolMark size={20} tone="acid" />
+                <SolMark size={20} tone="ink" />
                 <span style={{ color: 'var(--acid)' }}>
                   {winnerNet >= 0 ? '+' : ''}{winnerNet.toFixed(3)}
                 </span>
@@ -388,7 +388,7 @@ export const GameOverPage: React.FC = () => {
 
                 {/* huge amount */}
                 <div className="money" style={{ fontSize: 64, color: 'var(--acid)', lineHeight: 1, marginBottom: 6, animation: 'glow 2s ease-in-out infinite', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                  <SolMark size={48} tone="acid" />
+                  <SolMark size={48} tone="ink" />
                   {payoutAmount.toFixed(3)}
                 </div>
 

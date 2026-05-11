@@ -95,7 +95,7 @@ export const WalletDrawer: React.FC<Props> = ({ open, onClose }) => {
                 balance
               </p>
               <div className="money" style={{ fontSize: 36, color: 'var(--ink)', lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <SolMark size={28} tone="acid" />
+                <SolMark size={28} tone="ink" />
                 {balStr}
               </div>
               {usdStr && (

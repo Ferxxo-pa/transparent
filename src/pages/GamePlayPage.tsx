@@ -149,7 +149,7 @@ export const GamePlayPage: React.FC = () => {
   const PotRow = () => (
     <div style={{ display: 'flex', gap: 8, width: '100%', alignItems: 'stretch' }}>
       <div className="glass-flat" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px' }}>
-        <SolMark size={13} tone="acid" />
+        <SolMark size={13} tone="ink" />
         <span className="money" style={{ fontSize: 22, color: 'var(--acid)' }}>{(gameState.currentPot || 0).toFixed(2)}</span>
       </div>
       <button

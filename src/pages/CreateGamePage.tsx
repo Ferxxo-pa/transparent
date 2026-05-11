@@ -164,7 +164,7 @@ export const CreateGamePage: React.FC = () => {
               buy-in
             </span>
             <span className="money" style={{ fontSize: 22, color: 'var(--acid)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <SolMark size={16} tone="acid" />
+              <SolMark size={16} tone="ink" />
               {' '}{buyInNum > 0 ? buyInRaw : '0'}
               {usdEst && (
                 <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', fontWeight: 600 }}>{usdEst}</span>
