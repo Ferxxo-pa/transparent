@@ -79,7 +79,7 @@ export const GamePlayPage: React.FC = () => {
     <div style={{ width: '100%', paddingTop: 16, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <BackButton onClick={() => { resetGame(); navigate('/'); }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span className="chip" style={{ fontSize: 11 }}>round {round} / {total}</span>
+        <span className="chip" style={{ fontSize: 11, background: 'rgba(255,214,0,0.12)', color: '#FFD600', borderColor: 'rgba(255,214,0,0.3)' }}>round {round} / {total}</span>
         {gameState.questionMode === 'free-for-all' && gameState.currentRoundMode && (
           <span className="chip" style={{ fontSize: 10, background: 'rgba(255,138,42,0.12)', color: 'var(--tangerine)', borderColor: 'rgba(255,138,42,0.3)' }}>
             {gameState.currentRoundMode}
