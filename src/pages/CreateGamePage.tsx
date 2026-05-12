@@ -24,7 +24,7 @@ const ROUND_PRESETS = [3, 5, 7, 10];
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
-  const { createGame, createTestGame, loading, error } = useGame();
+  const { createGame, loading, error } = useGame();
   const { connected, login } = usePrivyWallet();
   const solPrice = useSolPrice();
 
@@ -390,21 +390,6 @@ export const CreateGamePage: React.FC = () => {
                 {' '}{buyInNum > 0 ? buyInRaw : 'FREE'}
               </>
             )}
-          </button>
-          <button
-            onClick={() => {
-              createTestGame(mode, classicSub);
-              navigate('/play');
-            }}
-            className="mono"
-            style={{
-              width: '100%', padding: '10px 0', borderRadius: 100,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-              color: 'var(--ink-faint)', fontSize: 10, fontWeight: 600, cursor: 'pointer',
-              letterSpacing: '0.08em', textTransform: 'uppercase',
-            }}
-          >
-            🧪 solo test · no wallet needed
           </button>
         </div>
 

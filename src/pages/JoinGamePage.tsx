@@ -9,7 +9,7 @@ import { Blobs, BackButton, SolMark, WalletChip } from '../components';
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { code: codeParam } = useParams<{ code?: string }>();
-  const { joinGame, loading, error } = useGame();
+  const { joinGame, createTestGame, loading, error } = useGame();
   const { displayName, walletReady } = usePrivyWallet();
 
   // Parse pre-filled code from URL param into 6 individual digits
@@ -69,6 +69,12 @@ export const JoinGamePage: React.FC = () => {
 
   const handleJoin = async () => {
     if (!allFilled) return;
+    // Test mode: 000-000 drops you into a solo test game
+    if (codeString === '000-000') {
+      createTestGame('classic');
+      navigate('/play');
+      return;
+    }
     const ok = await joinGame(codeString, nickname.trim() || undefined);
     if (ok) navigate('/waiting');
   };
