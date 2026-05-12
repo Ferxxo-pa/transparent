@@ -244,15 +244,11 @@ export const GameOverPage: React.FC = () => {
                   </span>
 
                   {/* name + stats */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                     <span style={{ fontWeight: 800, fontSize: 14 }}>{(p.name || 'anon').toLowerCase()}</span>
-                    {s ? (
-                      <div className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', marginTop: 2 }}>
-                        ✓{s.transparent} ✗{s.fake} · {Math.round(honesty * 100)}%
-                      </div>
-                    ) : (
-                      <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)' }}>no votes</span>
-                    )}
+                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', marginTop: 2 }}>
+                      {s ? `✓${s.transparent} ✗${s.fake} · ${Math.round(honesty * 100)}%` : 'no votes'}
+                    </span>
                   </div>
 
                   {/* net P&L */}
