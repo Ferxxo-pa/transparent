@@ -72,7 +72,7 @@ export const JoinGamePage: React.FC = () => {
     // Test mode: 000-000 drops you into a solo test game
     if (codeString === '000-000') {
       createTestGame('classic');
-      navigate('/play');
+      navigate('/game');
       return;
     }
     const ok = await joinGame(codeString, nickname.trim() || undefined);

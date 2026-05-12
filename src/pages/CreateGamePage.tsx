@@ -392,7 +392,7 @@ export const CreateGamePage: React.FC = () => {
             )}
           </button>
           <button
-            onClick={() => { createTestGame(mode, classicSub); navigate('/play'); }}
+            onClick={() => { createTestGame(mode, classicSub); navigate('/game'); }}
             className="mono"
             style={{
               width: '100%', padding: '9px 0', borderRadius: 100, marginTop: 2,
