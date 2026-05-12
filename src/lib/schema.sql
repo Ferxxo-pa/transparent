@@ -127,3 +127,19 @@ ALTER PUBLICATION supabase_realtime ADD TABLE games;
 ALTER PUBLICATION supabase_realtime ADD TABLE players;
 ALTER PUBLICATION supabase_realtime ADD TABLE votes;
 ALTER PUBLICATION supabase_realtime ADD TABLE question_submissions;
+
+-- ============================================================
+-- Migration: Update CHECK constraints for new game modes
+-- Run this if you get "violates check constraint" errors
+-- ============================================================
+ALTER TABLE games DROP CONSTRAINT IF EXISTS games_question_mode_check;
+ALTER TABLE games ADD CONSTRAINT games_question_mode_check
+  CHECK (question_mode IN ('classic', 'exposer', 'storyteller', 'free-for-all', 'custom', 'hot-take'));
+
+ALTER TABLE games DROP CONSTRAINT IF EXISTS games_game_phase_check;
+ALTER TABLE games ADD CONSTRAINT games_game_phase_check
+  CHECK (game_phase IN (
+    'host-picking', 'player-voting', 'submitting-questions', 'voting-question',
+    'exposer-bidding', 'picking-question', 'answering', 'voting-honesty',
+    'storyteller-prep', 'storyteller-telling', 'storyteller-voting', 'storyteller-reveal'
+  ));
