@@ -493,27 +493,15 @@ export const GamePlayPage: React.FC = () => {
             </div>
 
             {/* Host controls */}
-            {votesIn >= voterCount && voterCount > 0 && (
-              <motion.button
-                className="btn-degen"
-                onClick={forceAdvanceRound}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                whileTap={{ scale: 0.96 }}
-                style={{ width: '100%' }}
-              >
-                next round →
-              </motion.button>
-            )}
-            {votesIn > 0 && votesIn < voterCount && (
-              <motion.button
-                className="btn-degen" style={{ width: '100%', height: 38, fontSize: 12, opacity: 0.7 }}
-                onClick={forceAdvanceRound}
-                initial={{ opacity: 0 }} animate={{ opacity: 0.7 }}
-                whileTap={{ scale: 0.96 }}
-              >
-                force next ({votesIn}/{voterCount})
-              </motion.button>
-            )}
+            <motion.button
+              className="btn-degen"
+              onClick={forceAdvanceRound}
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              whileTap={{ scale: 0.96 }}
+              style={{ width: '100%', opacity: votesIn >= voterCount ? 1 : 0.7 }}
+            >
+              {votesIn >= voterCount ? 'next round →' : `next round (${votesIn}/${voterCount})`}
+            </motion.button>
 
             {/* Solo test controls */}
             {isTestMode && (
