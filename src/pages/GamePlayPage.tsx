@@ -15,7 +15,7 @@ import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote, resetGame } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const isTestMode = gameState?.roomCode === '000-000';
@@ -77,7 +77,7 @@ export const GamePlayPage: React.FC = () => {
   // ── Top bar ────────────────────────────────────────────────
   const TopBar = () => (
     <div style={{ width: '100%', paddingTop: 16, marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <BackButton onClick={() => navigate(-1)} />
+      <BackButton onClick={() => { resetGame(); navigate('/'); }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <span className="chip" style={{ fontSize: 11 }}>round {round} / {total}</span>
         {gameState.questionMode === 'free-for-all' && gameState.currentRoundMode && (
