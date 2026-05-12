@@ -68,7 +68,7 @@ export const GamePlayPage: React.FC = () => {
   const round      = (gameState.currentRound ?? 0) + 1;
   const total      = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
   const votesIn    = gameState.voteCount;
-  const voterCount = Math.max(total - 1, 1);
+  const voterCount = Math.max(gameState.players.filter(p => p.id !== gameState.currentPlayerInHotSeat).length, 1);
   const myVote     = gameState.votes[myWallet];
 
   // blob palette changes when vote is cast

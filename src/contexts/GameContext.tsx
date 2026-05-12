@@ -711,14 +711,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     async (vote: 'transparent' | 'fake') => {
       if (!gameState) return;
       const wallet = walletRef.current;
-      if (!wallet) return;
+      const isTestMode = gameState.roomCode === '000-000';
+      const myWalletId = isTestMode ? 'test-host' : wallet?.publicKey?.toBase58();
+      if (!myWalletId) return;
 
       const gid = gameState.gameId;
       if (!gid) {
-        // Fallback for offline mode
+        // Fallback for offline/test mode
         setGameState((prev) => {
           if (!prev) return null;
-          const newVotes = { ...prev.votes, [wallet.publicKey.toBase58()]: vote };
+          const newVotes = { ...prev.votes, [myWalletId]: vote };
           const count = Object.keys(newVotes).length;
           return { ...prev, votes: newVotes, voteCount: count };
         });
@@ -802,21 +804,30 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     async (text: string) => {
       if (!gameState) return;
       const wallet = walletRef.current;
-      if (!wallet) return;
+      const isTestMode = gameState.roomCode === '000-000';
+      const myWalletId = isTestMode ? 'test-host' : wallet?.publicKey?.toBase58();
+      if (!myWalletId) return;
 
       const gid = gameState.gameId;
-      if (!gid) return;
+
+      if (!gid) {
+        // Local-only fallback for test mode
+        setGameState(prev => {
+          if (!prev) return null;
+          const newQ: SubmittedQuestion = { id: `test-q-${Date.now()}`, text, submitter: myWalletId, votes: 0 };
+          return { ...prev, submittedQuestions: [...(prev.submittedQuestions ?? []), newQ] };
+        });
+        return;
+      }
 
       try {
         const round = gameState.currentRound ?? 0;
         await submitQuestionToDB({
           game_id: gid,
           round,
-          submitter_wallet: wallet.publicKey.toBase58(),
+          submitter_wallet: myWalletId,
           question_text: text,
         });
-
-        // Real-time subscription will update submittedQuestions for all clients
       } catch (err: any) {
         console.error('Submit question error:', err);
         setError(err.message || 'Failed to submit question');
@@ -831,26 +842,37 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     async (questionId: string) => {
       if (!gameState) return;
       const wallet = walletRef.current;
-      if (!wallet) return;
+      const isTestMode = gameState.roomCode === '000-000';
+      const myWalletId = isTestMode ? 'test-host' : wallet?.publicKey?.toBase58();
+      if (!myWalletId) return;
 
-      try {
-        await voteForQuestionInDB(questionId);
+      const gid = gameState.gameId;
 
-        const myWallet = wallet.publicKey.toBase58();
-        setGameState((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            questionVotes: {
-              ...(prev.questionVotes ?? {}),
-              [myWallet]: questionId,
-            },
-          };
-        });
-      } catch (err: any) {
-        console.error('Vote for question error:', err);
-        setError(err.message || 'Failed to vote for question');
+      if (gid) {
+        try {
+          await voteForQuestionInDB(questionId);
+        } catch (err: any) {
+          console.error('Vote for question error:', err);
+          setError(err.message || 'Failed to vote for question');
+          return;
+        }
       }
+
+      setGameState((prev) => {
+        if (!prev) return null;
+        // Also increment the question's vote count locally
+        const updatedQuestions = (prev.submittedQuestions ?? []).map(q =>
+          q.id === questionId ? { ...q, votes: q.votes + 1 } : q
+        );
+        return {
+          ...prev,
+          submittedQuestions: updatedQuestions,
+          questionVotes: {
+            ...(prev.questionVotes ?? {}),
+            [myWalletId]: questionId,
+          },
+        };
+      });
     },
     [gameState],
   );
@@ -860,14 +882,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const advanceHotTakePhase = useCallback(async () => {
     if (!gameState) return;
     const gid = gameState.gameId;
-    if (!gid) return;
 
     const currentPhase = gameState.gamePhase;
 
     try {
       if (currentPhase === 'submitting-questions') {
         // Move to voting-question
-        await updateGameStatus(gid, { game_phase: 'voting-question' });
+        if (gid) await updateGameStatus(gid, { game_phase: 'voting-question' });
         setGameState((prev) =>
           prev ? { ...prev, gamePhase: 'voting-question' } : null,
         );
@@ -880,7 +901,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
         const winningText = winner?.text || 'No question submitted';
 
-        await updateGameStatus(gid, { game_phase: 'answering' });
+        if (gid) await updateGameStatus(gid, { game_phase: 'answering' });
         setGameState((prev) =>
           prev
             ? { ...prev, gamePhase: 'answering', currentQuestion: winningText }
@@ -888,7 +909,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         );
       } else if (currentPhase === 'answering') {
         // Move to honesty voting
-        await updateGameStatus(gid, { game_phase: 'voting-honesty' });
+        if (gid) await updateGameStatus(gid, { game_phase: 'voting-honesty' });
         setGameState((prev) =>
           prev ? { ...prev, gamePhase: 'voting-honesty' } : null,
         );
@@ -903,7 +924,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
         if (nextRound >= totalRounds) {
-          await updateGameStatus(gid, { status: 'gameover' });
+          if (gid) await updateGameStatus(gid, { status: 'gameover' });
           setGameState((prev) => (prev ? { ...prev, gameStatus: 'gameover' } : null));
         } else if (gameState.questionMode === 'free-for-all') {
           // Free-for-all: pick random mode for next round
@@ -913,22 +934,24 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (nextMode === 'storyteller') {
             const { STORYTELLER_PROMPTS } = await import('../types/game');
             const prompt = STORYTELLER_PROMPTS[Math.floor(Math.random() * STORYTELLER_PROMPTS.length)];
-            await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'storyteller-prep', storyteller_choice: null });
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'storyteller-prep', storyteller_choice: null });
             setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: prompt, storytellerPrompt: prompt, storytellerChoice: null, gamePhase: 'storyteller-prep', votes: {}, voteCount: 0, stakeVotes: {}, currentRoundMode: 'storyteller' } : null);
           } else if (nextMode === 'exposer') {
-            await updateGameStatus(gid, { game_phase: 'submitting-questions', current_hot_seat_player: nextPlayer, current_round: nextRound });
+            if (gid) await updateGameStatus(gid, { game_phase: 'submitting-questions', current_hot_seat_player: nextPlayer, current_round: nextRound });
             setGameState(prev => prev ? { ...prev, gamePhase: 'submitting-questions', currentPlayerInHotSeat: nextPlayer, currentRound: nextRound, currentQuestion: '', submittedQuestions: [], questionVotes: {}, questionBids: {}, votes: {}, voteCount: 0, currentRoundMode: 'exposer' } : null);
           } else {
-            await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
             setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: '', gamePhase: 'host-picking', votes: {}, voteCount: 0, currentRoundMode: 'classic' } : null);
           }
         } else {
           // Pure exposer mode — next round is always exposer
-          await updateGameStatus(gid, {
-            game_phase: 'submitting-questions',
-            current_hot_seat_player: nextPlayer,
-            current_round: nextRound,
-          });
+          if (gid) {
+            await updateGameStatus(gid, {
+              game_phase: 'submitting-questions',
+              current_hot_seat_player: nextPlayer,
+              current_round: nextRound,
+            });
+          }
           setGameState((prev) =>
             prev
               ? {
@@ -1103,12 +1126,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const hostPickQuestion = useCallback(async (question: string, index: number) => {
     if (!gameState) return;
     const gid = gameState.gameId;
-    if (!gid) return;
 
-    await updateGameStatus(gid, {
-      current_question_index: index >= 0 ? index : 0,
-      game_phase: 'answering',
-    });
+    if (gid) {
+      await updateGameStatus(gid, {
+        current_question_index: index >= 0 ? index : 0,
+        game_phase: 'answering',
+      });
+    }
 
     setGameState((prev) =>
       prev
@@ -1219,7 +1243,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const forceAdvanceRound = useCallback(async () => {
     if (!gameState) return;
     const gid = gameState.gameId;
-    if (!gid) return;
     const hotSeatWallet = gameState.currentPlayerInHotSeat;
     const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
     const nextRoundNum = (gameState.currentRound ?? 0) + 1;
@@ -1227,27 +1250,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     try {
       if (nextRoundNum >= totalRounds) {
-        await updateGameStatus(gid, { status: 'gameover' });
+        if (gid) await updateGameStatus(gid, { status: 'gameover' });
         setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
       } else {
         const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
         const nextPlayer = gameState.players[nextPlayerIdx];
         const nextRound = (gameState.currentRound ?? 0) + 1;
-        const questionPool = QUESTIONS;
-        const nextQIdx = Math.floor(Math.random() * questionPool.length);
-        await updateGameStatus(gid, {
-          current_hot_seat_player: nextPlayer.id,
-          current_question_index: nextQIdx,
-          current_round: nextRound,
-          game_phase: 'answering',
-        });
+        if (gid) {
+          await updateGameStatus(gid, {
+            current_hot_seat_player: nextPlayer.id,
+            current_question_index: -1,
+            current_round: nextRound,
+            game_phase: 'host-picking',
+          });
+        }
         setGameState(prev => prev ? {
           ...prev,
           currentPlayerInHotSeat: nextPlayer.id,
-          currentQuestion: questionPool[nextQIdx],
+          currentQuestion: '',
           currentRound: nextRound,
           votes: {}, voteCount: 0,
-          gamePhase: 'answering',
+          gamePhase: 'host-picking',
         } : null);
       }
     } catch (err: any) {
@@ -1376,7 +1399,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const skipQuestion = useCallback(async () => {
     if (!gameState) return;
     const gid = gameState.gameId;
-    if (!gid) return;
 
     const hotSeatWallet = gameState.currentPlayerInHotSeat;
     if (!hotSeatWallet) return;
@@ -1409,18 +1431,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const newPot = (gameState.currentPot || 0) + penalty;
 
     if (nextRound >= totalRounds) {
-      await updateGameStatus(gid, { status: 'gameover', current_pot: newPot });
+      if (gid) await updateGameStatus(gid, { status: 'gameover', current_pot: newPot });
       setGameState(prev => prev ? { ...prev, gameStatus: 'gameover', scores: newScores, currentPot: newPot } : null);
     } else {
       const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
       const nextPlayer = gameState.players[nextPlayerIdx];
-      await updateGameStatus(gid, {
-        current_hot_seat_player: nextPlayer.id,
-        current_question_index: -1,
-        current_round: nextRound,
-        game_phase: 'host-picking',
-        current_pot: newPot,
-      });
+      if (gid) {
+        await updateGameStatus(gid, {
+          current_hot_seat_player: nextPlayer.id,
+          current_question_index: -1,
+          current_round: nextRound,
+          game_phase: 'host-picking',
+          current_pot: newPot,
+        });
+      }
       setGameState(prev => prev ? {
         ...prev,
         currentPlayerInHotSeat: nextPlayer.id,
@@ -1439,9 +1463,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const bidOnQuestion = useCallback(async (questionId: string, amount: number) => {
     if (!gameState) return;
     const wallet = walletRef.current;
-    if (!wallet) return;
+    const isTestMode = gameState.roomCode === '000-000';
+    const myWalletId = isTestMode ? 'test-host' : wallet?.publicKey?.toBase58();
+    if (!myWalletId) return;
 
-    const myWallet = wallet.publicKey.toBase58();
+    const myWallet = myWalletId;
     const currentBids = gameState.questionBids ?? {};
     const questionBids = currentBids[questionId] ?? [];
 
@@ -1466,9 +1492,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const castStakeVote = useCallback(async (vote: 'transparent' | 'fake', stakeAmount: number) => {
     if (!gameState) return;
     const wallet = walletRef.current;
-    if (!wallet) return;
+    const isTestMode = gameState.roomCode === '000-000';
+    const myWalletId = isTestMode ? 'test-host' : wallet?.publicKey?.toBase58();
+    if (!myWalletId) return;
 
-    const myWallet = wallet.publicKey.toBase58();
+    const myWallet = myWalletId;
 
     setGameState(prev => {
       if (!prev) return null;
