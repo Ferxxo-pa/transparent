@@ -38,6 +38,51 @@ export const GamePlayPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState?.gameStatus, pollGameState]);
 
+  // Auto-demo: simulate the full game flow in test mode
+  useEffect(() => {
+    if (!gameState || gameState.roomCode !== '000-000' || gameState.gameStatus !== 'playing') return;
+    const phase = gameState.gamePhase;
+
+    // Classic: auto-vote after question appears
+    if (phase === 'answering' && gameState.voteCount === 0) {
+      const t = setTimeout(() => { testAutoVote(); }, 2500);
+      return () => clearTimeout(t);
+    }
+    // Storyteller prep: auto-choose truth after a beat
+    if (phase === 'storyteller-prep') {
+      const t = setTimeout(() => { storytellerChoose('truth'); }, 2000);
+      return () => clearTimeout(t);
+    }
+    // Storyteller telling: auto-advance after 5s (don't wait full 60s for demo)
+    if (phase === 'storyteller-telling') {
+      const t = setTimeout(() => { storytellerAdvance(); }, 5000);
+      return () => clearTimeout(t);
+    }
+    // Storyteller voting: auto-vote
+    if (phase === 'storyteller-voting' && gameState.voteCount === 0) {
+      const t = setTimeout(() => { testAutoVote(); }, 2000);
+      return () => clearTimeout(t);
+    }
+    // Storyteller reveal: auto-advance to next round
+    if (phase === 'storyteller-reveal') {
+      const t = setTimeout(() => { storytellerAdvance(); }, 3000);
+      return () => clearTimeout(t);
+    }
+    // Exposer: auto-advance through phases
+    if (phase === 'submitting-questions') {
+      const t = setTimeout(() => { advanceHotTakePhase(); }, 3000);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'voting-question') {
+      const t = setTimeout(() => { advanceHotTakePhase(); }, 2000);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'voting-honesty' && gameState.voteCount === 0) {
+      const t = setTimeout(() => { testAutoVote(); }, 2000);
+      return () => clearTimeout(t);
+    }
+  }, [gameState?.gamePhase, gameState?.currentRound, gameState?.voteCount, testAutoVote, storytellerChoose, storytellerAdvance, advanceHotTakePhase]);
+
   // Auto-advance when host detects all votes are in
   useEffect(() => {
     if (!gameState || !isHost || gameState.gameStatus !== 'playing') return;
