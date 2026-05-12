@@ -467,30 +467,29 @@ export const GamePlayPage: React.FC = () => {
         {/* === HOST VIEW === */}
         {isHost ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {/* Live vote progress */}
-            <div className="glass glass-strong" style={{ padding: '18px', textAlign: 'center', borderRadius: 28 }}>
-              <p className="mono" style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-faint)', marginBottom: 10 }}>live votes</p>
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 24, marginBottom: 12 }}>
-                <div style={{ textAlign: 'center' }}>
-                  <p className="money" style={{ fontSize: 28, color: 'var(--azure)' }}>
-                    {Object.values(gameState.votes).filter(v => v === 'transparent').length}
-                  </p>
-                  <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)' }}>😇 truth</p>
-                </div>
-                <div style={{ width: 1, background: 'var(--glass-stroke)' }} />
-                <div style={{ textAlign: 'center' }}>
-                  <p className="money" style={{ fontSize: 28, color: 'var(--tangerine)' }}>
-                    {Object.values(gameState.votes).filter(v => v === 'fake').length}
-                  </p>
-                  <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)' }}>🤥 bluff</p>
-                </div>
+            {/* Vote results (compact) */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 20, padding: '8px 0' }}>
+              <div style={{ textAlign: 'center' }}>
+                <p className="money" style={{ fontSize: 24, color: 'var(--azure)' }}>
+                  {Object.values(gameState.votes).filter(v => v === 'transparent').length}
+                </p>
+                <p className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>😇 truth</p>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textTransform: 'uppercase' }}>{votesIn}/{voterCount} voted</span>
+              <div style={{ width: 1, background: 'var(--glass-stroke)' }} />
+              <div style={{ textAlign: 'center' }}>
+                <p className="money" style={{ fontSize: 24, color: 'var(--tangerine)' }}>
+                  {Object.values(gameState.votes).filter(v => v === 'fake').length}
+                </p>
+                <p className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>🤥 bluff</p>
               </div>
-              <div className="progress" style={{ boxShadow: `0 0 12px var(--acid-glow)` }}>
+            </div>
+
+            {/* Progress */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="progress" style={{ flex: 1 }}>
                 <div className="progress-bar" style={{ width: `${(votesIn / Math.max(voterCount, 1)) * 100}%` }} />
               </div>
+              <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>{votesIn}/{voterCount}</span>
             </div>
 
             {/* Host controls */}
@@ -516,10 +515,8 @@ export const GamePlayPage: React.FC = () => {
               </motion.button>
             )}
 
-            <Scores />
-
             {/* Solo test controls */}
-            {gameState.roomCode === '000-000' && (
+            {isTestMode && (
               <button
                 onClick={testAutoVote}
                 className="mono"
@@ -530,9 +527,11 @@ export const GamePlayPage: React.FC = () => {
                   fontWeight: 600,
                 }}
               >
-                🧪 simulate player votes
+                simulate player votes
               </button>
             )}
+
+            <Scores />
 
             <button
               onClick={() => setShowEndConfirm(true)}
@@ -550,7 +549,7 @@ export const GamePlayPage: React.FC = () => {
           <VoteButtons />
         )}
 
-        {!isHost && !isHotSeat && <Scores />}
+        {!isHost && <Scores />}
       </div>
 
       {/* End Game confirmation */}
