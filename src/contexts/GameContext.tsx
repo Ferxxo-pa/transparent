@@ -1918,14 +1918,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
   }, []);
 
-  // Auto-vote from fake players after a delay (simulates other players voting)
+  // Auto-vote from all non-hot-seat players (simulates the full round)
   const testAutoVote = useCallback(() => {
     if (!gameState) return;
     const hotSeat = gameState.currentPlayerInHotSeat;
-    const fakePlayers = TEST_PLAYERS.filter(p => p.id !== hotSeat && p.id !== 'test-host');
+    const voters = TEST_PLAYERS.filter(p => p.id !== hotSeat);
 
-    // Simulate votes from fake players with staggered timing
-    fakePlayers.forEach((fp, i) => {
+    // Simulate votes with staggered timing
+    voters.forEach((fp, i) => {
       setTimeout(() => {
         setGameState(prev => {
           if (!prev) return null;
@@ -1933,7 +1933,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const newVotes = { ...prev.votes, [fp.id]: vote };
           return { ...prev, votes: newVotes, voteCount: Object.keys(newVotes).length };
         });
-      }, (i + 1) * 800);
+      }, (i + 1) * 600);
     });
   }, [gameState]);
 
