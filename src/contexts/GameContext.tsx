@@ -1246,45 +1246,34 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Force Advance Round (host skip) ───────────────────
 
   const forceAdvanceRound = useCallback(async () => {
-    if (!gameState) return;
-    const gid = gameState.gameId;
-    const hotSeatWallet = gameState.currentPlayerInHotSeat;
-    const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
-    const nextRoundNum = (gameState.currentRound ?? 0) + 1;
-    const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+    // Use functional update to avoid stale closure
+    setGameState(prev => {
+      if (!prev) return null;
+      const hotSeatWallet = prev.currentPlayerInHotSeat;
+      const currentIdx = prev.players.findIndex(p => p.id === hotSeatWallet);
+      const nextRoundNum = (prev.currentRound ?? 0) + 1;
+      const totalRounds = prev.numQuestions > 0 ? prev.numQuestions : prev.players.length;
 
-    try {
       if (nextRoundNum >= totalRounds) {
-        if (gid) await updateGameStatus(gid, { status: 'gameover' });
-        setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' } : null);
-      } else {
-        const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
-        const nextPlayer = gameState.players[nextPlayerIdx];
-        const nextRound = (gameState.currentRound ?? 0) + 1;
-        const usedIdxs = gameState.usedQuestionIndices || [];
-        const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
-        if (gid) {
-          await updateGameStatus(gid, {
-            current_hot_seat_player: nextPlayer.id,
-            current_question_index: nextQIdx,
-            current_round: nextRound,
-            game_phase: 'answering',
-          });
-        }
-        setGameState(prev => prev ? {
-          ...prev,
-          currentPlayerInHotSeat: nextPlayer.id,
-          currentQuestion: QUESTIONS[nextQIdx],
-          currentRound: nextRound,
-          votes: {}, voteCount: 0,
-          gamePhase: 'answering',
-          usedQuestionIndices: [...usedIdxs, nextQIdx],
-        } : null);
+        return { ...prev, gameStatus: 'gameover' as const };
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to advance round');
-    }
-  }, [gameState]);
+
+      const nextPlayerIdx = (currentIdx + 1) % prev.players.length;
+      const nextPlayer = prev.players[nextPlayerIdx];
+      const usedIdxs = prev.usedQuestionIndices || [];
+      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+
+      return {
+        ...prev,
+        currentPlayerInHotSeat: nextPlayer.id,
+        currentQuestion: QUESTIONS[nextQIdx],
+        currentRound: nextRoundNum,
+        votes: {}, voteCount: 0,
+        gamePhase: 'answering' as GamePhase,
+        usedQuestionIndices: [...usedIdxs, nextQIdx],
+      };
+    });
+  }, []);
 
   // ── End Game Now ───────────────────────────────────────
 

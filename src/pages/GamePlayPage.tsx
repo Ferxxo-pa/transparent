@@ -495,7 +495,7 @@ export const GamePlayPage: React.FC = () => {
             {/* Host controls */}
             <motion.button
               className="btn-degen"
-              onClick={forceAdvanceRound}
+              onClick={() => { setAutoAdvanced(gameState.currentRound ?? 0); forceAdvanceRound(); }}
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
               whileTap={{ scale: 0.96 }}
               style={{ width: '100%', opacity: votesIn >= voterCount ? 1 : 0.7 }}
