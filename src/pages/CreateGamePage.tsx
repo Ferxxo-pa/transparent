@@ -24,7 +24,7 @@ const ROUND_PRESETS = [3, 5, 7, 10];
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
-  const { createGame, loading, error } = useGame();
+  const { createGame, createTestGame, loading, error } = useGame();
   const { connected, login } = usePrivyWallet();
   const solPrice = useSolPrice();
 
@@ -390,6 +390,18 @@ export const CreateGamePage: React.FC = () => {
                 {' '}{buyInNum > 0 ? buyInRaw : 'FREE'}
               </>
             )}
+          </button>
+          <button
+            onClick={() => { createTestGame(mode, classicSub); navigate('/play'); }}
+            className="mono"
+            style={{
+              width: '100%', padding: '9px 0', borderRadius: 100, marginTop: 2,
+              background: 'none', border: '1px dashed rgba(255,255,255,0.12)',
+              color: 'var(--ink-faint)', fontSize: 9, fontWeight: 600, cursor: 'pointer',
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+            }}
+          >
+            activate test · {MODES.find(m => m.id === mode)?.label ?? mode}
           </button>
         </div>
 
