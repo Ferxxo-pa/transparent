@@ -71,6 +71,20 @@ export interface PredictionRow {
   created_at: string;
 }
 
+// ── Mode mapping (app ↔ DB) ─────────────────────────────────
+// DB constraint only allows: classic, hot-take, custom, storyteller
+// App uses: classic, exposer, storyteller, free-for-all
+const modeToDb = (mode: string): string => {
+  if (mode === 'exposer') return 'hot-take';
+  if (mode === 'free-for-all') return 'custom';
+  return mode;
+};
+const modeFromDb = (mode: string): string => {
+  if (mode === 'hot-take') return 'exposer';
+  if (mode === 'custom') return 'free-for-all';
+  return mode;
+};
+
 // ── CRUD Helpers ────────────────────────────────────────────
 
 export async function createGameInDB(data: {
@@ -83,12 +97,15 @@ export async function createGameInDB(data: {
   payout_mode?: string;
   num_questions?: number | null;
 }): Promise<GameRow> {
+  const dbData = { ...data };
+  if (dbData.question_mode) dbData.question_mode = modeToDb(dbData.question_mode);
   const { data: game, error } = await supabase
     .from('games')
-    .insert(data)
+    .insert(dbData)
     .select()
     .single();
   if (error) throw error;
+  if (game.question_mode) game.question_mode = modeFromDb(game.question_mode) as any;
   return game;
 }
 
@@ -99,6 +116,7 @@ export async function getGameByRoomCode(roomCode: string): Promise<GameRow | nul
     .eq('room_code', roomCode)
     .single();
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 = not found
+  if (data?.question_mode) data.question_mode = modeFromDb(data.question_mode) as any;
   return data ?? null;
 }
 
