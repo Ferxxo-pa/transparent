@@ -95,9 +95,8 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 // ── Helpers ─────────────────────────────────────────────────
 
-/** Pick a random question index that hasn't been used yet (reserved for on-chain mode) */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
+/** Pick a random question index that hasn't been used yet */
+const pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
   if (used.length >= poolSize) {
     return Math.floor(Math.random() * poolSize);
   }
@@ -655,31 +654,32 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } : null,
           );
         } else {
-          // classic
+          // classic — auto-pick question
+          const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
           await updateGameStatus(gid, {
             status: 'playing',
             current_hot_seat_player: firstPlayer,
-            current_question_index: -1,
-            game_phase: 'host-picking',
+            current_question_index: qIdx,
+            game_phase: 'answering',
             current_round: 0,
           });
           setGameState((prev) =>
             prev ? {
               ...prev, gameStatus: 'playing', currentPlayerInHotSeat: firstPlayer,
-              currentQuestion: '', gamePhase: 'host-picking', currentRound: 0,
-              usedQuestionIndices: [],
+              currentQuestion: QUESTIONS[qIdx], gamePhase: 'answering', currentRound: 0,
+              usedQuestionIndices: [qIdx],
               currentRoundMode: 'classic',
             } : null,
           );
         }
       } else {
-        // Classic
-        // Start in host-picking phase — host sees question list and picks
+        // Classic — auto-pick a random question and go straight to answering
+        const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
-          current_question_index: -1,
-          game_phase: 'host-picking',
+          current_question_index: qIdx,
+          game_phase: 'answering',
           current_round: 0,
         });
 
@@ -689,10 +689,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...prev,
                 gameStatus: 'playing',
                 currentPlayerInHotSeat: firstPlayer,
-                currentQuestion: '',
-                gamePhase: 'host-picking',
+                currentQuestion: QUESTIONS[qIdx],
+                gamePhase: 'answering',
                 currentRound: 0,
-                usedQuestionIndices: [],
+                usedQuestionIndices: [qIdx],
               }
             : null,
         );
@@ -767,12 +767,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
             const nextPlayer = gameState.players[nextPlayerIdx];
             const nextRound = round + 1;
-            // Go to host-picking phase for next round
+            // Auto-pick next question
+            const usedIdxs = gameState.usedQuestionIndices || [];
+            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
-              current_question_index: -1,
+              current_question_index: nextQIdx,
               current_round: nextRound,
-              game_phase: 'host-picking',
+              game_phase: 'answering',
             });
 
             setGameState((prev) =>
@@ -780,11 +782,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ? {
                     ...prev,
                     currentPlayerInHotSeat: nextPlayer.id,
-                    currentQuestion: '',
+                    currentQuestion: QUESTIONS[nextQIdx],
                     currentRound: nextRound,
                     votes: {},
                     voteCount: 0,
-                    gamePhase: 'host-picking',
+                    gamePhase: 'answering',
+                    usedQuestionIndices: [...usedIdxs, nextQIdx],
                   }
                 : null,
             );
@@ -940,8 +943,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (gid) await updateGameStatus(gid, { game_phase: 'submitting-questions', current_hot_seat_player: nextPlayer, current_round: nextRound });
             setGameState(prev => prev ? { ...prev, gamePhase: 'submitting-questions', currentPlayerInHotSeat: nextPlayer, currentRound: nextRound, currentQuestion: '', submittedQuestions: [], questionVotes: {}, questionBids: {}, votes: {}, voteCount: 0, currentRoundMode: 'exposer' } : null);
           } else {
-            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
-            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: '', gamePhase: 'host-picking', votes: {}, voteCount: 0, currentRoundMode: 'classic' } : null);
+            const usedIdxs = gameState.usedQuestionIndices || [];
+            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'answering', current_question_index: nextQIdx });
+            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: QUESTIONS[nextQIdx], gamePhase: 'answering', votes: {}, voteCount: 0, currentRoundMode: 'classic', usedQuestionIndices: [...usedIdxs, nextQIdx] } : null);
           }
         } else {
           // Pure exposer mode — next round is always exposer
@@ -1256,21 +1261,24 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
         const nextPlayer = gameState.players[nextPlayerIdx];
         const nextRound = (gameState.currentRound ?? 0) + 1;
+        const usedIdxs = gameState.usedQuestionIndices || [];
+        const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
         if (gid) {
           await updateGameStatus(gid, {
             current_hot_seat_player: nextPlayer.id,
-            current_question_index: -1,
+            current_question_index: nextQIdx,
             current_round: nextRound,
-            game_phase: 'host-picking',
+            game_phase: 'answering',
           });
         }
         setGameState(prev => prev ? {
           ...prev,
           currentPlayerInHotSeat: nextPlayer.id,
-          currentQuestion: '',
+          currentQuestion: QUESTIONS[nextQIdx],
           currentRound: nextRound,
           votes: {}, voteCount: 0,
-          gamePhase: 'host-picking',
+          gamePhase: 'answering',
+          usedQuestionIndices: [...usedIdxs, nextQIdx],
         } : null);
       }
     } catch (err: any) {
@@ -1372,13 +1380,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             } : null);
             if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'submitting-questions' });
           } else {
+            const usedIdxs = gameState.usedQuestionIndices || [];
+            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
             setGameState(prev => prev ? {
               ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
-              currentQuestion: '', gamePhase: 'host-picking', votes: {}, voteCount: 0,
-              usedQuestionIndices: prev.usedQuestionIndices ?? [],
+              currentQuestion: QUESTIONS[nextQIdx], gamePhase: 'answering', votes: {}, voteCount: 0,
+              usedQuestionIndices: [...usedIdxs, nextQIdx],
               currentRoundMode: 'classic',
             } : null);
-            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'host-picking', current_question_index: -1 });
+            if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'answering', current_question_index: nextQIdx });
           }
         } else {
           // Pure storyteller mode — next round is always storyteller
@@ -1436,24 +1446,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } else {
       const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
       const nextPlayer = gameState.players[nextPlayerIdx];
+      const usedIdxs = gameState.usedQuestionIndices || [];
+      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
       if (gid) {
         await updateGameStatus(gid, {
           current_hot_seat_player: nextPlayer.id,
-          current_question_index: -1,
+          current_question_index: nextQIdx,
           current_round: nextRound,
-          game_phase: 'host-picking',
+          game_phase: 'answering',
           current_pot: newPot,
         });
       }
       setGameState(prev => prev ? {
         ...prev,
         currentPlayerInHotSeat: nextPlayer.id,
-        currentQuestion: '',
+        currentQuestion: QUESTIONS[nextQIdx],
         currentRound: nextRound,
         votes: {}, voteCount: 0,
-        gamePhase: 'host-picking',
+        gamePhase: 'answering',
         scores: newScores,
         currentPot: newPot,
+        usedQuestionIndices: [...usedIdxs, nextQIdx],
       } : null);
     }
   }, [gameState]);
@@ -1870,6 +1883,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const createTestGame = useCallback((questionMode: QuestionMode = 'classic', classicSubMode?: ClassicSubMode) => {
     const roomCode = '000-000';
+    const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
+    const isClassicStart = questionMode === 'classic' || questionMode === 'free-for-all';
     setGameState({
       roomCode,
       roomName: 'Test Room',
@@ -1877,7 +1892,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       players: TEST_PLAYERS,
       currentPot: 0,
       gameStatus: 'playing',
-      currentQuestion: '',
+      currentQuestion: questionMode === 'storyteller' ? 'Tell us about the craziest thing you\'ve ever done on a dare.' : isClassicStart ? QUESTIONS[qIdx] : '',
       currentPlayerInHotSeat: 'test-p1',
       votes: {},
       voteCount: 0,
@@ -1889,12 +1904,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       numQuestions: TEST_PLAYERS.length,
       submittedQuestions: [],
       questionVotes: {},
-      gamePhase: questionMode === 'storyteller' ? 'storyteller-prep' : questionMode === 'exposer' ? 'submitting-questions' : 'host-picking',
+      gamePhase: questionMode === 'storyteller' ? 'storyteller-prep' : questionMode === 'exposer' ? 'submitting-questions' : 'answering',
       currentRound: 0,
       scores: {},
       classicSubMode: questionMode === 'classic' ? (classicSubMode ?? 'all-or-nothing') : undefined,
       stakeVotes: {},
       questionBids: {},
+      usedQuestionIndices: isClassicStart ? [qIdx] : [],
       currentRoundMode: questionMode === 'free-for-all' ? 'classic' : undefined,
       storytellerPrompt: questionMode === 'storyteller' ? 'Tell us about the craziest thing you\'ve ever done on a dare.' : undefined,
       storytellerChoice: null,
