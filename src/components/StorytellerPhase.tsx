@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Blobs } from './Blobs';
-
 interface Props {
   phase: 'storyteller-prep' | 'storyteller-telling' | 'storyteller-voting' | 'storyteller-reveal';
   prompt: string;
@@ -55,8 +53,6 @@ export const StorytellerPhase: React.FC<Props> = ({
           animate={{ opacity: 1, y: 0 }}
           style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%', alignItems: 'center', textAlign: 'center' }}
         >
-          <Blobs palette="story" />
-
           {/* header */}
           <span className="chip chip-pink" style={{ fontSize: 11 }}>you're in the chair 🪑</span>
 
@@ -132,7 +128,6 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1 }}
         style={{ textAlign: 'center', padding: 40 }}
       >
-        <Blobs palette="story" />
         <p className="display" style={{ fontSize: 18, marginBottom: 8 }}>{playerName.toLowerCase()} is preparing...</p>
         <p style={{ color: 'var(--ink-soft)', fontSize: 13, marginTop: 8 }}>
           they're about to tell a story. your job: figure out if it's real or fake.
@@ -152,8 +147,6 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, y: 0 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
-        <Blobs palette="story" />
-
         {/* prompt card */}
         <div className="glass glass-strong" style={{ padding: 28, borderRadius: 28, textAlign: 'center', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
@@ -216,8 +209,6 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, y: 0 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
-        <Blobs palette={myVote === 'transparent' ? 'truth' : myVote === 'fake' ? 'bluff' : 'vote'} />
-
         <p className="display" style={{ fontSize: 20 }}>was {playerName.toLowerCase()} being transparent?</p>
 
         {isHotSeat ? (
@@ -323,8 +314,6 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, scale: 1 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
-        <Blobs palette={isTruth ? 'truth' : 'bluff'} />
-
         <motion.div
           animate={{ rotate: [0, -10, 10, -10, 0] }}
           transition={{ duration: 0.5 }}

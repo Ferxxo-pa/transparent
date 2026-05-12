@@ -286,31 +286,32 @@ export const GamePlayPage: React.FC = () => {
   const isStorytellerRound = phase && phase.startsWith('storyteller-');
   if (isStorytellerRound) {
     return (
-      <div className="page page--game fade-in" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="page page--game fade-in scroll-no-bar" style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100dvh', overflowY: 'auto', position: 'relative' }}>
         <Blobs palette="story" />
-        <TopBar />
-        <SubjectCard />
-        <div style={{ marginTop: 24, width: '100%' }}>
-          <StorytellerPhase
-            phase={phase as any}
-            prompt={gameState.storytellerPrompt || gameState.currentQuestion || ''}
-            isHotSeat={isHotSeat}
-            isHost={isHost}
-            playerName={player?.name ?? 'Unknown'}
-            storytellerChoice={gameState.storytellerChoice ?? null}
-            votes={gameState.votes}
-            voteCount={votesIn}
-            voterCount={voterCount}
-            myVote={myVote}
-            buyInAmount={gameState.buyInAmount}
-            stakeVotes={gameState.stakeVotes}
-            onChoose={storytellerChoose}
-            onVote={castVote}
-            onStakeVote={castStakeVote}
-            onAdvance={storytellerAdvance}
-          />
+        <div style={{ position: 'relative', zIndex: 1, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
+          <TopBar />
+          <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <StorytellerPhase
+              phase={phase as any}
+              prompt={gameState.storytellerPrompt || gameState.currentQuestion || ''}
+              isHotSeat={isHotSeat}
+              isHost={isHost}
+              playerName={player?.name ?? 'Unknown'}
+              storytellerChoice={gameState.storytellerChoice ?? null}
+              votes={gameState.votes}
+              voteCount={votesIn}
+              voterCount={voterCount}
+              myVote={myVote}
+              buyInAmount={gameState.buyInAmount}
+              stakeVotes={gameState.stakeVotes}
+              onChoose={storytellerChoose}
+              onVote={castVote}
+              onStakeVote={castStakeVote}
+              onAdvance={storytellerAdvance}
+            />
+          </div>
+          <Scores />
         </div>
-        <Scores />
       </div>
     );
   }
