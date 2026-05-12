@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 interface Props {
   phase: 'storyteller-prep' | 'storyteller-telling' | 'storyteller-voting' | 'storyteller-reveal';
   prompt: string;
@@ -19,6 +19,10 @@ interface Props {
   onAdvance: () => void;
 }
 
+const STORYTELLER_TIME_LIMIT = 60; // seconds
+const TIME_EXTENSION = 15; // seconds per purchase
+const EXTENSION_COST = 0.01; // SOL
+
 /** highlight a middle phrase in pink italic-serif */
 const renderPrompt = (text: string) => {
   const words = text.split(' ');
@@ -35,6 +39,39 @@ const renderPrompt = (text: string) => {
   );
 };
 
+/** Circular countdown timer */
+const CountdownRing = ({ seconds, total }: { seconds: number; total: number }) => {
+  const pct = seconds / total;
+  const radius = 32;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct);
+  const isLow = seconds <= 10;
+  const color = isLow ? '#FF5C5C' : 'var(--acid)';
+
+  return (
+    <div style={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <svg width={80} height={80} style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx={40} cy={40} r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={4} />
+        <circle
+          cx={40} cy={40} r={radius} fill="none"
+          stroke={color}
+          strokeWidth={4}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}
+        />
+      </svg>
+      <span className="money" style={{
+        position: 'absolute', fontSize: 22, color,
+        animation: isLow ? 'pulse 1s ease infinite' : 'none',
+      }}>
+        {seconds}
+      </span>
+    </div>
+  );
+};
+
 export const StorytellerPhase: React.FC<Props> = ({
   phase, prompt, isHotSeat, isHost, playerName, storytellerChoice,
   votes, voteCount, voterCount, myVote, buyInAmount, stakeVotes,
@@ -43,6 +80,60 @@ export const StorytellerPhase: React.FC<Props> = ({
   const [doneTelling, setDoneTelling] = useState(false);
   const [recording, setRecording] = useState(false);
   const [stakeAmount, setStakeAmount] = useState(buyInAmount > 0 ? buyInAmount * 0.25 : 0);
+
+  // Timer state
+  const [timeLeft, setTimeLeft] = useState(STORYTELLER_TIME_LIMIT);
+  const [totalTime, setTotalTime] = useState(STORYTELLER_TIME_LIMIT);
+  const [extensions, setExtensions] = useState<string[]>([]); // who bought time
+  const [showTimeBought, setShowTimeBought] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hasAutoAdvanced = useRef(false);
+
+  // Start/stop timer based on phase
+  useEffect(() => {
+    if (phase === 'storyteller-telling' && !doneTelling) {
+      hasAutoAdvanced.current = false;
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [phase, doneTelling]);
+
+  // Auto-advance when timer hits 0
+  useEffect(() => {
+    if (timeLeft === 0 && phase === 'storyteller-telling' && !doneTelling && !hasAutoAdvanced.current) {
+      hasAutoAdvanced.current = true;
+      setDoneTelling(true);
+      onAdvance();
+    }
+  }, [timeLeft, phase, doneTelling, onAdvance]);
+
+  const buyMoreTime = useCallback(() => {
+    setTimeLeft(prev => prev + TIME_EXTENSION);
+    setTotalTime(prev => prev + TIME_EXTENSION);
+    setExtensions(prev => [...prev, 'you']);
+    setShowTimeBought('you');
+    setTimeout(() => setShowTimeBought(null), 2000);
+  }, []);
+
+  // Reset timer when phase changes away from telling
+  useEffect(() => {
+    if (phase !== 'storyteller-telling') {
+      setTimeLeft(STORYTELLER_TIME_LIMIT);
+      setTotalTime(STORYTELLER_TIME_LIMIT);
+      setDoneTelling(false);
+      setExtensions([]);
+      hasAutoAdvanced.current = false;
+    }
+  }, [phase]);
 
   // ── PREP PHASE: Hot-seat player sees prompt, chooses truth/fake ──
   if (phase === 'storyteller-prep') {
@@ -139,7 +230,7 @@ export const StorytellerPhase: React.FC<Props> = ({
     );
   }
 
-  // ── TELLING PHASE: Hot-seat tells the story, shows done button ──
+  // ── TELLING PHASE: Hot-seat tells the story with countdown timer ──
   if (phase === 'storyteller-telling') {
     return (
       <motion.div
@@ -147,6 +238,9 @@ export const StorytellerPhase: React.FC<Props> = ({
         animate={{ opacity: 1, y: 0 }}
         style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', alignItems: 'center', textAlign: 'center' }}
       >
+        {/* Timer */}
+        <CountdownRing seconds={timeLeft} total={totalTime} />
+
         {/* prompt card */}
         <div className="glass glass-strong" style={{ padding: 28, borderRadius: 28, textAlign: 'center', width: '100%' }}>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
@@ -171,9 +265,47 @@ export const StorytellerPhase: React.FC<Props> = ({
           </span>
         )}
 
-        {!isHotSeat && (
-          <p style={{ color: 'var(--ink-soft)', fontSize: 13 }}>
-            listen carefully... is it real or fake?
+        {/* Buy more time button — only for listeners (not hot seat, not host) */}
+        {!isHotSeat && !doneTelling && (
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={buyMoreTime}
+            className="glass-flat"
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 10, padding: '12px 16px', cursor: 'pointer',
+              border: '1px dashed rgba(196,255,60,0.3)',
+            }}
+          >
+            <span style={{ fontSize: 16 }}>⏳</span>
+            <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--acid)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              +{TIME_EXTENSION}s more time
+            </span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)' }}>
+              {EXTENSION_COST} SOL
+            </span>
+          </motion.button>
+        )}
+
+        {/* Time bought toast */}
+        <AnimatePresence>
+          {showTimeBought && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="chip"
+              style={{ background: 'rgba(196,255,60,0.12)', color: 'var(--acid)', borderColor: 'rgba(196,255,60,0.3)' }}
+            >
+              +{TIME_EXTENSION}s added
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Extensions log */}
+        {extensions.length > 0 && (
+          <p className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>
+            {extensions.length} time extension{extensions.length > 1 ? 's' : ''} bought
           </p>
         )}
 
@@ -181,7 +313,7 @@ export const StorytellerPhase: React.FC<Props> = ({
         {(isHotSeat || isHost) && (
           <motion.button
             whileTap={{ scale: 0.95 }}
-            onClick={() => { setDoneTelling(true); onAdvance(); }}
+            onClick={() => { setDoneTelling(true); if (timerRef.current) clearInterval(timerRef.current); onAdvance(); }}
             className="btn-degen"
             style={{
               width: '100%', padding: '16px', marginTop: 8,
@@ -195,7 +327,7 @@ export const StorytellerPhase: React.FC<Props> = ({
 
         {/* footer */}
         <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', textAlign: 'center' }}>
-          the table votes truth or bluff next
+          {timeLeft <= 10 && timeLeft > 0 ? 'time is running out...' : 'the table votes truth or bluff next'}
         </p>
       </motion.div>
     );
@@ -292,7 +424,7 @@ export const StorytellerPhase: React.FC<Props> = ({
             className="btn-degen"
             style={{ padding: '14px 32px', marginTop: 12, width: '100%' }}
           >
-            reveal answer 👀
+            reveal answer
           </motion.button>
         )}
       </motion.div>
