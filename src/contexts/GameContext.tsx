@@ -1915,12 +1915,32 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Simulate votes with staggered timing
     voters.forEach((fp, i) => {
+      const isLast = i === voters.length - 1;
       setTimeout(() => {
         setGameState(prev => {
           if (!prev) return null;
           const vote: 'transparent' | 'fake' = Math.random() > 0.4 ? 'transparent' : 'fake';
           const newVotes = { ...prev.votes, [fp.id]: vote };
-          return { ...prev, votes: newVotes, voteCount: Object.keys(newVotes).length };
+          // On the final vote, also fold this round's tally into scores so the
+          // gameover leaderboard isn't empty (real mode does this via realtime).
+          let newScores = prev.scores ?? {};
+          if (isLast) {
+            const hotSeatWallet = prev.currentPlayerInHotSeat;
+            if (hotSeatWallet) {
+              const transparentVotes = Object.values(newVotes).filter(v => v === 'transparent').length;
+              const fakeVotes = Object.values(newVotes).filter(v => v === 'fake').length;
+              const existing = newScores[hotSeatWallet] ?? { transparent: 0, fake: 0, rounds: 0 };
+              newScores = {
+                ...newScores,
+                [hotSeatWallet]: {
+                  transparent: existing.transparent + transparentVotes,
+                  fake: existing.fake + fakeVotes,
+                  rounds: (existing.rounds ?? 0) + 1,
+                },
+              };
+            }
+          }
+          return { ...prev, votes: newVotes, voteCount: Object.keys(newVotes).length, scores: newScores };
         });
       }, (i + 1) * 600);
     });

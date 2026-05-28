@@ -15,7 +15,7 @@ import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote, resetGame } = useGame();
+  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote, submitQuestion, voteForQuestion, resetGame } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const isTestMode = gameState?.roomCode === '000-000';
@@ -68,37 +68,69 @@ export const GamePlayPage: React.FC = () => {
       const t = setTimeout(() => { storytellerAdvance(); }, 3000);
       return () => clearTimeout(t);
     }
-    // Exposer: auto-advance through phases
+    // Exposer: auto-submit fake questions, then advance through phases
     if (phase === 'submitting-questions') {
-      const t = setTimeout(() => { advanceHotTakePhase(); }, 3000);
-      return () => clearTimeout(t);
+      const subs = gameState.submittedQuestions ?? [];
+      if (subs.length === 0) {
+        // Auto-submit demo questions with staggered timing for unique IDs
+        const demoQs = ['What\'s the wildest lie you\'ve told?', 'Have you ever cheated on a test?', 'What\'s your biggest regret?'];
+        const t = setTimeout(() => {
+          demoQs.forEach((q, i) => {
+            setTimeout(() => submitQuestion(q), i * 200);
+          });
+          // Advance to voting after all questions submitted
+          setTimeout(() => { advanceHotTakePhase(); }, demoQs.length * 200 + 600);
+        }, 1500);
+        return () => clearTimeout(t);
+      } else {
+        const t = setTimeout(() => { advanceHotTakePhase(); }, 2000);
+        return () => clearTimeout(t);
+      }
     }
     if (phase === 'voting-question') {
-      const t = setTimeout(() => { advanceHotTakePhase(); }, 2000);
-      return () => clearTimeout(t);
+      const subs = gameState.submittedQuestions ?? [];
+      if (subs.length > 0) {
+        // Auto-vote for the first question to give it a winner
+        const t = setTimeout(() => {
+          voteForQuestion(subs[0].id);
+          setTimeout(() => { advanceHotTakePhase(); }, 1000);
+        }, 1500);
+        return () => clearTimeout(t);
+      } else {
+        const t = setTimeout(() => { advanceHotTakePhase(); }, 2000);
+        return () => clearTimeout(t);
+      }
     }
     if (phase === 'voting-honesty' && gameState.voteCount === 0) {
       const t = setTimeout(() => { testAutoVote(); }, 2000);
       return () => clearTimeout(t);
     }
-  }, [gameState?.gamePhase, gameState?.currentRound, gameState?.voteCount, testAutoVote, storytellerChoose, storytellerAdvance, advanceHotTakePhase]);
+  }, [gameState?.gamePhase, gameState?.currentRound, gameState?.voteCount, gameState?.submittedQuestions?.length, testAutoVote, storytellerChoose, storytellerAdvance, advanceHotTakePhase, submitQuestion, voteForQuestion]);
 
   // Auto-advance when host detects all votes are in
   useEffect(() => {
     if (!gameState || !isHost || gameState.gameStatus !== 'playing') return;
     const currentRound = gameState.currentRound ?? 0;
     if (autoAdvanced === currentRound) return;
+    const phase = gameState.gamePhase;
     const hotSeatWallet = gameState.currentPlayerInHotSeat;
     const eligible = gameState.players.filter(p => p.id !== hotSeatWallet).length;
     const needed = Math.max(eligible, 1);
     if (gameState.voteCount >= needed && needed > 0) {
       const t = setTimeout(() => {
         setAutoAdvanced(currentRound);
-        forceAdvanceRound();
+        // Route to the correct advance function based on current phase
+        if (phase === 'storyteller-voting') {
+          storytellerAdvance(); // → storyteller-reveal
+        } else if (phase === 'voting-honesty') {
+          advanceHotTakePhase(); // → next exposer round
+        } else {
+          forceAdvanceRound(); // classic → next round
+        }
       }, 2000);
       return () => clearTimeout(t);
     }
-  }, [gameState?.voteCount, gameState?.currentRound, isHost, autoAdvanced, forceAdvanceRound]);
+  }, [gameState?.voteCount, gameState?.currentRound, gameState?.gamePhase, isHost, autoAdvanced, forceAdvanceRound, storytellerAdvance, advanceHotTakePhase]);
 
   const advance = useCallback(() => {
     if (isHost) advanceHotTakePhase();
