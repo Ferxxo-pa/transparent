@@ -26,7 +26,7 @@ export const pageVariants = {
   out:     { opacity: 0, y: -20, scale: 0.97 },
 };
 
-export const pageTransition = { type: 'spring', stiffness: 320, damping: 30 };
+export const pageTransition = { type: 'spring' as const, stiffness: 320, damping: 30 };
 
 export const PageWrap = ({ children }: { children: React.ReactNode }) => (
   <motion.div

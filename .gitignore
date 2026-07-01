@@ -22,3 +22,7 @@ dist-ssr
 *.sw?
 .env
 .vercel
+
+# Rust / Anchor build artifacts
+target/
+*.tsbuildinfo

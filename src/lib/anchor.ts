@@ -21,6 +21,9 @@ export interface WalletAdapter {
   publicKey: PublicKey;
   /** Signs and sends tx via Privy wallet, returns signature */
   sendTransaction: (tx: Transaction) => Promise<string>;
+  /** Signs an arbitrary message (ed25519) — used to prove wallet identity
+   *  to the Supabase Edge Functions. Optional: external wallets may lack it. */
+  signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 }
 
 export function deriveGamePDA(hostPubkey: PublicKey, _roomName?: string): [PublicKey, number] {

@@ -100,7 +100,7 @@ export interface GameState {
   buyInAmount: number;
   players: Player[];
   currentPot: number;
-  gameStatus: 'waiting' | 'playing' | 'voting' | 'gameover';
+  gameStatus: 'waiting' | 'playing' | 'voting' | 'gameover' | 'cancelled';
   currentQuestion: string;
   currentPlayerInHotSeat: string | null;
   votes: Record<string, 'transparent' | 'fake'>;

@@ -41,3 +41,16 @@ export const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || '';
 
 /** Trustless escrow mode — PDA-based pot management instead of host-held funds */
 export const USE_ESCROW = import.meta.env.VITE_USE_ESCROW === 'true';
+
+/** Settlement authority pubkey (base58, public info). Baked into each game at
+ *  creation so the settle-game Edge Function can trigger on-chain distribution
+ *  with its own devnet keypair. Empty = host-only distribution. */
+export const SETTLEMENT_AUTHORITY = import.meta.env.VITE_SETTLEMENT_AUTHORITY || '';
+
+/** Base URL for Supabase Edge Functions (derived from the project URL). */
+export const SUPABASE_FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : '';
+
+/** Route protected game-phase updates + settlement through Edge Functions.
+ *  Requires the escrow-hardening RLS migration applied AND the advance-phase /
+ *  settle-game functions deployed — otherwise phase updates will fail. */
+export const USE_EDGE_GAME_AUTH = import.meta.env.VITE_USE_EDGE_GAME_AUTH === 'true';

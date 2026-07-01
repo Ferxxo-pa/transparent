@@ -1,5 +1,6 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, USE_EDGE_GAME_AUTH } from './config';
+import { advancePhaseViaEdge, settleGameViaEdge } from './gameAuth';
 
 // ============================================================
 // Supabase Client + Real-Time Helpers
@@ -28,6 +29,7 @@ export interface GameRow {
   question_options?: string[] | null;
   question_pick_votes?: Record<string, number> | null;
   storyteller_choice?: 'truth' | 'fake' | null;
+  game_pda?: string | null;
   created_at: string;
 }
 
@@ -96,6 +98,7 @@ export async function createGameInDB(data: {
   custom_questions?: string[] | null;
   payout_mode?: string;
   num_questions?: number | null;
+  game_pda?: string | null;
 }): Promise<GameRow> {
   const dbData = { ...data };
   if (dbData.question_mode) dbData.question_mode = modeToDb(dbData.question_mode);
@@ -120,10 +123,27 @@ export async function getGameByRoomCode(roomCode: string): Promise<GameRow | nul
   return data ?? null;
 }
 
+/** Columns the escrow-hardening migration protects at the DB level — anon
+ *  clients cannot write them directly; changes must go through the
+ *  advance-phase Edge Function, which verifies a wallet signature. */
+const PROTECTED_GAME_COLUMNS = new Set([
+  'status',
+  'game_phase',
+  'current_round',
+  'current_question_index',
+  'current_hot_seat_player',
+  'storyteller_choice',
+]);
+
 export async function updateGameStatus(
   gameId: string,
   updates: Partial<GameRow>
 ) {
+  const touchesProtected = Object.keys(updates).some((k) => PROTECTED_GAME_COLUMNS.has(k));
+  if (USE_EDGE_GAME_AUTH && touchesProtected) {
+    await advancePhaseViaEdge(gameId, updates as Record<string, unknown>);
+    return;
+  }
   const { error } = await supabase.from('games').update(updates).eq('id', gameId);
   if (error) throw error;
 }
@@ -266,6 +286,12 @@ export async function getPredictionsForGame(gameId: string): Promise<PredictionR
 }
 
 export async function settlePredictions(gameId: string): Promise<void> {
+  if (USE_EDGE_GAME_AUTH) {
+    // Hardened mode: anon cannot update predictions — the settle-game
+    // function verifies the host's signature and marks them settled.
+    await settleGameViaEdge({ gameId, action: 'settle_predictions' });
+    return;
+  }
   const { error } = await supabase
     .from('predictions')
     .update({ settled: true })

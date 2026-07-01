@@ -20,9 +20,10 @@ import {
   TransactionInstruction,
 } from '@solana/web3.js';
 import { WalletAdapter, connection } from './anchor';
+import { PROGRAM_ID as PROGRAM_ID_STR, SETTLEMENT_AUTHORITY } from './config';
 
 // ── Program ID (update after deploy) ──────────────────────
-const PROGRAM_ID = new PublicKey('2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9');
+const PROGRAM_ID = new PublicKey(PROGRAM_ID_STR);
 
 // ── PDA Derivations ───────────────────────────────────────
 
@@ -99,29 +100,26 @@ function encodeI64(val: number | bigint): Buffer {
   return buf;
 }
 
-// Anchor discriminators (first 8 bytes of sha256("global:<instruction_name>"))
+// Anchor discriminators: first 8 bytes of sha256("global:<instruction_name>").
+// Verified against the deployed devnet program (standard Anchor codegen).
 // Lazy-initialized to avoid Buffer-not-defined at module load time.
 let _disc: Record<string, Buffer> | null = null;
 function DISCRIMINATORS() {
   if (!_disc) {
     _disc = {
-      create_game: Buffer.from([24, 237, 120, 89, 171, 82, 155, 98]),
+      create_game: Buffer.from([124, 69, 75, 66, 184, 220, 72, 206]),
       join_game: Buffer.from([107, 112, 18, 38, 56, 173, 60, 128]),
       start_game: Buffer.from([249, 47, 252, 172, 184, 162, 245, 14]),
-      distribute: Buffer.from([155, 67, 128, 195, 187, 40, 95, 101]),
+      distribute: Buffer.from([191, 44, 223, 207, 164, 236, 126, 61]),
       end_game: Buffer.from([224, 135, 245, 99, 67, 175, 121, 252]),
-      refund_player: Buffer.from([124, 72, 4, 227, 2, 53, 178, 169]),
-      cancel_game: Buffer.from([100, 0, 54, 73, 81, 230, 26, 209]),
-      refund_all_expired: Buffer.from([197, 22, 184, 51, 118, 7, 220, 200]),
+      refund_player: Buffer.from([251, 32, 76, 233, 171, 106, 120, 46]),
+      cancel_game: Buffer.from([121, 194, 154, 118, 103, 235, 149, 52]),
+      refund_all_expired: Buffer.from([215, 251, 63, 14, 120, 65, 31, 190]),
     };
   }
   return _disc;
 }
 
-// NOTE: The discriminators above are placeholders.
-// After deploying the program, generate the real IDL and use:
-//   anchor idl init --filepath target/idl/transparent.json <PROGRAM_ID>
-// Or compute them with: sha256("global:create_game")[0..8]
 
 // ── Public API ────────────────────────────────────────────
 
@@ -138,12 +136,19 @@ export async function createGameEscrow(
   const [gamePDA] = deriveGamePDA(wallet.publicKey, roomCode);
   const [escrowPDA] = deriveEscrowPDA(gamePDA);
 
+  // Settlement authority baked into the game so the settle-game Edge Function
+  // can trigger distribution. PublicKey.default (all zeros) = host-only.
+  const settlementAuthority = SETTLEMENT_AUTHORITY
+    ? new PublicKey(SETTLEMENT_AUTHORITY)
+    : PublicKey.default;
+
   const data = Buffer.concat([
     DISCRIMINATORS().create_game,
     encodeString(roomCode),
     encodeU64(buyInLamports),
     encodeU8(maxPlayers),
     encodeI64(expirySeconds),
+    settlementAuthority.toBuffer(),
   ]);
 
   const ix = new TransactionInstruction({

@@ -7,16 +7,16 @@ import { useGame } from '../contexts/GameContext';
  * Uses sendTransaction (sign+send in one call via Privy wallet).
  */
 export function WalletBridge() {
-  const { publicKey, sendTransaction } = usePrivyWallet();
+  const { publicKey, sendTransaction, signMessage } = usePrivyWallet();
   const { setWalletAdapter } = useGame();
 
   useEffect(() => {
     if (publicKey && sendTransaction) {
-      setWalletAdapter({ publicKey, sendTransaction });
+      setWalletAdapter({ publicKey, sendTransaction, signMessage: signMessage ?? undefined });
     } else {
       setWalletAdapter(null);
     }
-  }, [publicKey, sendTransaction, setWalletAdapter]);
+  }, [publicKey, sendTransaction, signMessage, setWalletAdapter]);
 
   return null;
 }

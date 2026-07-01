@@ -38,12 +38,15 @@ import {
   distributeViaMagicBlock,
 } from '../lib/magicblock';
 import {
+  createGameEscrow,
   joinGameEscrow,
   distributeEscrow,
   refundPlayerEscrow,
+  cancelGameEscrow,
   deriveGamePDA as deriveEscrowGamePDA,
 } from '../lib/anchor-escrow';
-import { USE_ESCROW } from '../lib/config';
+import { USE_ESCROW, USE_EDGE_GAME_AUTH } from '../lib/config';
+import { setGameAuthSigner, settleGameViaEdge } from '../lib/gameAuth';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -164,6 +167,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const setWalletAdapter = useCallback((adapter: WalletAdapter | null) => {
     walletRef.current = adapter;
+    setGameAuthSigner(adapter);
   }, []);
 
   // Keep ref in sync
@@ -378,8 +382,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const buyInLamports = Math.round(buyIn * LAMPORTS_PER_SOL);
 
         // 1. Create on-chain
+        let gamePdaStr: string | null = null;
         try {
-          await createGameOnChain(wallet, roomName || 'Game Room', buyInLamports);
+          if (USE_ESCROW) {
+            // Trustless: initialize the game + escrow PDA so buy-ins can be held on-chain
+            const { gamePDA } = await createGameEscrow(wallet, roomCode, buyInLamports);
+            gamePdaStr = gamePDA.toBase58();
+          } else {
+            await createGameOnChain(wallet, roomName || 'Game Room', buyInLamports);
+          }
         } catch (chainErr) {
           console.warn('On-chain creation failed (may already exist or devnet issue):', chainErr);
           // Continue with Supabase — on-chain is optional during dev
@@ -395,6 +406,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           custom_questions: questionMode === 'free-for-all' ? (customQuestions ?? null) : null,
           payout_mode: payoutMode,
           num_questions: numQuestions > 0 ? numQuestions : null,
+          game_pda: gamePdaStr,
         });
 
         // 3. Host does NOT join as a player (Kahoot model: host = screen/controller)
@@ -734,14 +746,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await insertVote({
           game_id: gid,
           round,
-          voter_wallet: wallet.publicKey.toBase58(),
+          voter_wallet: myWalletId,
           vote,
         });
 
         // Update locally for immediate feedback
         setGameState((prev) => {
           if (!prev) return null;
-          const newVotes = { ...prev.votes, [wallet.publicKey.toBase58()]: vote };
+          const newVotes = { ...prev.votes, [myWalletId]: vote };
           return { ...prev, votes: newVotes, voteCount: Object.keys(newVotes).length };
         });
 
@@ -817,7 +829,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Local-only fallback for test mode
         setGameState(prev => {
           if (!prev) return null;
-          const newQ: SubmittedQuestion = { id: `test-q-${Date.now()}`, text, submitter: myWalletId, votes: 0 };
+          const newQ: SubmittedQuestion = { id: `test-q-${Date.now()}`, text, submitterId: myWalletId, votes: 0 };
           return { ...prev, submittedQuestions: [...(prev.submittedQuestions ?? []), newQ] };
         });
         return;
@@ -1004,39 +1016,49 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (gameState.buyInAmount > 0 && isHost) {
           try {
             const hostPubkey = new PublicKey(hostWallet);
-            const [gamePDA] = deriveGamePDA(hostPubkey, gameState.roomName);
+            // Escrow PDAs are derived from host + room *code* (must match
+            // create_game seeds); the legacy stub used roomName.
+            const [gamePDA] = USE_ESCROW
+              ? deriveEscrowGamePDA(hostPubkey, gameState.roomCode)
+              : deriveGamePDA(hostPubkey, gameState.roomName);
 
+            // Compute payouts (lamports per wallet) once, up front
+            const payoutsLamports: Record<string, number> = {};
+            let splitPayoutsSol: Record<string, number> | null = null;
             if (gameState.payoutMode === 'winner-takes-all') {
-              // Winner gets entire pot
-              const winnerPubkey = new PublicKey(winnerWallet);
-              const potLamports = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
-              if (USE_ESCROW) {
-                // Trustless: distribute from escrow PDA
-                await distributeEscrow(wallet, gamePDA, winnerPubkey, potLamports);
-              } else {
-                // Direct transfer via MagicBlock with fallback
-                try {
-                  await distributeViaMagicBlock(wallet, winnerPubkey, potLamports);
-                } catch (mbErr) {
-                  console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
-                  await distributeOnChain(wallet, gamePDA, winnerPubkey, potLamports);
-                }
-              }
+              payoutsLamports[winnerWallet] = Math.round(gameState.currentPot * LAMPORTS_PER_SOL);
             } else if (gameState.payoutMode === 'split-pot') {
-              // Split pot: each player gets payout based on honesty scores
-              // Host is pot holder only — exclude from payout calc
+              // Split pot by honesty scores. Host is pot holder only — exclude.
               const playerScores: Record<string, any> = {};
               const allScores = gameState.scores ?? {};
               for (const [w, s] of Object.entries(allScores)) {
                 if (w !== hostWallet) playerScores[w] = s;
               }
               const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
-              const payouts = calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
+              splitPayoutsSol = calculateSplitPayouts(playerScores, gameState.buyInAmount, totalRounds);
+              for (const [w, amountSol] of Object.entries(splitPayoutsSol)) {
+                if (amountSol > 0) payoutsLamports[w] = Math.round(amountSol * LAMPORTS_PER_SOL);
+              }
+            }
 
-              // Send each player their share — host sends ALL pot money out
-              for (const [playerWallet, amountSol] of Object.entries(payouts)) {
-                if (amountSol <= 0) continue;
-                const lamports = Math.round(amountSol * LAMPORTS_PER_SOL);
+            // Hardened path: the settle-game Edge Function verifies the host's
+            // wallet signature + game state, then triggers on-chain distribution
+            // from the escrow PDA via the settlement authority.
+            let settledViaEdge = false;
+            if (USE_ESCROW && USE_EDGE_GAME_AUTH && gid) {
+              try {
+                await settleGameViaEdge({ gameId: gid, action: 'distribute', payouts: payoutsLamports });
+                settledViaEdge = true;
+              } catch (edgeErr) {
+                console.warn('[settle] Edge settlement failed, falling back to host-signed distribute:', edgeErr);
+              }
+            }
+
+            if (!settledViaEdge) {
+              // Host-signed path: distribute directly (escrow program still
+              // enforces host authority on-chain).
+              for (const [playerWallet, lamports] of Object.entries(payoutsLamports)) {
+                if (lamports <= 0) continue;
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
                   if (USE_ESCROW) {
@@ -1045,7 +1067,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                     try {
                       await distributeViaMagicBlock(wallet, playerPubkey, lamports);
                     } catch (mbErr) {
-                      console.warn('[MagicBlock] ER split payout failed, falling back:', mbErr);
+                      console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
                       await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
                     }
                   }
@@ -1053,26 +1075,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
                 }
               }
-
-              // Broadcast split results — computed once, used for broadcast
-              if (channelRef.current) {
-                channelRef.current.send({
-                  type: 'broadcast',
-                  event: 'payout_distributed',
-                  payload: { mode: 'split-pot', payouts },
-                });
-              }
             }
 
-            // Broadcast winner-takes-all payout
-            if (gameState.payoutMode === 'winner-takes-all' && channelRef.current) {
+            // Broadcast payout results to all clients
+            if (channelRef.current) {
               channelRef.current.send({
                 type: 'broadcast',
                 event: 'payout_distributed',
-                payload: {
-                  mode: 'winner-takes-all',
-                  payouts: { [winnerWallet]: gameState.currentPot },
-                },
+                payload: gameState.payoutMode === 'split-pot'
+                  ? { mode: 'split-pot', payouts: splitPayoutsSol ?? {} }
+                  : { mode: 'winner-takes-all', payouts: { [winnerWallet]: gameState.currentPot } },
               });
             }
           } catch (chainErr) {
@@ -1743,6 +1755,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // If host leaves, refund all readied players first
         if (isHost && gs && gs.buyInAmount > 0) {
+          // Escrow: cancel the game on-chain first (program allows refunds in
+          // both Waiting and Cancelled states), so no new joins can land.
+          if (USE_ESCROW && gs.hostWallet) {
+            try {
+              const hostPubkey = new PublicKey(gs.hostWallet);
+              const [gamePDA] = deriveEscrowGamePDA(hostPubkey, gs.roomCode ?? '');
+              await cancelGameEscrow(wallet, gamePDA);
+            } catch (cancelErr) {
+              console.warn('[hostLeave] On-chain cancel failed (game may have started):', cancelErr);
+            }
+          }
           const readiedPlayers = gs.players.filter(
             p => p.isReady && p.id !== gs.hostWallet
           );
@@ -1825,9 +1848,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Refund the player's buy-in
     if (gs.buyInAmount > 0) {
       try {
-        const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         const playerPubkey = new PublicKey(playerWallet);
-        await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
+        if (USE_ESCROW && gs.hostWallet) {
+          const hostPubkey = new PublicKey(gs.hostWallet);
+          const [gamePDA] = deriveEscrowGamePDA(hostPubkey, gs.roomCode ?? '');
+          await refundPlayerEscrow(wallet, gamePDA, playerPubkey);
+        } else {
+          const lamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
+          await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
+        }
       } catch (err) {
         console.warn('[approveLeave] Refund failed:', err);
       }

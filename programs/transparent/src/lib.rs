@@ -6,32 +6,52 @@ declare_id!("2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9");
 /// Transparent Escrow Program
 ///
 /// Trustless pot management for the Transparent party game.
-/// All buy-ins go to a PDA escrow — no player holds funds.
+/// All buy-ins go to a program-owned escrow PDA — no player holds funds.
 /// The host can distribute winnings or anyone can trigger
 /// auto-refund after the game expires.
+///
+/// The escrow is a PROGRAM-OWNED account (not a System account). Buy-ins are
+/// credited via System transfer; payouts/refunds move lamports by direct
+/// debit/credit, which is legal because the program owns the escrow. The
+/// escrow's own rent-exempt reserve is never counted in `total_pot` and is
+/// never paid out, so partial payouts can never drop the account below the
+/// rent-exempt minimum (the failure mode of the old System-owned design).
 
 #[program]
 pub mod transparent {
     use super::*;
 
-    /// Host creates a game. Initializes the escrow PDA.
+    /// Host creates a game. Initializes the program-owned escrow PDA.
+    /// `settlement_authority` (optional; pass Pubkey::default() to disable)
+    /// is a backend key allowed to trigger `distribute` on the host's behalf
+    /// — used by the settlement Edge Function. It can ONLY pay out from the
+    /// escrow to recipients; it can never change the game or withdraw to itself
+    /// unless the host names it as recipient.
     pub fn create_game(
         ctx: Context<CreateGame>,
         room_code: String,
         buy_in_lamports: u64,
         max_players: u8,
         expiry_seconds: i64,
+        settlement_authority: Pubkey,
     ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+
+        let escrow = &mut ctx.accounts.escrow;
+        escrow.game = ctx.accounts.game.key();
+        escrow.bump = ctx.bumps.escrow;
+
         let game = &mut ctx.accounts.game;
         game.host = ctx.accounts.host.key();
+        game.settlement_authority = settlement_authority;
         game.room_code = room_code;
         game.buy_in_lamports = buy_in_lamports;
         game.max_players = max_players;
         game.player_count = 0;
         game.total_pot = 0;
         game.status = GameStatus::Waiting;
-        game.created_at = Clock::get()?.unix_timestamp;
-        game.expires_at = Clock::get()?.unix_timestamp + expiry_seconds;
+        game.created_at = now;
+        game.expires_at = now + expiry_seconds;
         game.bump = ctx.bumps.game;
         Ok(())
     }
@@ -46,7 +66,9 @@ pub mod transparent {
         let player_entry = &mut ctx.accounts.player_entry;
         require!(!player_entry.joined, TransparentError::AlreadyJoined);
 
-        // Transfer buy-in from player to escrow PDA
+        // Credit buy-in to the escrow PDA via System transfer. Crediting a
+        // program-owned account this way is allowed (the source is the player,
+        // a System account). This adds on top of the escrow's rent reserve.
         if game.buy_in_lamports > 0 {
             system_program::transfer(
                 CpiContext::new(
@@ -68,7 +90,10 @@ pub mod transparent {
         player_entry.bump = ctx.bumps.player_entry;
 
         game.player_count += 1;
-        game.total_pot += game.buy_in_lamports;
+        game.total_pot = game
+            .total_pot
+            .checked_add(game.buy_in_lamports)
+            .ok_or(TransparentError::MathOverflow)?;
 
         Ok(())
     }
@@ -84,39 +109,36 @@ pub mod transparent {
         Ok(())
     }
 
-    /// Host distributes winnings to a specific player (winner-takes-all).
-    /// Can be called multiple times for split-pot (once per player).
-    pub fn distribute(
-        ctx: Context<Distribute>,
-        amount_lamports: u64,
-    ) -> Result<()> {
+    /// Host (or the game's settlement authority) distributes winnings to a
+    /// specific player (winner-takes-all). Can be called multiple times for
+    /// split-pot (once per player).
+    pub fn distribute(ctx: Context<Distribute>, amount_lamports: u64) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(
             game.status == GameStatus::Playing || game.status == GameStatus::Distributing,
             TransparentError::GameNotActive
         );
-        require!(game.host == ctx.accounts.host.key(), TransparentError::NotHost);
+        let signer = ctx.accounts.authority.key();
+        let is_settlement_authority = game.settlement_authority != Pubkey::default()
+            && signer == game.settlement_authority;
+        require!(
+            signer == game.host || is_settlement_authority,
+            TransparentError::NotHost
+        );
         require!(amount_lamports <= game.total_pot, TransparentError::InsufficientPot);
 
         game.status = GameStatus::Distributing;
-
-        // Transfer from escrow PDA to winner
-        let seeds = &[
-            b"escrow",
-            game.key().as_ref(),
-            &[ctx.bumps.escrow],
-        ];
-        let signer_seeds = &[&seeds[..]];
-
-        **ctx.accounts.escrow.try_borrow_mut_lamports()? -= amount_lamports;
-        **ctx.accounts.recipient.try_borrow_mut_lamports()? += amount_lamports;
-
         game.total_pot -= amount_lamports;
 
-        // If pot is empty, game is over
         if game.total_pot == 0 {
             game.status = GameStatus::Completed;
         }
+
+        move_from_escrow(
+            &ctx.accounts.escrow.to_account_info(),
+            &ctx.accounts.recipient.to_account_info(),
+            amount_lamports,
+        )?;
 
         Ok(())
     }
@@ -130,32 +152,43 @@ pub mod transparent {
     }
 
     /// Refund a specific player (host-initiated, e.g. player wants to leave).
+    /// Allowed while waiting AND after cancellation, so a host can cancel the
+    /// game first and then refund every readied player.
     pub fn refund_player(ctx: Context<RefundPlayer>) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(game.host == ctx.accounts.host.key(), TransparentError::NotHost);
-        require!(game.status == GameStatus::Waiting, TransparentError::GameNotWaiting);
+        require!(
+            game.status == GameStatus::Waiting || game.status == GameStatus::Cancelled,
+            TransparentError::GameNotWaiting
+        );
 
-        let player_entry = &mut ctx.accounts.player_entry;
-        require!(player_entry.joined, TransparentError::NotJoined);
-        require!(!player_entry.refunded, TransparentError::AlreadyRefunded);
-
-        if game.buy_in_lamports > 0 {
-            **ctx.accounts.escrow.try_borrow_mut_lamports()? -= game.buy_in_lamports;
-            **ctx.accounts.player.try_borrow_mut_lamports()? += game.buy_in_lamports;
+        let buy_in = game.buy_in_lamports;
+        {
+            let player_entry = &mut ctx.accounts.player_entry;
+            require!(player_entry.joined, TransparentError::NotJoined);
+            require!(!player_entry.refunded, TransparentError::AlreadyRefunded);
+            player_entry.refunded = true;
         }
 
-        player_entry.refunded = true;
         game.player_count -= 1;
-        game.total_pot -= game.buy_in_lamports;
+        game.total_pot -= buy_in;
+
+        if buy_in > 0 {
+            move_from_escrow(
+                &ctx.accounts.escrow.to_account_info(),
+                &ctx.accounts.player.to_account_info(),
+                buy_in,
+            )?;
+        }
 
         Ok(())
     }
 
-    /// Anyone can call this after the game expires to refund ALL players.
+    /// Anyone can call this after the game expires to refund a player.
     /// This is the trustless guarantee — if the host ghosts, funds are safe.
     pub fn refund_all_expired(ctx: Context<RefundExpired>) -> Result<()> {
-        let game = &mut ctx.accounts.game;
         let clock = Clock::get()?;
+        let game = &mut ctx.accounts.game;
 
         require!(
             clock.unix_timestamp > game.expires_at,
@@ -166,26 +199,32 @@ pub mod transparent {
             TransparentError::GameAlreadyCompleted
         );
 
-        let player_entry = &mut ctx.accounts.player_entry;
-        require!(player_entry.joined, TransparentError::NotJoined);
-        require!(!player_entry.refunded, TransparentError::AlreadyRefunded);
-
-        if game.buy_in_lamports > 0 {
-            **ctx.accounts.escrow.try_borrow_mut_lamports()? -= game.buy_in_lamports;
-            **ctx.accounts.player.try_borrow_mut_lamports()? += game.buy_in_lamports;
+        let buy_in = game.buy_in_lamports;
+        {
+            let player_entry = &mut ctx.accounts.player_entry;
+            require!(player_entry.joined, TransparentError::NotJoined);
+            require!(!player_entry.refunded, TransparentError::AlreadyRefunded);
+            player_entry.refunded = true;
         }
 
-        player_entry.refunded = true;
-        game.total_pot -= game.buy_in_lamports;
+        game.total_pot -= buy_in;
 
         if game.total_pot == 0 {
             game.status = GameStatus::Completed;
         }
 
+        if buy_in > 0 {
+            move_from_escrow(
+                &ctx.accounts.escrow.to_account_info(),
+                &ctx.accounts.player.to_account_info(),
+                buy_in,
+            )?;
+        }
+
         Ok(())
     }
 
-    /// Host cancels the game — refunds everyone automatically.
+    /// Host cancels the game — marks it cancelled so refunds can proceed.
     pub fn cancel_game(ctx: Context<CancelGame>) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(game.host == ctx.accounts.host.key(), TransparentError::NotHost);
@@ -195,10 +234,28 @@ pub mod transparent {
         );
 
         game.status = GameStatus::Cancelled;
-        // Individual refunds still need to be called per player
-        // (or use refund_all_expired after expiry)
         Ok(())
     }
+}
+
+/// Move lamports out of the program-owned escrow by direct debit/credit.
+/// Legal because the program owns the escrow account. The escrow's rent-exempt
+/// reserve is never part of `total_pot`, so callers only ever pass amounts that
+/// leave the reserve intact — but we still assert it as a hard invariant.
+fn move_from_escrow(escrow: &AccountInfo, dest: &AccountInfo, amount: u64) -> Result<()> {
+    let reserve = Rent::get()?.minimum_balance(escrow.data_len());
+    let escrow_balance = escrow.lamports();
+    require!(
+        escrow_balance
+            .checked_sub(amount)
+            .ok_or(TransparentError::MathOverflow)?
+            >= reserve,
+        TransparentError::InsufficientPot
+    );
+
+    **escrow.try_borrow_mut_lamports()? -= amount;
+    **dest.try_borrow_mut_lamports()? += amount;
+    Ok(())
 }
 
 // ── Accounts ─────────────────────────────────────────────
@@ -215,13 +272,15 @@ pub struct CreateGame<'info> {
     )]
     pub game: Account<'info, GameState>,
 
-    /// CHECK: Escrow PDA that holds the pot. Just a system account.
+    /// Program-owned escrow PDA that holds the pot. Rent-exempt by its own data.
     #[account(
-        mut,
+        init,
+        payer = host,
+        space = 8 + Escrow::SPACE,
         seeds = [b"escrow", game.key().as_ref()],
         bump
     )]
-    pub escrow: SystemAccount<'info>,
+    pub escrow: Account<'info, Escrow>,
 
     #[account(mut)]
     pub host: Signer<'info>,
@@ -243,13 +302,12 @@ pub struct JoinGame<'info> {
     )]
     pub player_entry: Account<'info, PlayerEntry>,
 
-    /// CHECK: Escrow PDA
     #[account(
         mut,
         seeds = [b"escrow", game.key().as_ref()],
-        bump
+        bump = escrow.bump
     )]
-    pub escrow: SystemAccount<'info>,
+    pub escrow: Account<'info, Escrow>,
 
     #[account(mut)]
     pub player: Signer<'info>,
@@ -270,19 +328,19 @@ pub struct Distribute<'info> {
     #[account(mut)]
     pub game: Account<'info, GameState>,
 
-    /// CHECK: Escrow PDA
     #[account(
         mut,
         seeds = [b"escrow", game.key().as_ref()],
-        bump
+        bump = escrow.bump
     )]
-    pub escrow: SystemAccount<'info>,
+    pub escrow: Account<'info, Escrow>,
 
-    /// CHECK: Winner/recipient
+    /// CHECK: Winner/recipient — receives lamports only.
     #[account(mut)]
     pub recipient: UncheckedAccount<'info>,
 
-    pub host: Signer<'info>,
+    /// Host or the game's settlement authority.
+    pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -307,15 +365,14 @@ pub struct RefundPlayer<'info> {
     )]
     pub player_entry: Account<'info, PlayerEntry>,
 
-    /// CHECK: Escrow PDA
     #[account(
         mut,
         seeds = [b"escrow", game.key().as_ref()],
-        bump
+        bump = escrow.bump
     )]
-    pub escrow: SystemAccount<'info>,
+    pub escrow: Account<'info, Escrow>,
 
-    /// CHECK: Player to refund
+    /// CHECK: Player to refund — receives lamports only.
     #[account(mut)]
     pub player: UncheckedAccount<'info>,
 
@@ -336,19 +393,18 @@ pub struct RefundExpired<'info> {
     )]
     pub player_entry: Account<'info, PlayerEntry>,
 
-    /// CHECK: Escrow PDA
     #[account(
         mut,
         seeds = [b"escrow", game.key().as_ref()],
-        bump
+        bump = escrow.bump
     )]
-    pub escrow: SystemAccount<'info>,
+    pub escrow: Account<'info, Escrow>,
 
-    /// CHECK: Player to refund
+    /// CHECK: Player to refund — receives lamports only.
     #[account(mut)]
     pub player: UncheckedAccount<'info>,
 
-    /// Anyone can call this — no signer restriction
+    /// Anyone can call this — no signer restriction beyond paying fees.
     pub caller: Signer<'info>,
 
     pub system_program: Program<'info, System>,
@@ -366,20 +422,31 @@ pub struct CancelGame<'info> {
 
 #[account]
 pub struct GameState {
-    pub host: Pubkey,            // 32
-    pub room_code: String,       // 4 + 10 (max)
-    pub buy_in_lamports: u64,    // 8
-    pub max_players: u8,         // 1
-    pub player_count: u8,        // 1
-    pub total_pot: u64,          // 8
-    pub status: GameStatus,      // 1
-    pub created_at: i64,         // 8
-    pub expires_at: i64,         // 8
-    pub bump: u8,                // 1
+    pub host: Pubkey,                 // 32
+    pub room_code: String,            // 4 + 10 (max)
+    pub buy_in_lamports: u64,         // 8
+    pub max_players: u8,              // 1
+    pub player_count: u8,             // 1
+    pub total_pot: u64,               // 8
+    pub status: GameStatus,           // 1
+    pub created_at: i64,              // 8
+    pub expires_at: i64,              // 8
+    pub bump: u8,                     // 1
+    pub settlement_authority: Pubkey, // 32 (Pubkey::default() = host-only)
 }
 
 impl GameState {
-    pub const SPACE: usize = 32 + (4 + 10) + 8 + 1 + 1 + 8 + 1 + 8 + 8 + 1 + 32; // + padding
+    pub const SPACE: usize = 32 + (4 + 10) + 8 + 1 + 1 + 8 + 1 + 8 + 8 + 1 + 32 + 32; // + padding
+}
+
+#[account]
+pub struct Escrow {
+    pub game: Pubkey,  // 32
+    pub bump: u8,      // 1
+}
+
+impl Escrow {
+    pub const SPACE: usize = 32 + 1 + 7; // + padding
 }
 
 #[account]
@@ -431,4 +498,6 @@ pub enum TransparentError {
     GameNotExpired,
     #[msg("Game is already completed")]
     GameAlreadyCompleted,
+    #[msg("Arithmetic overflow")]
+    MathOverflow,
 }

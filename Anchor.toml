@@ -1,9 +1,11 @@
+[toolchain]
+
 [features]
-seeds = false
+resolution = true
 skip-lint = false
 
 [programs.devnet]
-transparent = "TransPARENTEscr0w11111111111111111111111111"
+transparent = "2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9"
 
 [registry]
 url = "https://api.apr.dev"

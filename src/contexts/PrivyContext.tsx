@@ -8,6 +8,7 @@ import {
 import {
   useWallets as useSolanaWallets,
   useSignAndSendTransaction,
+  useSignMessage as useSolanaSignMessage,
 } from '@privy-io/react-auth/solana';
 import { PublicKey, Transaction, Connection } from '@solana/web3.js';
 import { createSolanaRpc, createSolanaRpcSubscriptions } from '@solana/kit';
@@ -28,6 +29,7 @@ export interface PrivyWallet {
   publicKey: PublicKey | null;
   address: string | null;
   sendTransaction: ((tx: Transaction) => Promise<string>) | null;
+  signMessage: ((message: Uint8Array) => Promise<Uint8Array>) | null;
   connected: boolean;
   walletReady: boolean;
   walletType: 'embedded' | 'external' | null;
@@ -47,6 +49,7 @@ function WalletInner({ children }: { children: ReactNode }) {
 
   const { wallets } = useSolanaWallets();
   const { signAndSendTransaction } = useSignAndSendTransaction();
+  const { signMessage: privySignMessage } = useSolanaSignMessage();
   const [walletStabilized, setWalletStabilized] = useState(false);
   const walletStabilizedRef = useRef(false); // mirrors walletStabilized state for use inside async closures
   const walletWarmupRef = useRef<Promise<void> | null>(null);
@@ -54,7 +57,7 @@ function WalletInner({ children }: { children: ReactNode }) {
   const activeWallet = useMemo(() => {
     if (!wallets.length) return null;
     // Prefer the Privy embedded wallet
-    return wallets.find(w => w.walletClientType === 'privy')
+    return wallets.find(w => (w as { walletClientType?: string }).walletClientType === 'privy')
       ?? wallets[0];
   }, [wallets]);
 
@@ -66,7 +69,7 @@ function WalletInner({ children }: { children: ReactNode }) {
 
   const walletType = useMemo((): 'embedded' | 'external' | null => {
     if (!activeWallet) return null;
-    return activeWallet.walletClientType === 'privy' ? 'embedded' : 'external';
+    return (activeWallet as { walletClientType?: string }).walletClientType === 'privy' ? 'embedded' : 'external';
   }, [activeWallet]);
 
   useEffect(() => {
@@ -175,7 +178,13 @@ function WalletInner({ children }: { children: ReactNode }) {
             chain,
           } as any);
 
-          return result.signature;
+          // Privy v3 returns the signature as a base58 string at runtime, but
+          // the SDK types declare Uint8Array. Normalise to a base58 string so
+          // downstream getSignatureStatus() calls work in both cases.
+          const sig = (result as { signature: unknown }).signature;
+          if (typeof sig === 'string') return sig;
+          const bs58 = ((await import('bs58')) as { default: { encode: (b: Uint8Array) => string } }).default;
+          return bs58.encode(sig as Uint8Array);
         } catch (err) {
           lastError = err;
         }
@@ -186,6 +195,19 @@ function WalletInner({ children }: { children: ReactNode }) {
         : new Error('Failed to send Solana transaction');
     };
   }, [activeWallet, publicKey, signAndSendTransaction]);
+
+  // Bridge: sign an arbitrary message with the active Solana wallet (ed25519).
+  // Used to prove wallet identity to the Supabase Edge Functions.
+  const signMessage = useMemo(() => {
+    if (!activeWallet || !publicKey) return null;
+    return async (message: Uint8Array): Promise<Uint8Array> => {
+      const { signature } = await privySignMessage({
+        message,
+        wallet: activeWallet,
+      } as any);
+      return signature;
+    };
+  }, [activeWallet, publicKey, privySignMessage]);
 
   const displayName = useMemo(() => {
     if (!ready || !authenticated) return 'Anon';
@@ -204,6 +226,7 @@ function WalletInner({ children }: { children: ReactNode }) {
     publicKey,
     address: activeWallet?.address ?? null,
     sendTransaction,
+    signMessage,
     connected: authenticated,
     walletReady: !!publicKey && !!sendTransaction && walletStabilized,
     walletType,
@@ -212,7 +235,7 @@ function WalletInner({ children }: { children: ReactNode }) {
     user,
     displayName,
     connection,
-  }), [publicKey, activeWallet?.address, sendTransaction, authenticated, walletStabilized, walletType, login, logout, user, displayName]);
+  }), [publicKey, activeWallet?.address, sendTransaction, signMessage, authenticated, walletStabilized, walletType, login, logout, user, displayName]);
 
   return (
     <PrivyWalletContext.Provider value={value}>
@@ -239,6 +262,9 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
           },
         },
         solana: {
+          // Cast: @solana/kit's generic RPC type doesn't structurally match
+          // Privy's test-cluster RPC index signature, but the runtime value is
+          // correct for both devnet and mainnet-beta.
           rpcs: {
             'solana:devnet': {
               rpc: createSolanaRpc(SOLANA_RPC),
@@ -248,7 +274,7 @@ export const PrivyWalletProvider: React.FC<{ children: ReactNode }> = ({ childre
               rpc: createSolanaRpc(SOLANA_RPC),
               rpcSubscriptions: createSolanaRpcSubscriptions(wssUrl),
             },
-          },
+          } as any,
         },
       }}
     >
