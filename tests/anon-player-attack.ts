@@ -76,14 +76,25 @@ async function main() {
   );
 
   async function asAnon(sql: string, params: unknown[] = []) {
-    await db.query(`set local role anon; set local request.jwt.claim.role = 'anon'`);
     try {
+      await db.query("BEGIN");
+      await db.query("SET LOCAL ROLE anon");
+      await db.query("SET LOCAL request.jwt.claim.role = 'anon'");
+
+      const { rows: [roleCheck] } = await db.query(
+        `SELECT current_user AS cu, auth.role() AS ar`,
+      );
+      if (roleCheck.cu !== "anon" || roleCheck.ar !== "anon") {
+        await db.query("ROLLBACK");
+        return { ok: false, err: `role assertion failed: cu=${roleCheck.cu}, ar=${roleCheck.ar}`, rowCount: 0, rows: [] };
+      }
+
       const r = await db.query(sql, params);
+      await db.query("ROLLBACK");
       return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows };
     } catch (e: any) {
+      try { await db.query("ROLLBACK"); } catch {}
       return { ok: false, err: e.message, rowCount: 0, rows: [] };
-    } finally {
-      await db.query(`reset role; reset request.jwt.claim.role`);
     }
   }
 

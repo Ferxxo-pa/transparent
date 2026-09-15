@@ -1,7 +1,13 @@
-# Transparent Security Review — 2026-09-15 (rev 2)
+# Transparent Security Review — 2026-09-15 (rev 3)
 
 Read-only review of `main` (dacc323) + security branch `security/anon-player-vulnerability-2026-09-15`.
 No production policy changes applied.
+
+## Rev 3 corrections (from independent Ez review of c2d3693)
+
+1. **INSERT path ungated** — proposed migration only blocked UPDATE/DELETE. Anon could INSERT a player with `has_paid=true, is_ready=true` via the existing INSERT policy. Fixed: INSERT policy now enforces `has_paid = false AND is_ready = false`.
+2. **Test role assertion failure** — `SET LOCAL` without `BEGIN` means the role reset before the action query. Tests were running as `postgres`, not `anon`. Fixed: all `as()` helpers now wrap in `BEGIN/ROLLBACK` with explicit `current_user`/`auth.role()` assertion before each action.
+3. **GRANT EXECUTE ON ALL FUNCTIONS** — test setup granted anon execute on all functions including the service_role-only RPCs, undoing the privilege boundary. Fixed: test setup now grants only table access, not function execute.
 
 ## Critical: anon player manipulation (DB)
 
@@ -103,18 +109,24 @@ Current client calls that **will break** when anon UPDATE/DELETE is blocked:
 
 Applying the migration before step 3 **will break the live app**.
 
-## Test coverage (rev 2)
+## Test coverage (rev 3)
 
-**`tests/anon-player-attack.ts`** — 7 tests, all succeed on current schema (proves vulnerabilities)
+**`tests/anon-player-attack.ts`** — 7 tests, all succeed on current schema (proves vulnerabilities). Now uses proper `BEGIN/SET LOCAL/ROLLBACK` with role assertions (was running as postgres in rev 1-2).
 
-**`tests/anon-player-fixed.ts`** — 17 tests (was 12, now includes):
-- Tests 1-11: original anon-block + service_role-allow + predictions
-- Test 12: **Cross-player denial** — RPC with wrong wallet does not affect victim
-- Test 13: **Cross-player denial** — leave RPC with wrong wallet does not remove bystander  
-- Test 14: **Cross-room isolation** — RPC on game A does not affect game B player (same wallet, different game_id)
-- Test 15: **Cross-room isolation** — leave RPC on game A does not remove game B player
-- Test 16: Victim row integrity check
-- Test 17: Active game prediction still works (positive path)
+**`tests/anon-player-fixed.ts`** — 23 tests (was 17), all with transaction-wrapped role assertions:
+- Tests 1-4: anon UPDATE/DELETE blocked
+- Tests 5-7: **NEW** — forged INSERT blocked (has_paid=true, is_ready=true, both)
+- Test 8: **NEW** — legitimate join allowed (has_paid=false, is_ready=false, waiting game)
+- Test 9: **NEW** — INSERT into playing game blocked
+- Tests 10-11: predictions (gameover blocked, active allowed)
+- Tests 12-15: service_role positive paths (display_name RPC, has_paid/is_ready, leave RPC, leave on playing refused)
+- Tests 16-17: anon RPC privilege boundary (cannot call either RPC)
+- Tests 18-19: cross-player denial (wrong wallet = no-op)
+- Tests 20-21: cross-room isolation (game A RPC cannot affect game B)
+- Test 22: **NEW** — duplicate join with same wallet blocked
+- Test 23: victim row integrity check
+
+**Test methodology fix:** `GRANT EXECUTE ON ALL FUNCTIONS` removed from test setup. Only table-level grants issued. RPC privilege boundary tests (16-17) now actually test the revocation.
 
 **Missing test coverage** (requires Edge Functions to exist):
 - Wallet signature verification (ed25519 check in Edge Function)

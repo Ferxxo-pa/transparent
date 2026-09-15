@@ -60,6 +60,19 @@ begin
 end;
 $$;
 
+-- ── Gate INSERT: anon cannot forge has_paid/is_ready ──────────
+
+drop policy if exists "anon can insert players" on public.players;
+create policy "anon can insert players" on public.players
+  for insert with check (
+    exists (
+      select 1 from public.games g
+      where g.id = game_id and g.status = 'waiting'
+    )
+    and has_paid = false
+    and is_ready = false
+  );
+
 -- ── Replace wide-open UPDATE with scoped policy ─────────────
 
 drop policy if exists "anon can update players" on public.players;
