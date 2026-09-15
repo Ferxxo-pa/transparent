@@ -12,7 +12,7 @@ create table if not exists public.games (
   host_wallet             text not null,
   buy_in_lamports         bigint not null default 0,
   status                  text not null default 'waiting'
-                            check (status in ('waiting','playing','voting','gameover')),
+                            check (status in ('waiting','playing','voting','gameover','cancelled')),
   current_question_index  int not null default 0,
   current_hot_seat_player text,
   question_mode           text not null default 'classic'
@@ -29,6 +29,7 @@ create table if not exists public.players (
   wallet_address text not null,
   display_name   text not null default 'Player',
   has_paid       boolean not null default false,
+  is_ready       boolean not null default false,
   joined_at      timestamptz not null default now(),
   unique(game_id, wallet_address)
 );

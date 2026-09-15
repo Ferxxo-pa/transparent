@@ -32,6 +32,10 @@ async function main() {
     create schema if not exists auth;
     create or replace function auth.role() returns text language sql stable
       as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
+    -- Test roles must be able to resolve auth.role(). Without USAGE on the auth
+    -- schema, calling auth.role() raises 42501 (permission denied) — which the
+    -- harness must treat as an infra failure, NOT a silently "denied" action.
+    grant usage on schema auth to anon, authenticated, service_role;
     do $$ begin
       if not exists (select from pg_publication where pubname = 'supabase_realtime') then
         create publication supabase_realtime;
@@ -89,32 +93,57 @@ async function main() {
    * auth.role() match the requested role before executing.
    */
   async function as(role: "anon" | "service_role", sql: string, params: unknown[] = []) {
+    await db.query("BEGIN");
     try {
-      await db.query("BEGIN");
       await db.query(`SET LOCAL ROLE ${role}`);
       await db.query(`SET LOCAL request.jwt.claim.role = '${role}'`);
 
-      // Assert role is actually applied
-      const { rows: [roleCheck] } = await db.query(
-        `SELECT current_user AS cu, auth.role() AS ar`,
-      );
+      // Assert the role is actually applied. A failure HERE (e.g. 42501 on
+      // auth.role() because the role lacks USAGE on schema auth) is an infra
+      // fault and MUST abort the whole test run — it must never be mistaken for
+      // a policy "denial" that a later `rowCount === 0` assertion would pass.
+      let roleCheck: { cu: string; ar: string };
+      try {
+        const { rows } = await db.query(`SELECT current_user AS cu, auth.role() AS ar`);
+        roleCheck = rows[0];
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        throw new Error(
+          `FATAL: role assertion query failed for '${role}' (${e.code ?? "?"}: ${e.message}). ` +
+          `This means the test harness cannot resolve current_user/auth.role() — ` +
+          `fix the bootstrap (GRANT USAGE ON SCHEMA auth) before trusting any result.`,
+        );
+      }
       if (roleCheck.cu !== role || roleCheck.ar !== role) {
         await db.query("ROLLBACK");
-        return {
-          ok: false,
-          err: `role assertion failed: current_user=${roleCheck.cu}, auth.role()=${roleCheck.ar}, expected ${role}`,
-          rowCount: 0,
-          rows: [],
-        };
+        throw new Error(
+          `FATAL: role not applied — current_user=${roleCheck.cu}, auth.role()=${roleCheck.ar}, expected ${role}`,
+        );
       }
 
-      const r = await db.query(sql, params);
-      await db.query("ROLLBACK");
-      return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows, err: "" };
+      // From here on, errors are genuine action outcomes (e.g. RLS denial).
+      try {
+        const r = await db.query(sql, params);
+        await db.query("ROLLBACK");
+        return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows, err: "" };
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      }
     } catch (e: any) {
       try { await db.query("ROLLBACK"); } catch {}
-      return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      throw e; // propagate FATAL infra faults
     }
+  }
+
+  // ── Preflight: prove the role machinery works before any policy test ──
+  {
+    const anonCheck = await as("anon", "SELECT 1 AS ok");
+    const svcCheck = await as("service_role", "SELECT 1 AS ok");
+    if (!anonCheck.ok || !svcCheck.ok) {
+      throw new Error("FATAL: preflight role checks did not execute cleanly");
+    }
+    console.log("preflight: anon + service_role role assertions OK\n");
   }
 
   console.log("\n=== FIX VERIFICATION: anon player attacks should be BLOCKED ===\n");
@@ -364,6 +393,157 @@ async function main() {
   report(!r.ok,
     "BLOCKED: cannot re-join with same wallet (duplicate)",
     r.err);
+
+  // ── RPC behavior: lifecycle fixes 1–4 (run as service_role, rolled back) ──
+
+  console.log("\n=== RPC behavior (fixes 1–4) ===\n");
+
+  async function svcTx<T>(fn: () => Promise<T>): Promise<T> {
+    await db.query("BEGIN");
+    await db.query("SET LOCAL ROLE service_role");
+    await db.query("SET LOCAL request.jwt.claim.role = 'service_role'");
+    try {
+      return await fn();
+    } finally {
+      await db.query("ROLLBACK");
+    }
+  }
+
+  // FIX 1: join on reconnect preserves has_paid/is_ready (no reset to false)
+  await svcTx(async () => {
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid, is_ready)
+       VALUES ($1, 'RECONNECT', 'Recon', true, true)`,
+      [waitGame.id],
+    );
+    const { rows: [row] } = await db.query(
+      `SELECT * FROM join_game_player($1, 'RECONNECT', 'Recon')`,
+      [waitGame.id],
+    );
+    report(
+      row.has_paid === true && row.is_ready === true,
+      "FIX1: join on reconnect preserves has_paid/is_ready (no reset)",
+      JSON.stringify({ has_paid: row.has_paid, is_ready: row.is_ready }),
+    );
+  });
+
+  // FIX 2: host leave deletes host AND cancels the game atomically
+  await svcTx(async () => {
+    const { rows: [hg] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round)
+       VALUES ('HL01', 'HOST_HL', 'waiting', 0) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name) VALUES ($1, 'HOST_HL', 'Host')`,
+      [hg.id],
+    );
+    const { rows: [res] } = await db.query(
+      `SELECT leave_game_player($1, 'HOST_HL', NULL) AS host_left`,
+      [hg.id],
+    );
+    const { rows: [g2] } = await db.query(`SELECT status FROM games WHERE id=$1`, [hg.id]);
+    const { rows: remaining } = await db.query(`SELECT 1 FROM players WHERE game_id=$1`, [hg.id]);
+    report(
+      res.host_left === true && g2.status === "cancelled" && remaining.length === 0,
+      "FIX2: host leave deletes host AND cancels game in one transaction",
+      `host_left=${res.host_left}, status=${g2.status}, remaining=${remaining.length}`,
+    );
+  });
+
+  // FIX 2b: a non-host leave never cancels the game
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round)
+       VALUES ('HL02', 'HOST_HL2', 'waiting', 0) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name) VALUES ($1, 'PLAYER_X', 'X')`,
+      [g.id],
+    );
+    const { rows: [res] } = await db.query(
+      `SELECT leave_game_player($1, 'PLAYER_X', NULL) AS host_left`,
+      [g.id],
+    );
+    const { rows: [g2] } = await db.query(`SELECT status FROM games WHERE id=$1`, [g.id]);
+    report(
+      res.host_left === false && g2.status === "waiting",
+      "FIX2b: non-host leave does not cancel the game",
+      `host_left=${res.host_left}, status=${g2.status}`,
+    );
+  });
+
+  // FIX 4: mark_player_paid is the only false→true path, and is idempotent
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('PAY01', 'HOST_PAY', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'PAYER', 'Payer', false)`,
+      [g.id],
+    );
+    const { rows: [p1] } = await db.query(`SELECT * FROM mark_player_paid($1, 'PAYER')`, [g.id]);
+    const { rows: [p2] } = await db.query(`SELECT * FROM mark_player_paid($1, 'PAYER')`, [g.id]);
+    report(
+      p1.has_paid === true && p2.has_paid === true,
+      "FIX4: mark_player_paid flips has_paid false→true and is idempotent",
+    );
+  });
+
+  // FIX 3/4: ready-up is gated on payment for paid games
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('RDY01', 'HOST_RDY', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'RD', 'RD', false)`,
+      [g.id],
+    );
+    let denied = false;
+    await db.query("SAVEPOINT before_ready");
+    try {
+      await db.query(`SELECT ready_up_player($1, 'RD')`, [g.id]);
+    } catch (e: any) {
+      denied = /payment required/.test(e.message);
+    }
+    // Recover the transaction after the expected exception.
+    await db.query("ROLLBACK TO SAVEPOINT before_ready");
+    await db.query(`SELECT mark_player_paid($1, 'RD')`, [g.id]);
+    const { rows: [p] } = await db.query(`SELECT * FROM ready_up_player($1, 'RD')`, [g.id]);
+    report(
+      denied && p.is_ready === true,
+      "FIX3/4: ready-up blocked until paid, then succeeds after payment",
+    );
+  });
+
+  // FIX 5 (replay guard table): duplicate token hash is rejected
+  await svcTx(async () => {
+    await db.query(
+      `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('HASH_A', $1, 'leave')`,
+      [waitGame.id],
+    );
+    let rejected = false;
+    try {
+      await db.query(
+        `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('HASH_A', $1, 'leave')`,
+        [waitGame.id],
+      );
+    } catch (e: any) {
+      rejected = e.code === "23505";
+    }
+    report(rejected, "FIX5: replayed destructive token (same hash) is rejected");
+  });
+
+  // Anon cannot call the new lifecycle RPCs (defense in depth)
+  {
+    const r1 = await as("anon", `SELECT join_game_player($1, 'HACKER', 'H')`, [waitGame.id]);
+    report(!r1.ok, "BLOCKED: anon cannot call join_game_player", r1.err);
+    const r2 = await as("anon", `SELECT leave_game_player($1, 'HACKER', NULL)`, [waitGame.id]);
+    report(!r2.ok, "BLOCKED: anon cannot call leave_game_player", r2.err);
+    const r3 = await as("anon", `SELECT mark_player_paid($1, 'HACKER')`, [waitGame.id]);
+    report(!r3.ok, "BLOCKED: anon cannot call mark_player_paid", r3.err);
+  }
 
   // ── Final integrity check ──
 

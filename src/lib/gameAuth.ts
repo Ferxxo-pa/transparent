@@ -6,9 +6,12 @@
  * (phase advance, settlement) go through Edge Functions that verify an ed25519
  * signature from the caller's wallet, then act with the service role.
  *
- * The token is a signed message:
- *   transparent-auth:v1:<gameId>:<walletBase58>:<issuedAtMs>:<expiresAtMs>
- * It is created once per game per session and cached — no per-action signing.
+ * The token is a signed message. Two formats:
+ *   v1 (game-scoped):   transparent-auth:v1:<gameId>:<wallet>:<issuedAt>:<expiresAt>
+ *   v2 (action-scoped): transparent-auth:v2:<gameId>:<action>:<wallet>:<issuedAt>:<expiresAt>
+ * Game-scoped tokens are cached per game (advance-phase / settle-game). Action
+ * tokens bind to a specific endpoint. Destructive actions (leave) mint a fresh,
+ * single-use token every call so the server's replay guard can reject reuse.
  */
 
 import { PublicKey } from '@solana/web3.js';
@@ -54,11 +57,16 @@ export async function getGameAuthToken(gameId: string): Promise<GameAuthToken> {
     return cached.token;
   }
 
+  return mintToken(gameId);
+}
+
+/** Low-level: sign a v1 (game-scoped) token and cache it. */
+async function mintToken(gameId: string): Promise<GameAuthToken> {
   const issuedAt = Date.now();
   const expiresAt = issuedAt + TOKEN_TTL_MS;
-  const wallet = signer.publicKey.toBase58();
+  const wallet = signer!.publicKey.toBase58();
   const message = `transparent-auth:v1:${gameId}:${wallet}:${issuedAt}:${expiresAt}`;
-  const sigBytes = await signer.signMessage(new TextEncoder().encode(message));
+  const sigBytes = await signer!.signMessage!(new TextEncoder().encode(message));
 
   const token: GameAuthToken = {
     message,
@@ -66,6 +74,42 @@ export async function getGameAuthToken(gameId: string): Promise<GameAuthToken> {
     publicKey: wallet,
   };
   tokenCache.set(gameId, { token, expiresAt });
+  return token;
+}
+
+/**
+ * Get (or mint) a v2 action-scoped token bound to a specific endpoint.
+ * Pass fresh=true for destructive/single-use actions (leave, pay) so a new
+ * signature is produced every call and the server's replay guard works.
+ */
+export async function getActionToken(
+  gameId: string,
+  action: string,
+  fresh = false,
+): Promise<GameAuthToken> {
+  if (!signer) throw new Error('No wallet connected — cannot authorize game action');
+  if (!signer.signMessage) throw new Error('Connected wallet cannot sign messages');
+
+  const cacheKey = `${gameId}:${action}`;
+  if (!fresh) {
+    const cached = tokenCache.get(cacheKey);
+    if (cached && cached.expiresAt - TOKEN_REFRESH_MARGIN_MS > Date.now()) {
+      return cached.token;
+    }
+  }
+
+  const issuedAt = Date.now();
+  const expiresAt = issuedAt + TOKEN_TTL_MS;
+  const wallet = signer.publicKey.toBase58();
+  const message = `transparent-auth:v2:${gameId}:${action}:${wallet}:${issuedAt}:${expiresAt}`;
+  const sigBytes = await signer.signMessage(new TextEncoder().encode(message));
+
+  const token: GameAuthToken = {
+    message,
+    signature: await encodeBase58(sigBytes),
+    publicKey: wallet,
+  };
+  if (!fresh) tokenCache.set(cacheKey, { token, expiresAt });
   return token;
 }
 
@@ -122,16 +166,37 @@ export interface JoinGameResponse {
 }
 
 export async function joinGameViaEdge(gameId: string, displayName?: string): Promise<JoinGameResponse> {
-  const auth = await getGameAuthToken(gameId);
+  const auth = await getActionToken(gameId, 'join');
   return callEdgeFunction<JoinGameResponse>('join-game', { gameId, displayName, auth });
 }
 
 export async function readyUpViaEdge(gameId: string): Promise<{ ok: boolean; already?: boolean; error?: string }> {
-  const auth = await getGameAuthToken(gameId);
+  const auth = await getActionToken(gameId, 'ready');
   return callEdgeFunction('ready-up-player', { gameId, auth });
 }
 
 export async function leaveGameViaEdge(gameId: string, targetWallet?: string): Promise<{ ok: boolean; hostLeft?: boolean; error?: string }> {
-  const auth = await getGameAuthToken(gameId);
+  // Destructive + single-use: always mint a fresh 'leave' token.
+  const auth = await getActionToken(gameId, 'leave', true);
   return callEdgeFunction('leave-game', { gameId, auth, ...(targetWallet ? { targetWallet } : {}) });
+}
+
+export interface VerifyPaymentResponse {
+  ok: boolean;
+  player?: { id: string; game_id: string; wallet_address: string; has_paid: boolean; is_ready: boolean };
+  free?: boolean;
+  error?: string;
+}
+
+/**
+ * Confirm an on-chain buy-in payment. The server independently verifies the
+ * transaction moved buy_in_lamports into the escrow before flipping has_paid.
+ * txSignature is optional for free games.
+ */
+export async function verifyPaymentViaEdge(
+  gameId: string,
+  txSignature?: string,
+): Promise<VerifyPaymentResponse> {
+  const auth = await getActionToken(gameId, 'pay', true);
+  return callEdgeFunction<VerifyPaymentResponse>('verify-payment', { gameId, auth, txSignature });
 }

@@ -1,9 +1,10 @@
 // Edge Function: ready-up-player
-// Sets is_ready=true for the verified caller's own player row.
-// Only the server (this function) can flip is_ready — anon UPDATE is blocked.
-// Payment verification: the caller must already have has_paid=true (set by
-// the payment confirmation flow) before they can ready up. For free games
-// (buy_in_lamports=0), has_paid is irrelevant and skipped.
+// Sets is_ready=true for the verified caller's own player row via the
+// ready_up_player RPC, which performs the status guard, the payment guard
+// (has_paid must be true for paid games), and the flip INSIDE one transaction
+// (SELECT ... FOR UPDATE). Only the server can flip is_ready — anon UPDATE is
+// blocked by RLS. has_paid is set only by verify-payment; it is never trusted
+// from the client.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -12,6 +13,15 @@ import { verifyGameAuth, corsHeaders, jsonResponse, type GameAuthToken } from '.
 interface ReadyUpRequest {
   gameId: string;
   auth: GameAuthToken;
+}
+
+function statusForPgError(code?: string): number {
+  switch (code) {
+    case 'P0002': return 404; // not found
+    case 'P0001': return 409; // wrong game state
+    case 'P0003': return 402; // payment required
+    default: return 500;
+  }
 }
 
 serve(async (req: Request) => {
@@ -34,54 +44,25 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const { data: game, error: gameErr } = await supabase
-      .from('games')
-      .select('id, status, buy_in_lamports')
-      .eq('id', gameId)
+    const { data: player, error } = await supabase
+      .rpc('ready_up_player', {
+        p_game_id: gameId,
+        p_wallet: caller.wallet,
+      })
       .single();
 
-    if (gameErr || !game) {
-      return jsonResponse({ error: 'game not found' }, 404);
-    }
-    if (game.status !== 'waiting') {
-      return jsonResponse({ error: 'game already started' }, 409);
+    if (error) {
+      return jsonResponse({ error: error.message }, statusForPgError(error.code));
     }
 
-    const { data: player, error: playerErr } = await supabase
-      .from('players')
-      .select('id, wallet_address, has_paid, is_ready')
-      .eq('game_id', gameId)
-      .eq('wallet_address', caller.wallet)
-      .single();
-
-    if (playerErr || !player) {
-      return jsonResponse({ error: 'player not found in this game' }, 404);
-    }
-
-    if (player.is_ready) {
-      return jsonResponse({ ok: true, already: true });
-    }
-
-    // For paid games, require payment confirmation before ready-up.
-    // has_paid is set by the payment confirmation flow (separate from this EF).
-    if ((game.buy_in_lamports ?? 0) > 0 && !player.has_paid) {
-      return jsonResponse({ error: 'payment required before ready-up' }, 402);
-    }
-
-    const { error: updateErr } = await supabase
-      .from('players')
-      .update({ is_ready: true })
-      .eq('game_id', gameId)
-      .eq('wallet_address', caller.wallet);
-
-    if (updateErr) {
-      return jsonResponse({ error: updateErr.message }, 500);
-    }
-
-    return jsonResponse({ ok: true });
+    return jsonResponse({ ok: true, player });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'internal error';
-    const status = msg.includes('expired') || msg.includes('signature') || msg.includes('mismatch') ? 401 : 500;
+    const status =
+      msg.includes('expired') || msg.includes('signature') || msg.includes('mismatch') ||
+      msg.includes('lifetime') || msg.includes('action') || msg.includes('future')
+        ? 401
+        : 500;
     return jsonResponse({ error: msg }, status);
   }
 });

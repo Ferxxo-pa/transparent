@@ -35,6 +35,9 @@ async function main() {
     create schema if not exists auth;
     create or replace function auth.role() returns text language sql stable
       as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
+    -- auth.role() must resolve for the test roles; without USAGE it raises
+    -- 42501 and a naive harness would misread that as a policy denial.
+    grant usage on schema auth to anon, authenticated, service_role;
     do $$ begin
       if not exists (select from pg_publication where pubname = 'supabase_realtime') then
         create publication supabase_realtime;
@@ -76,27 +79,47 @@ async function main() {
   );
 
   async function asAnon(sql: string, params: unknown[] = []) {
+    await db.query("BEGIN");
     try {
-      await db.query("BEGIN");
       await db.query("SET LOCAL ROLE anon");
       await db.query("SET LOCAL request.jwt.claim.role = 'anon'");
 
-      const { rows: [roleCheck] } = await db.query(
-        `SELECT current_user AS cu, auth.role() AS ar`,
-      );
+      // A failure resolving the role/auth.role() is an infra fault (e.g. 42501
+      // missing USAGE on schema auth) and must abort the run — never be counted
+      // as a successful "block" by a later rowCount assertion.
+      let roleCheck: { cu: string; ar: string };
+      try {
+        const { rows } = await db.query(`SELECT current_user AS cu, auth.role() AS ar`);
+        roleCheck = rows[0];
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        throw new Error(
+          `FATAL: role assertion query failed (${e.code ?? "?"}: ${e.message}). ` +
+          `Fix the bootstrap (GRANT USAGE ON SCHEMA auth) before trusting results.`,
+        );
+      }
       if (roleCheck.cu !== "anon" || roleCheck.ar !== "anon") {
         await db.query("ROLLBACK");
-        return { ok: false, err: `role assertion failed: cu=${roleCheck.cu}, ar=${roleCheck.ar}`, rowCount: 0, rows: [] };
+        throw new Error(`FATAL: role not applied — cu=${roleCheck.cu}, ar=${roleCheck.ar}`);
       }
 
-      const r = await db.query(sql, params);
-      await db.query("ROLLBACK");
-      return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows };
+      try {
+        const r = await db.query(sql, params);
+        await db.query("ROLLBACK");
+        return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows };
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      }
     } catch (e: any) {
       try { await db.query("ROLLBACK"); } catch {}
-      return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      throw e; // propagate FATAL infra faults
     }
   }
+
+  // Preflight: prove the anon role machinery resolves before running attacks.
+  await asAnon("SELECT 1");
+  console.log("preflight: anon role assertion OK");
 
   console.log("\n=== VULNERABILITY PROOF: anon player manipulation ===\n");
 
