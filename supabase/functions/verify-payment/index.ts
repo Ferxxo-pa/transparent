@@ -163,15 +163,29 @@ serve(async (req: Request) => {
       );
     }
 
-    // Per-player deposit attribution via program instruction validation.
-    // Aggregate balance-decrease is not authoritative: an unrelated outgoing
-    // transfer can coincide with someone else funding escrow. Instead, verify
-    // the transaction contains an instruction to the escrow program where the
-    // caller is a signer account (depositor) and the escrow PDA is a writable
-    // destination. This proves the caller routed funds through the escrow
-    // program for this specific game.
+    // Per-player deposit attribution via Anchor ABI validation.
+    //
+    // The transaction must contain a `join_game` instruction (not `create_game`
+    // or any other instruction) to the escrow program. We validate:
+    //   1. Discriminator matches join_game [107,112,18,38,56,173,60,128]
+    //   2. Account layout matches the deployed Anchor ABI:
+    //      [game(0), player_entry(1), escrow(2), player(3), system_program(4)]
+    //   3. game (index 0) matches the expected game PDA for this game
+    //   4. escrow (index 2) matches the expected escrow PDA
+    //   5. player (index 3) is the caller wallet and is a signer
+    //
+    // The legacy smart-contract program (656vXmoQ3oYXdghy1PoVQ2NSzduwWW5XVfjJMqQ1fF44)
+    // has no escrow PDA — it transfers directly to the game account. Those
+    // transactions will never match the escrow-based validation. Only the main
+    // program (2zPL...) is supported.
+    //
+    // create_game also touches caller+escrow accounts but is initialization/rent,
+    // not a buy-in deposit. Its discriminator [124,69,75,66,184,220,72,206] is
+    // explicitly rejected.
+    const JOIN_GAME_DISCRIMINATOR = new Uint8Array([107, 112, 18, 38, 56, 173, 60, 128]);
     const programIdStr = programId.toBase58();
     const escrowStr = escrowPDA.toBase58();
+    const gamePDAStr = gamePDA.toBase58();
     const callerStr = caller.wallet;
 
     const compiledIxs = tx.transaction.message.compiledInstructions
@@ -183,24 +197,33 @@ serve(async (req: Request) => {
       const ixProgramIdx = ix.programIdIndex;
       if (accountKeys[ixProgramIdx] !== programIdStr) continue;
 
+      const ixData: Uint8Array = ix.data instanceof Uint8Array
+        ? ix.data
+        : new Uint8Array(ix.data ?? []);
+
+      if (ixData.length < 8) continue;
+      const disc = ixData.slice(0, 8);
+      if (!disc.every((b: number, i: number) => b === JOIN_GAME_DISCRIMINATOR[i])) continue;
+
       const ixAccountIndices: number[] = ix.accountKeyIndexes ?? ix.accounts ?? [];
-      const ixAccounts = ixAccountIndices.map((i: number) => accountKeys[i]);
+      if (ixAccountIndices.length < 5) continue;
 
-      const hasCallerAsSigner = ixAccounts.includes(callerStr)
-        && tx.transaction.message.isAccountSigner(
-          ixAccountIndices[ixAccounts.indexOf(callerStr)],
-        );
-      const hasEscrow = ixAccounts.includes(escrowStr);
+      const acct0 = accountKeys[ixAccountIndices[0]]; // game PDA
+      const acct2 = accountKeys[ixAccountIndices[2]]; // escrow PDA
+      const acct3 = accountKeys[ixAccountIndices[3]]; // player (signer)
 
-      if (hasCallerAsSigner && hasEscrow) {
-        callerDepositInstruction = true;
-        break;
-      }
+      if (acct0 !== gamePDAStr) continue;
+      if (acct2 !== escrowStr) continue;
+      if (acct3 !== callerStr) continue;
+      if (!tx.transaction.message.isAccountSigner(ixAccountIndices[3])) continue;
+
+      callerDepositInstruction = true;
+      break;
     }
 
     if (!callerDepositInstruction) {
       return jsonResponse(
-        { error: 'no escrow program instruction with caller as signer and escrow as destination' },
+        { error: 'no valid join_game instruction found: expected join_game discriminator with correct game/escrow/player accounts' },
         402,
       );
     }

@@ -341,9 +341,16 @@ create table if not exists public.used_game_tokens (
   token_hash text primary key,
   game_id    uuid not null,
   action     text not null,
-  wallet     text not null,
+  wallet     text,           -- nullable: legacy rows from pre-wallet era keep NULL
   used_at    timestamptz not null default now()
 );
+
+-- Additive upgrade: if the table already exists from a prior migration without
+-- the wallet column, ADD it. CREATE TABLE IF NOT EXISTS skips the whole
+-- statement when the table exists, so existing schemas never get the wallet
+-- column without this explicit ALTER. Legacy rows (from the pre-wallet era)
+-- keep wallet=NULL — they are reviewable, never reclaimed or guessed.
+alter table public.used_game_tokens add column if not exists wallet text;
 
 alter table public.used_game_tokens enable row level security;
 -- No anon/authenticated policies → only the service_role (bypassrls) can
@@ -398,7 +405,10 @@ begin
     where t.token_hash = p_token_hash
     for update;
 
-    if existing_wallet <> p_wallet then
+    -- Foreign-owner replay: different wallet owns this hash → reject.
+    -- Legacy rows (wallet IS NULL) are ambiguous — they cannot be reclaimed
+    -- by ANY wallet because original ownership is unknown. Treat as foreign.
+    if existing_wallet is null or existing_wallet <> p_wallet then
       raise exception 'payment signature already claimed by another wallet'
         using errcode = 'P0001';
     end if;

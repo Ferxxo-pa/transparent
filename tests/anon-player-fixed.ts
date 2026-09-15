@@ -743,6 +743,74 @@ async function main() {
     report(!r.ok, "BLOCKED: anon cannot call claim_payment_and_credit", r.err);
   }
 
+  // ── Existing-schema upgrade path: wallet column added by ALTER TABLE ──
+
+  console.log("\n=== Existing-schema upgrade (ALTER TABLE wallet) ===\n");
+
+  // Simulate pre-wallet schema: DDL runs as postgres (superuser) since
+  // service_role cannot CREATE/DROP tables.
+  {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS public._test_upgrade_tokens (
+        token_hash text primary key,
+        game_id    uuid not null,
+        action     text not null,
+        used_at    timestamptz not null default now()
+      );
+    `);
+    await db.query(`ALTER TABLE public._test_upgrade_tokens ADD COLUMN IF NOT EXISTS wallet text;`);
+    const { rows } = await db.query(`
+      INSERT INTO public._test_upgrade_tokens (token_hash, game_id, action, wallet)
+      VALUES ('test_hash', $1, 'pay', 'UPGRADED_WALLET')
+      RETURNING wallet
+    `, [waitGame.id]);
+    report(
+      rows[0]?.wallet === "UPGRADED_WALLET",
+      "UPGRADE: ALTER TABLE adds wallet column to existing table",
+    );
+    await db.query("DROP TABLE IF EXISTS public._test_upgrade_tokens");
+  }
+
+  // Legacy NULL-wallet dedup: unknown-owner claim blocks ALL new claimants
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('LEGACY01', 'HOST_LEG', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'CLAIMER', 'C', false)`,
+      [g.id],
+    );
+    // Simulate a legacy dedup row with NULL wallet (from pre-wallet era)
+    await db.query(
+      `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet, used_at)
+       VALUES ('hash_legacy_null', $1, 'pay', NULL, now())`,
+      [g.id],
+    );
+    let rejected = false;
+    let errMsg = "";
+    await db.query("SAVEPOINT before_legacy");
+    try {
+      await db.query(
+        `SELECT * FROM claim_payment_and_credit($1, 'CLAIMER', 'hash_legacy_null')`,
+        [g.id],
+      );
+    } catch (e: any) {
+      rejected = /already claimed by another wallet/.test(e.message);
+      errMsg = e.message;
+    }
+    await db.query("ROLLBACK TO SAVEPOINT before_legacy");
+    const { rows: [cl] } = await db.query(
+      `SELECT has_paid FROM players WHERE game_id=$1 AND wallet_address='CLAIMER'`,
+      [g.id],
+    );
+    report(
+      rejected && cl.has_paid === false,
+      "LEGACY: NULL-wallet dedup blocks new claimant (not reclaimed)",
+      `rejected=${rejected}, paid=${cl.has_paid}, err=${errMsg}`,
+    );
+  });
+
   // ── Final integrity check ──
 
   // 23. Victim row still intact
