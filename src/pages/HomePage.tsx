@@ -286,9 +286,10 @@ export const HomePage: React.FC = () => {
                 fontSize: 9,
                 color: 'var(--ink-soft)',
                 letterSpacing: '0.08em',
+                opacity: 0.6,
               }}
             >
-              1,284
+              example
             </span>
           </div>
 

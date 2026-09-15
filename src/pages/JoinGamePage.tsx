@@ -126,6 +126,7 @@ export const JoinGamePage: React.FC = () => {
                     inputMode="numeric"
                     maxLength={1}
                     value={d}
+                    aria-label={`Room code digit ${i + 1}`}
                     onChange={e => handleDigitChange(i, e.target.value)}
                     onKeyDown={e => handleKeyDown(i, e)}
                     style={{
