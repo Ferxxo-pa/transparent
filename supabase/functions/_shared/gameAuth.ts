@@ -137,10 +137,9 @@ export async function consumeAuthToken(
 
   const { error } = await supabase
     .from('used_game_tokens')
-    .insert({ token_hash: tokenHash, game_id: gameId, action });
+    .insert({ token_hash: tokenHash, game_id: gameId, action, wallet: caller.wallet });
 
   if (error) {
-    // 23505 = unique_violation → the token was already spent for this action.
     if ((error as { code?: string }).code === '23505') {
       throw new Error('auth token already used (replay)');
     }

@@ -147,7 +147,6 @@ serve(async (req: Request) => {
     if (callerIdx === -1) {
       return jsonResponse({ error: 'caller wallet is not part of this transaction' }, 403);
     }
-    // Caller must have signed (be a writable signer paying the buy-in).
     if (!tx.transaction.message.isAccountSigner(callerIdx)) {
       return jsonResponse({ error: 'caller did not sign the payment transaction' }, 403);
     }
@@ -164,14 +163,44 @@ serve(async (req: Request) => {
       );
     }
 
-    // Per-player deposit attribution: the caller's balance must have decreased
-    // by at least the buy-in amount. Without this, a co-signer whose balance is
-    // unchanged (another account funded escrow) would pass the aggregate check.
-    const callerDebit =
-      Number(tx.meta.preBalances[callerIdx]) - Number(tx.meta.postBalances[callerIdx]);
-    if (callerDebit < buyIn) {
+    // Per-player deposit attribution via program instruction validation.
+    // Aggregate balance-decrease is not authoritative: an unrelated outgoing
+    // transfer can coincide with someone else funding escrow. Instead, verify
+    // the transaction contains an instruction to the escrow program where the
+    // caller is a signer account (depositor) and the escrow PDA is a writable
+    // destination. This proves the caller routed funds through the escrow
+    // program for this specific game.
+    const programIdStr = programId.toBase58();
+    const escrowStr = escrowPDA.toBase58();
+    const callerStr = caller.wallet;
+
+    const compiledIxs = tx.transaction.message.compiledInstructions
+      ?? (tx.transaction.message as any).instructions
+      ?? [];
+
+    let callerDepositInstruction = false;
+    for (const ix of compiledIxs) {
+      const ixProgramIdx = ix.programIdIndex;
+      if (accountKeys[ixProgramIdx] !== programIdStr) continue;
+
+      const ixAccountIndices: number[] = ix.accountKeyIndexes ?? ix.accounts ?? [];
+      const ixAccounts = ixAccountIndices.map((i: number) => accountKeys[i]);
+
+      const hasCallerAsSigner = ixAccounts.includes(callerStr)
+        && tx.transaction.message.isAccountSigner(
+          ixAccountIndices[ixAccounts.indexOf(callerStr)],
+        );
+      const hasEscrow = ixAccounts.includes(escrowStr);
+
+      if (hasCallerAsSigner && hasEscrow) {
+        callerDepositInstruction = true;
+        break;
+      }
+    }
+
+    if (!callerDepositInstruction) {
       return jsonResponse(
-        { error: `caller did not fund the buy-in: balance decreased by ${callerDebit}, need ${buyIn}` },
+        { error: 'no escrow program instruction with caller as signer and escrow as destination' },
         402,
       );
     }

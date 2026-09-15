@@ -339,8 +339,9 @@ grant execute on function public.mark_player_paid(uuid, text) to service_role;
 
 create table if not exists public.used_game_tokens (
   token_hash text primary key,
-  game_id    uuid,
+  game_id    uuid not null,
   action     text not null,
+  wallet     text not null,
   used_at    timestamptz not null default now()
 );
 
@@ -376,6 +377,7 @@ as $$
 declare
   g  public.games;
   pl public.players;
+  existing_wallet text;
 begin
   perform public.assert_game_server();
 
@@ -387,28 +389,33 @@ begin
   where game_id = p_game_id and wallet_address = p_wallet for update;
   if not found then raise exception 'player not found in this game' using errcode = 'P0002'; end if;
 
-  -- Attempt dedup insert. On conflict (replay), check if this player is
-  -- already paid — if so, return success (idempotent same-owner replay).
-  -- If not paid, the original claim failed mid-transaction and this is a
-  -- legitimate retry: delete the stale dedup record and re-insert below.
   begin
-    insert into public.used_game_tokens (token_hash, game_id, action)
-    values (p_token_hash, p_game_id, 'pay');
+    insert into public.used_game_tokens (token_hash, game_id, action, wallet)
+    values (p_token_hash, p_game_id, 'pay', p_wallet);
   exception when unique_violation then
-    -- Same token seen before. Check if credit actually landed.
+    select t.wallet into existing_wallet
+    from public.used_game_tokens t
+    where t.token_hash = p_token_hash
+    for update;
+
+    if existing_wallet <> p_wallet then
+      raise exception 'payment signature already claimed by another wallet'
+        using errcode = 'P0001';
+    end if;
+
     if pl.has_paid then
       return next pl;
       return;
     end if;
-    -- Credit never landed — previous attempt failed after dedup insert.
-    -- Remove stale dedup so this retry can re-claim atomically.
+
+    -- Same wallet, credit never landed — stale from a failed prior attempt.
+    -- Re-claim atomically.
     delete from public.used_game_tokens
-    where token_hash = p_token_hash and game_id = p_game_id;
-    insert into public.used_game_tokens (token_hash, game_id, action)
-    values (p_token_hash, p_game_id, 'pay');
+    where token_hash = p_token_hash;
+    insert into public.used_game_tokens (token_hash, game_id, action, wallet)
+    values (p_token_hash, p_game_id, 'pay', p_wallet);
   end;
 
-  -- Credit the player (same logic as mark_player_paid, inline for atomicity).
   if pl.has_paid then
     return next pl;
     return;

@@ -520,13 +520,13 @@ async function main() {
   // FIX 5 (replay guard table): duplicate token hash is rejected
   await svcTx(async () => {
     await db.query(
-      `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('HASH_A', $1, 'leave')`,
+      `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet) VALUES ('HASH_A', $1, 'leave', 'LEAVER_W')`,
       [waitGame.id],
     );
     let rejected = false;
     try {
       await db.query(
-        `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('HASH_A', $1, 'leave')`,
+        `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet) VALUES ('HASH_A', $1, 'leave', 'LEAVER_W')`,
         [waitGame.id],
       );
     } catch (e: any) {
@@ -606,7 +606,7 @@ async function main() {
     );
     // Simulate the old bug: dedup record exists but player NOT paid
     await db.query(
-      `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('hash_stale_03', $1, 'pay')`,
+      `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet) VALUES ('hash_stale_03', $1, 'pay', 'PAYER_C')`,
       [g.id],
     );
     // Retry should recover: delete stale dedup, re-insert, credit player
@@ -617,6 +617,120 @@ async function main() {
     report(
       p.has_paid === true,
       "ATOMIC: retry after failed credit recovers — player gets credited",
+    );
+  });
+
+  // Two-wallet replay: Alice claims hash, Bob tries same hash → REJECTED
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM04', 'HOST_ATOM4', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'ALICE', 'Alice', false)`,
+      [g.id],
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'BOB', 'Bob', false)`,
+      [g.id],
+    );
+    // Alice claims the payment hash
+    const { rows: [alice] } = await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'ALICE', 'hash_shared_04')`,
+      [g.id],
+    );
+    report(alice.has_paid === true, "TWO-WALLET: Alice claims hash successfully");
+
+    // Bob tries to claim the SAME hash → must be rejected, not steal Alice's claim
+    let bobRejected = false;
+    let bobErr = "";
+    await db.query("SAVEPOINT before_bob");
+    try {
+      await db.query(
+        `SELECT * FROM claim_payment_and_credit($1, 'BOB', 'hash_shared_04')`,
+        [g.id],
+      );
+    } catch (e: any) {
+      bobRejected = /already claimed by another wallet/.test(e.message);
+      bobErr = e.message;
+    }
+    await db.query("ROLLBACK TO SAVEPOINT before_bob");
+
+    // Verify Bob is still unpaid
+    const { rows: [bobRow] } = await db.query(
+      `SELECT has_paid FROM players WHERE game_id=$1 AND wallet_address='BOB'`,
+      [g.id],
+    );
+    // Verify Alice's dedup row still exists and is hers
+    const { rows: [dedupRow] } = await db.query(
+      `SELECT wallet FROM used_game_tokens WHERE token_hash='hash_shared_04'`,
+    );
+    report(
+      bobRejected && bobRow.has_paid === false && dedupRow.wallet === "ALICE",
+      "TWO-WALLET: Bob rejected, Alice's claim intact, Bob still unpaid",
+      `rejected=${bobRejected}, bobPaid=${bobRow.has_paid}, dedupOwner=${dedupRow.wallet}, err=${bobErr}`,
+    );
+  });
+
+  // Stale dedup from different wallet: foreign stale claim must not be recoverable
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM05', 'HOST_ATOM5', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'MALLORY', 'Mallory', false)`,
+      [g.id],
+    );
+    // Simulate a stale dedup from a DIFFERENT wallet (old claim that failed)
+    await db.query(
+      `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet) VALUES ('hash_foreign_05', $1, 'pay', 'ORIGINAL_PAYER')`,
+      [g.id],
+    );
+    // Mallory tries to claim — must reject even though "credit never landed" on original
+    let rejected = false;
+    await db.query("SAVEPOINT before_mallory");
+    try {
+      await db.query(
+        `SELECT * FROM claim_payment_and_credit($1, 'MALLORY', 'hash_foreign_05')`,
+        [g.id],
+      );
+    } catch (e: any) {
+      rejected = /already claimed by another wallet/.test(e.message);
+    }
+    await db.query("ROLLBACK TO SAVEPOINT before_mallory");
+    const { rows: [m] } = await db.query(
+      `SELECT has_paid FROM players WHERE game_id=$1 AND wallet_address='MALLORY'`,
+      [g.id],
+    );
+    report(
+      rejected && m.has_paid === false,
+      "TWO-WALLET: foreign stale dedup blocks different wallet from stealing claim",
+    );
+  });
+
+  // Rollback-failure recovery: same wallet stale dedup → retry succeeds
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM06', 'HOST_ATOM6', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'RETRIER', 'Retrier', false)`,
+      [g.id],
+    );
+    // Simulate same-wallet stale dedup (own prior failed attempt)
+    await db.query(
+      `INSERT INTO used_game_tokens (token_hash, game_id, action, wallet) VALUES ('hash_retry_06', $1, 'pay', 'RETRIER')`,
+      [g.id],
+    );
+    const { rows: [p] } = await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'RETRIER', 'hash_retry_06')`,
+      [g.id],
+    );
+    report(
+      p.has_paid === true,
+      "RECOVERY: same-wallet stale dedup allows retry and credits player",
     );
   });
 
