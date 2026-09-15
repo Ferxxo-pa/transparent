@@ -151,6 +151,10 @@ export interface GameState {
   currentRoundMode?: 'classic' | 'exposer' | 'storyteller';
   /** Whether the host controls question author visibility in exposer mode */
   exposerShowAuthors?: boolean;
+  /** Settlement state: whether on-chain distribute() actually landed after gameover */
+  settlementStatus?: 'none' | 'pending' | 'settled' | 'failed';
+  /** Wallet -> lamports still owed when settlementStatus is 'failed'; retry-safe, cleared once paid */
+  pendingPayouts?: Record<string, number> | null;
 }
 
 // ── 30+ Party Questions ─────────────────────────────────────

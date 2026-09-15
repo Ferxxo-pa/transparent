@@ -30,6 +30,8 @@ export interface GameRow {
   question_pick_votes?: Record<string, number> | null;
   storyteller_choice?: 'truth' | 'fake' | null;
   game_pda?: string | null;
+  settlement_status?: 'none' | 'pending' | 'settled' | 'failed' | null;
+  pending_payouts?: Record<string, number> | null;
   created_at: string;
 }
 
@@ -133,6 +135,9 @@ const PROTECTED_GAME_COLUMNS = new Set([
   'current_question_index',
   'current_hot_seat_player',
   'storyteller_choice',
+  'current_pot',
+  'settlement_status',
+  'pending_payouts',
 ]);
 
 export async function updateGameStatus(

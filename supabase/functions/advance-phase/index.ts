@@ -26,6 +26,8 @@ const UPDATABLE_COLUMNS = new Set([
   'current_hot_seat_player',
   'storyteller_choice',
   'current_pot',
+  'settlement_status',
+  'pending_payouts',
   'question_options',
   'question_pick_votes',
 ]);
