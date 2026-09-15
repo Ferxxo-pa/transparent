@@ -8,10 +8,12 @@
 // Payment is NEVER client-trusted: the caller submits the transaction
 // signature of their buy-in, and this function independently confirms on-chain
 // that a settled transaction moved at least buy_in_lamports into the game's
-// escrow PDA, that the caller signed it, and that the signature has not already
-// been credited. Only then does it call the mark_player_paid RPC (service_role).
+// escrow PDA, that the caller signed AND funded it (per-player deposit
+// attribution), and that the signature has not already been credited. Dedup and
+// credit happen atomically via claim_payment_and_credit RPC — a transient
+// credit failure never permanently consumes the payment signature.
 //
-// DEVNET ONLY: refuses to run against any mainnet RPC.
+// DEVNET ONLY: verified by genesis hash, not URL substring.
 //
 // Secrets (supabase secrets set):
 //   SOLANA_RPC        — optional, defaults to devnet public RPC
@@ -94,12 +96,18 @@ serve(async (req: Request) => {
     }
 
     // ── On-chain verification ──────────────────────────────────
+    const DEVNET_GENESIS = 'EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG';
     const rpcUrl = Deno.env.get('SOLANA_RPC') || 'https://api.devnet.solana.com';
-    if (rpcUrl.includes('mainnet')) {
-      return jsonResponse({ error: 'verify-payment is devnet-only' }, 500);
-    }
     const programId = new PublicKey(Deno.env.get('ESCROW_PROGRAM_ID') || DEFAULT_PROGRAM_ID);
     const connection = new Connection(rpcUrl, 'confirmed');
+
+    const genesisHash = await connection.getGenesisHash();
+    if (genesisHash !== DEVNET_GENESIS) {
+      return jsonResponse(
+        { error: `verify-payment is devnet-only: connected network genesis ${genesisHash} is not devnet` },
+        500,
+      );
+    }
 
     const hostPubkey = new PublicKey(game.host_wallet);
     const gamePDA = game.game_pda
@@ -156,24 +164,31 @@ serve(async (req: Request) => {
       );
     }
 
-    // ── Dedup: a given payment tx can credit exactly one player once ──
+    // Per-player deposit attribution: the caller's balance must have decreased
+    // by at least the buy-in amount. Without this, a co-signer whose balance is
+    // unchanged (another account funded escrow) would pass the aggregate check.
+    const callerDebit =
+      Number(tx.meta.preBalances[callerIdx]) - Number(tx.meta.postBalances[callerIdx]);
+    if (callerDebit < buyIn) {
+      return jsonResponse(
+        { error: `caller did not fund the buy-in: balance decreased by ${callerDebit}, need ${buyIn}` },
+        402,
+      );
+    }
+
+    // ── Atomic dedup + credit: one DB transaction, no lost payments ──
     const digest = await crypto.subtle.digest(
       'SHA-256',
       new TextEncoder().encode(`payment:${gameId}:${txSignature}`),
     );
     const tokenHash = bs58.encode(new Uint8Array(digest));
-    const { error: dedupErr } = await supabase
-      .from('used_game_tokens')
-      .insert({ token_hash: tokenHash, game_id: gameId, action: 'pay' });
-    if (dedupErr) {
-      if ((dedupErr as { code?: string }).code === '23505') {
-        return jsonResponse({ error: 'payment already credited' }, 409);
-      }
-      return jsonResponse({ error: dedupErr.message }, 500);
-    }
 
     const { data: player, error } = await supabase
-      .rpc('mark_player_paid', { p_game_id: gameId, p_wallet: caller.wallet })
+      .rpc('claim_payment_and_credit', {
+        p_game_id: gameId,
+        p_wallet: caller.wallet,
+        p_token_hash: tokenHash,
+      })
       .single();
     if (error) return jsonResponse({ error: error.message }, statusForPgError(error.code));
 

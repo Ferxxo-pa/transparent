@@ -545,6 +545,90 @@ async function main() {
     report(!r3.ok, "BLOCKED: anon cannot call mark_player_paid", r3.err);
   }
 
+  // ── Payment claim atomicity (claim_payment_and_credit RPC) ──
+
+  console.log("\n=== Payment claim atomicity ===\n");
+
+  // Atomic claim + credit: normal path
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM01', 'HOST_ATOM', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'PAYER_A', 'A', false)`,
+      [g.id],
+    );
+    const { rows: [p] } = await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'PAYER_A', 'hash_normal_01')`,
+      [g.id],
+    );
+    report(
+      p.has_paid === true,
+      "ATOMIC: claim_payment_and_credit credits player on first call",
+    );
+  });
+
+  // Same-owner replay when credit landed: returns success, not 409
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM02', 'HOST_ATOM2', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'PAYER_B', 'B', false)`,
+      [g.id],
+    );
+    await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'PAYER_B', 'hash_replay_02')`,
+      [g.id],
+    );
+    // Replay same hash — player already paid, should return success
+    const { rows: [p2] } = await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'PAYER_B', 'hash_replay_02')`,
+      [g.id],
+    );
+    report(
+      p2.has_paid === true,
+      "ATOMIC: same-owner replay returns paid player (not 409)",
+    );
+  });
+
+  // Failed credit recovery: dedup record exists but player not paid → retry succeeds
+  await svcTx(async () => {
+    const { rows: [g] } = await db.query(
+      `INSERT INTO games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       VALUES ('ATOM03', 'HOST_ATOM3', 'waiting', 0, 100000) RETURNING id`,
+    );
+    await db.query(
+      `INSERT INTO players (game_id, wallet_address, display_name, has_paid) VALUES ($1, 'PAYER_C', 'C', false)`,
+      [g.id],
+    );
+    // Simulate the old bug: dedup record exists but player NOT paid
+    await db.query(
+      `INSERT INTO used_game_tokens (token_hash, game_id, action) VALUES ('hash_stale_03', $1, 'pay')`,
+      [g.id],
+    );
+    // Retry should recover: delete stale dedup, re-insert, credit player
+    const { rows: [p] } = await db.query(
+      `SELECT * FROM claim_payment_and_credit($1, 'PAYER_C', 'hash_stale_03')`,
+      [g.id],
+    );
+    report(
+      p.has_paid === true,
+      "ATOMIC: retry after failed credit recovers — player gets credited",
+    );
+  });
+
+  // Anon cannot call claim_payment_and_credit
+  {
+    const r = await as("anon",
+      `SELECT claim_payment_and_credit($1, 'HACKER', 'hash_anon')`,
+      [waitGame.id],
+    );
+    report(!r.ok, "BLOCKED: anon cannot call claim_payment_and_credit", r.err);
+  }
+
   // ── Final integrity check ──
 
   // 23. Victim row still intact

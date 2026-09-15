@@ -349,3 +349,76 @@ alter table public.used_game_tokens enable row level security;
 -- read or write this table.
 revoke all on public.used_game_tokens from anon, authenticated;
 grant select, insert on public.used_game_tokens to service_role;
+
+-- ============================================================
+-- Atomic payment claim + credit
+--
+-- Solves the non-atomic dedup + mark_player_paid window: the old handler
+-- inserted a dedup record THEN called mark_player_paid. If mark_player_paid
+-- failed transiently, the dedup record persisted and retry returned 409
+-- "payment already credited" — but the player was never actually credited.
+--
+-- This RPC does both in one transaction:
+--   1. INSERT dedup record (unique violation → check existing credit)
+--   2. mark_player_paid (game lock, status guard, idempotent flip)
+-- On same-owner replay (dedup hit + player already paid): returns the paid
+-- player row, not an error. Failed attempts remain recoverable.
+-- ============================================================
+
+create or replace function public.claim_payment_and_credit(
+  p_game_id    uuid,
+  p_wallet     text,
+  p_token_hash text
+) returns setof public.players
+language plpgsql
+security definer
+as $$
+declare
+  g  public.games;
+  pl public.players;
+begin
+  perform public.assert_game_server();
+
+  select * into g from public.games where id = p_game_id for update;
+  if not found then raise exception 'game not found' using errcode = 'P0002'; end if;
+  if g.status <> 'waiting' then raise exception 'game already started' using errcode = 'P0001'; end if;
+
+  select * into pl from public.players
+  where game_id = p_game_id and wallet_address = p_wallet for update;
+  if not found then raise exception 'player not found in this game' using errcode = 'P0002'; end if;
+
+  -- Attempt dedup insert. On conflict (replay), check if this player is
+  -- already paid — if so, return success (idempotent same-owner replay).
+  -- If not paid, the original claim failed mid-transaction and this is a
+  -- legitimate retry: delete the stale dedup record and re-insert below.
+  begin
+    insert into public.used_game_tokens (token_hash, game_id, action)
+    values (p_token_hash, p_game_id, 'pay');
+  exception when unique_violation then
+    -- Same token seen before. Check if credit actually landed.
+    if pl.has_paid then
+      return next pl;
+      return;
+    end if;
+    -- Credit never landed — previous attempt failed after dedup insert.
+    -- Remove stale dedup so this retry can re-claim atomically.
+    delete from public.used_game_tokens
+    where token_hash = p_token_hash and game_id = p_game_id;
+    insert into public.used_game_tokens (token_hash, game_id, action)
+    values (p_token_hash, p_game_id, 'pay');
+  end;
+
+  -- Credit the player (same logic as mark_player_paid, inline for atomicity).
+  if pl.has_paid then
+    return next pl;
+    return;
+  end if;
+
+  return query
+    update public.players set has_paid = true
+    where game_id = p_game_id and wallet_address = p_wallet
+    returning *;
+end;
+$$;
+revoke all on function public.claim_payment_and_credit(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.claim_payment_and_credit(uuid, text, text) to service_role;
