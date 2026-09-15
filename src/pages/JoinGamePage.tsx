@@ -156,10 +156,11 @@ export const JoinGamePage: React.FC = () => {
 
             {/* handle field */}
             <div style={{ marginTop: 24, textAlign: 'left' }}>
-              <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="join-handle" className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
                 your handle
               </label>
               <input
+                id="join-handle"
                 className="input-bare"
                 type="text"
                 value={nickname}
@@ -174,6 +175,7 @@ export const JoinGamePage: React.FC = () => {
           {/* error */}
           {error && (
             <motion.div
+              role="alert"
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               style={{
@@ -205,7 +207,7 @@ export const JoinGamePage: React.FC = () => {
             >
               {loading ? 'joining...' : (
                 <>
-                  ape in · <SolMark size={14} tone="dark" /> 0.1
+                  ape in · <SolMark size={14} tone="dark" /> —
                 </>
               )}
             </motion.button>

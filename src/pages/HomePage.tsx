@@ -227,7 +227,8 @@ export const HomePage: React.FC = () => {
                 style={{
                   flex: 1,
                   height: 3,
-                  padding: 0,
+                  padding: '10px 0',
+                  backgroundClip: 'content-box',
                   background: i === modeIdx ? mode.accent : 'rgba(255,255,255,0.12)',
                   border: 'none',
                   borderRadius: 100,
@@ -258,26 +259,16 @@ export const HomePage: React.FC = () => {
             marginBottom: 10,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'var(--acid)',
-                boxShadow: '0 0 8px var(--acid)',
-                animation: 'pulseDot 1.4s ease-in-out infinite',
-                flexShrink: 0,
-                display: 'inline-block',
-              }} />
               <span
                 className="mono"
                 style={{
                   fontSize: 9,
                   letterSpacing: '0.18em',
                   textTransform: 'uppercase',
-                  color: 'var(--ink)',
+                  color: 'var(--ink-faint)',
                 }}
               >
-                live · players online
+                illustrative example
               </span>
             </div>
             <span
@@ -289,7 +280,7 @@ export const HomePage: React.FC = () => {
                 opacity: 0.6,
               }}
             >
-              example
+              not real data
             </span>
           </div>
 
