@@ -184,7 +184,89 @@ async function main() {
   );
   report(!r.ok, "BLOCKED: anon cannot call leave_game_verified");
 
-  // 12. Victim row still intact
+  // ── Cross-player denial: service_role RPC with wrong wallet ──
+
+  // 12. update_player_display_name with wrong wallet = no-op (0 rows)
+  r = await as("service_role",
+    `select update_player_display_name($1, 'NONEXISTENT_WALLET', 'Hacked')`,
+    [game.id],
+  );
+  // RPC succeeds (void) but the UPDATE matches 0 rows
+  const { rows: [victimAfterWrongWallet] } = await db.query(
+    `select display_name from players where game_id=$1 and wallet_address='VICTIM_WALLET'`,
+    [game.id],
+  );
+  report(
+    victimAfterWrongWallet.display_name === "New Name",
+    "DENIED: RPC with wrong wallet does not affect victim row",
+  );
+
+  // 13. leave_game_verified with wrong wallet = no-op on waiting game
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name) values ($1, 'BYSTANDER', 'Bystander')`,
+    [waitGame.id],
+  );
+  r = await as("service_role",
+    `select leave_game_verified($1, 'NONEXISTENT_WALLET')`,
+    [waitGame.id],
+  );
+  const { rows: waitPlayers } = await db.query(
+    `select wallet_address from players where game_id=$1 order by wallet_address`,
+    [waitGame.id],
+  );
+  report(
+    waitPlayers.some((p: any) => p.wallet_address === "BYSTANDER"),
+    "DENIED: leave RPC with wrong wallet does not remove bystander",
+  );
+
+  // ── Cross-room isolation ──
+
+  // 14. RPC on game A cannot affect game B player
+  const { rows: [gameB] } = await db.query(
+    `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports)
+     values ('ROOM_B','HOST_B','playing',1,50000) returning id`,
+  );
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+     values ($1, 'VICTIM_WALLET', 'Victim_B', true, true)`,
+    [gameB.id],
+  );
+  r = await as("service_role",
+    `select update_player_display_name($1, 'VICTIM_WALLET', 'Cross-Room-Hack')`,
+    [game.id],  // targeting game A, not game B
+  );
+  const { rows: [victimB] } = await db.query(
+    `select display_name from players where game_id=$1 and wallet_address='VICTIM_WALLET'`,
+    [gameB.id],
+  );
+  report(
+    victimB.display_name === "Victim_B",
+    "ISOLATED: RPC on game A does not affect game B player",
+  );
+
+  // 15. leave_game_verified on game A cannot delete game B player
+  const { rows: [waitGameB] } = await db.query(
+    `insert into games (room_code, host_wallet, status, current_round)
+     values ('WAIT_B','HOST_B','waiting',0) returning id`,
+  );
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name) values ($1, 'CROSSLEAVER', 'Cross')`,
+    [waitGameB.id],
+  );
+  r = await as("service_role",
+    `select leave_game_verified($1, 'CROSSLEAVER')`,
+    [waitGame.id],  // targeting waitGame, not waitGameB
+  );
+  const { rows: crossCheck } = await db.query(
+    `select wallet_address from players where game_id=$1`,
+    [waitGameB.id],
+  );
+  report(
+    crossCheck.some((p: any) => p.wallet_address === "CROSSLEAVER"),
+    "ISOLATED: leave RPC on game A does not remove game B player",
+  );
+
+  // 16. Victim row still intact
   const { rows: players } = await db.query(
     `select wallet_address, display_name, has_paid, is_ready from players where game_id=$1 order by wallet_address`,
     [game.id],

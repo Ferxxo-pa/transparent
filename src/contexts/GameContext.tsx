@@ -1717,6 +1717,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await joinGameEscrow(wallet, gamePDA);
           } else {
             // Direct transfer: route through MagicBlock for faster confirmations
+            // DUPLICATE-PAYMENT RISK: if buyInViaMagicBlock succeeds on-chain but
+            // throws (network timeout, ambiguous confirmation), the catch sends a
+            // second transfer. Reconcile the first tx before retrying.
             try {
               await buyInViaMagicBlock(wallet, hostPubkey, buyInLamports);
             } catch (mbErr) {
