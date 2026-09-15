@@ -89,6 +89,7 @@ interface GameContextType {
   pollGameState: () => Promise<void>;
   resetGame: () => void;
   simulateAutoPlay: () => void;
+  walletReady: boolean;
   setWalletAdapter: (adapter: WalletAdapter | null) => void;
   placePrediction: (predictedWallet: string, amountSol: number, bettorName: string) => Promise<boolean>;
   createTestGame: (questionMode?: QuestionMode, classicSubMode?: ClassicSubMode) => void;
@@ -162,12 +163,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
 
   const walletRef = useRef<WalletAdapter | null>(null);
+  const [walletReady, setWalletReady] = useState(false);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const gameIdRef = useRef<string | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
 
   const setWalletAdapter = useCallback((adapter: WalletAdapter | null) => {
     walletRef.current = adapter;
+    setWalletReady(adapter != null);
     setGameAuthSigner(adapter);
   }, []);
 
@@ -1360,34 +1363,48 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Force Advance Round (host skip) ───────────────────
 
   const forceAdvanceRound = useCallback(async () => {
-    // Use functional update to avoid stale closure
-    setGameState(prev => {
-      if (!prev) return null;
-      const hotSeatWallet = prev.currentPlayerInHotSeat;
-      const currentIdx = prev.players.findIndex(p => p.id === hotSeatWallet);
-      const nextRoundNum = (prev.currentRound ?? 0) + 1;
-      const totalRounds = prev.numQuestions > 0 ? prev.numQuestions : prev.players.length;
+    if (!gameState) return;
+    const gid = gameState.gameId;
+    const hotSeatWallet = gameState.currentPlayerInHotSeat;
+    const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
+    const nextRoundNum = (gameState.currentRound ?? 0) + 1;
+    const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
 
-      if (nextRoundNum >= totalRounds) {
-        return { ...prev, gameStatus: 'gameover' as const };
+    if (nextRoundNum >= totalRounds) {
+      setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' as const } : null);
+      if (gid) {
+        try { await updateGameStatus(gid, { status: 'gameover' }); } catch (e) { console.error('forceAdvanceRound gameover write failed:', e); }
       }
+      return;
+    }
 
-      const nextPlayerIdx = (currentIdx + 1) % prev.players.length;
-      const nextPlayer = prev.players[nextPlayerIdx];
-      const usedIdxs = prev.usedQuestionIndices || [];
-      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+    const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+    const nextPlayer = gameState.players[nextPlayerIdx];
+    const usedIdxs = gameState.usedQuestionIndices || [];
+    const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
 
-      return {
-        ...prev,
-        currentPlayerInHotSeat: nextPlayer.id,
-        currentQuestion: QUESTIONS[nextQIdx],
-        currentRound: nextRoundNum,
-        votes: {}, voteCount: 0,
-        gamePhase: 'answering' as GamePhase,
-        usedQuestionIndices: [...usedIdxs, nextQIdx],
-      };
-    });
-  }, []);
+    setGameState(prev => prev ? {
+      ...prev,
+      currentPlayerInHotSeat: nextPlayer.id,
+      currentQuestion: QUESTIONS[nextQIdx],
+      currentRound: nextRoundNum,
+      votes: {}, voteCount: 0,
+      gamePhase: 'answering' as GamePhase,
+      usedQuestionIndices: [...usedIdxs, nextQIdx],
+    } : null);
+
+    if (gid) {
+      try {
+        await updateGameStatus(gid, {
+          current_round: nextRoundNum,
+          game_phase: 'answering',
+          current_hot_seat_player: nextPlayer.id,
+        });
+      } catch (e) {
+        console.error('forceAdvanceRound DB write failed:', e);
+      }
+    }
+  }, [gameState]);
 
   // ── End Game Now ───────────────────────────────────────
 
@@ -2250,6 +2267,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         pollGameState,
         resetGame,
         simulateAutoPlay,
+        walletReady,
         setWalletAdapter,
         placePrediction,
         createTestGame,
