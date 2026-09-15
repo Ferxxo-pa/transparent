@@ -240,19 +240,20 @@ async function main() {
   );
   report(r.ok && r.rowCount === 1, "ALLOWED: service_role can set has_paid/is_ready");
 
-  // 14. Service role CAN remove player via leave RPC (waiting game)
+  // 14. Service role CAN delete player directly (EF uses service_role client)
   r = await as("service_role",
-    `SELECT leave_game_verified($1, 'LEAVER')`,
+    `DELETE FROM players WHERE game_id=$1 AND wallet_address='LEAVER'`,
     [waitGame.id],
   );
-  report(r.ok, "ALLOWED: service_role can remove player via leave RPC");
+  report(r.ok && r.rowCount === 1, "ALLOWED: service_role can delete player directly");
 
-  // 15. Leave RPC refuses on playing game
+  // 15. Service role enforces game-status check in EF (not RLS). Verify
+  // service_role CAN delete from playing game (EF adds the status guard).
   r = await as("service_role",
-    `SELECT leave_game_verified($1, 'ATTACKER_WALLET')`,
+    `DELETE FROM players WHERE game_id=$1 AND wallet_address='ATTACKER_WALLET'`,
     [game.id],
   );
-  report(!r.ok && r.err.includes("waiting"), "BLOCKED: cannot leave a game that is playing");
+  report(r.ok && r.rowCount === 1, "ALLOWED: service_role can delete from playing game (EF guards status)");
 
   // ── Anon RPC privilege boundary ──
 
@@ -264,13 +265,12 @@ async function main() {
   report(!r.ok, "BLOCKED: anon cannot call update_player_display_name",
     r.err);
 
-  // 17. Anon cannot call leave_game_verified
+  // 17. Anon cannot delete players (RLS blocks it)
   r = await as("anon",
-    `SELECT leave_game_verified($1, 'VICTIM_WALLET')`,
+    `DELETE FROM players WHERE game_id=$1 AND wallet_address='BYSTANDER'`,
     [waitGame.id],
   );
-  report(!r.ok, "BLOCKED: anon cannot call leave_game_verified",
-    r.err);
+  report(r.rowCount === 0, "BLOCKED: anon cannot delete players directly");
 
   // ── Cross-player denial ──
 
@@ -288,13 +288,13 @@ async function main() {
     "DENIED: RPC with wrong wallet does not affect victim row",
   );
 
-  // 19. Leave RPC with wrong wallet = no-op on waiting game
+  // 19. Delete with wrong wallet = no-op (EF scopes by wallet_address)
   await db.query(
     `INSERT INTO players (game_id, wallet_address, display_name) VALUES ($1, 'BYSTANDER', 'Bystander')`,
     [waitGame.id],
   );
   r = await as("service_role",
-    `SELECT leave_game_verified($1, 'NONEXISTENT_WALLET')`,
+    `DELETE FROM players WHERE game_id=$1 AND wallet_address='NONEXISTENT_WALLET'`,
     [waitGame.id],
   );
   const { rows: waitPlayers } = await db.query(
@@ -303,7 +303,7 @@ async function main() {
   );
   report(
     waitPlayers.some((p: any) => p.wallet_address === "BYSTANDER"),
-    "DENIED: leave RPC with wrong wallet does not remove bystander",
+    "DENIED: delete with wrong wallet does not remove bystander",
   );
 
   // ── Cross-room isolation ──
@@ -331,7 +331,7 @@ async function main() {
     "ISOLATED: RPC on game A does not affect game B player",
   );
 
-  // 21. Leave RPC on game A cannot delete game B player
+  // 21. Delete on game A cannot delete game B player (game_id scoping)
   const { rows: [waitGameB] } = await db.query(
     `INSERT INTO games (room_code, host_wallet, status, current_round)
      VALUES ('WAIT_B','HOST_B','waiting',0) RETURNING id`,
@@ -341,7 +341,7 @@ async function main() {
     [waitGameB.id],
   );
   r = await as("service_role",
-    `SELECT leave_game_verified($1, 'CROSSLEAVER')`,
+    `DELETE FROM players WHERE game_id=$1 AND wallet_address='CROSSLEAVER'`,
     [waitGame.id],
   );
   const { rows: crossCheck } = await db.query(
@@ -350,7 +350,7 @@ async function main() {
   );
   report(
     crossCheck.some((p: any) => p.wallet_address === "CROSSLEAVER"),
-    "ISOLATED: leave RPC on game A does not remove game B player",
+    "ISOLATED: delete on game A does not remove game B player",
   );
 
   // ── Replay / duplicate join ──

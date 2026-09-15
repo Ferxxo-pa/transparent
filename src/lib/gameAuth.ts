@@ -114,3 +114,24 @@ export async function settleGameViaEdge(req: SettleRequest): Promise<SettleRespo
   const auth = await getGameAuthToken(req.gameId);
   return callEdgeFunction<SettleResponse>('settle-game', { ...req, auth });
 }
+
+export interface JoinGameResponse {
+  ok: boolean;
+  player?: { id: string; game_id: string; wallet_address: string; display_name: string; has_paid: boolean; is_ready: boolean };
+  error?: string;
+}
+
+export async function joinGameViaEdge(gameId: string, displayName?: string): Promise<JoinGameResponse> {
+  const auth = await getGameAuthToken(gameId);
+  return callEdgeFunction<JoinGameResponse>('join-game', { gameId, displayName, auth });
+}
+
+export async function readyUpViaEdge(gameId: string): Promise<{ ok: boolean; already?: boolean; error?: string }> {
+  const auth = await getGameAuthToken(gameId);
+  return callEdgeFunction('ready-up-player', { gameId, auth });
+}
+
+export async function leaveGameViaEdge(gameId: string, targetWallet?: string): Promise<{ ok: boolean; hostLeft?: boolean; error?: string }> {
+  const auth = await getGameAuthToken(gameId);
+  return callEdgeFunction('leave-game', { gameId, auth, ...(targetWallet ? { targetWallet } : {}) });
+}

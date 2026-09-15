@@ -46,7 +46,7 @@ import {
   deriveGamePDA as deriveEscrowGamePDA,
 } from '../lib/anchor-escrow';
 import { USE_ESCROW, USE_EDGE_GAME_AUTH } from '../lib/config';
-import { setGameAuthSigner, settleGameViaEdge } from '../lib/gameAuth';
+import { setGameAuthSigner, settleGameViaEdge, leaveGameViaEdge } from '../lib/gameAuth';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -1789,28 +1789,37 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
 
-        // Remove player from DB
-        await supabase
-          .from('players')
-          .delete()
-          .eq('game_id', gameId)
-          .eq('wallet_address', wallet.publicKey.toBase58());
-
-        // If host leaves, cancel the game so all clients get notified
-        if (isHost) {
-          // Broadcast host leaving so players get it immediately
-          if (channelRef.current) {
+        // Remove player from DB (Edge Function handles delete + host cancel)
+        if (USE_EDGE_GAME_AUTH) {
+          if (isHost && channelRef.current) {
             channelRef.current.send({
               type: 'broadcast',
               event: 'host_leaving',
               payload: {},
             });
           }
-
+          await leaveGameViaEdge(gameId);
+        } else {
           await supabase
-            .from('games')
-            .update({ status: 'cancelled' })
-            .eq('id', gameId);
+            .from('players')
+            .delete()
+            .eq('game_id', gameId)
+            .eq('wallet_address', wallet.publicKey.toBase58());
+
+          if (isHost) {
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'host_leaving',
+                payload: {},
+              });
+            }
+
+            await supabase
+              .from('games')
+              .update({ status: 'cancelled' })
+              .eq('id', gameId);
+          }
         }
       } catch (err) {
         console.warn('Failed to remove player from DB:', err);
@@ -1867,11 +1876,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // Remove player from DB
     try {
-      await supabase
-        .from('players')
-        .delete()
-        .eq('game_id', gameId)
-        .eq('wallet_address', playerWallet);
+      if (USE_EDGE_GAME_AUTH) {
+        await leaveGameViaEdge(gameId, playerWallet);
+      } else {
+        await supabase
+          .from('players')
+          .delete()
+          .eq('game_id', gameId)
+          .eq('wallet_address', playerWallet);
+      }
     } catch (err) {
       console.warn('[approveLeave] Remove failed:', err);
     }

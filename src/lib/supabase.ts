@@ -1,6 +1,6 @@
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, USE_EDGE_GAME_AUTH } from './config';
-import { advancePhaseViaEdge, settleGameViaEdge } from './gameAuth';
+import { advancePhaseViaEdge, settleGameViaEdge, joinGameViaEdge, readyUpViaEdge } from './gameAuth';
 
 // ============================================================
 // Supabase Client + Real-Time Helpers
@@ -154,6 +154,11 @@ export async function addPlayerToDB(data: {
   display_name: string;
   has_paid: boolean;
 }): Promise<PlayerRow> {
+  if (USE_EDGE_GAME_AUTH) {
+    const res = await joinGameViaEdge(data.game_id, data.display_name);
+    if (!res.ok || !res.player) throw new Error(res.error || 'join-game failed');
+    return res.player as PlayerRow;
+  }
   const { data: player, error } = await supabase
     .from('players')
     .upsert(data, { onConflict: 'game_id,wallet_address', ignoreDuplicates: false })
@@ -164,6 +169,11 @@ export async function addPlayerToDB(data: {
 }
 
 export async function readyUpPlayer(gameId: string, walletAddress: string): Promise<void> {
+  if (USE_EDGE_GAME_AUTH) {
+    const res = await readyUpViaEdge(gameId);
+    if (!res.ok && !res.already) throw new Error(res.error || 'ready-up failed');
+    return;
+  }
   const { error } = await supabase
     .from('players')
     .update({ is_ready: true })
