@@ -115,14 +115,14 @@ serve(async (req) => {
     }
 
     // ── Stale crash-lease reclaim ──────────────────────────────────
-    // A 'retrying' row past LEASE_TIMEOUT_MS means the process that
-    // claimed it is dead. Reclaim it to 'failed' so the normal retry
-    // flow below can run. This UPDATE only sets settlement_status +
-    // lease_reclaimed_at — paid_tx_signatures and pending_payouts are
-    // never touched, so signatures already persisted by the dead run
-    // are preserved exactly as-is.
+    // A 'retrying' or 'pending' row past LEASE_TIMEOUT_MS means the
+    // process that claimed it is dead. Reclaim it to 'failed' so the
+    // normal retry flow below can run. This UPDATE only sets
+    // settlement_status + lease_reclaimed_at — paid_tx_signatures and
+    // pending_payouts are never touched, so signatures already
+    // persisted by the dead run are preserved exactly as-is.
     let effectiveStatus = game.settlement_status;
-    if (effectiveStatus === 'retrying') {
+    if (effectiveStatus === 'retrying' || effectiveStatus === 'pending') {
       const leaseAgeMs = Date.now() - new Date(game.updated_at).getTime();
       if (leaseAgeMs > LEASE_TIMEOUT_MS) {
         const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
@@ -130,13 +130,10 @@ serve(async (req) => {
           .from('games')
           .update({ settlement_status: 'failed', lease_reclaimed_at: new Date().toISOString() })
           .eq('id', gameId)
-          .eq('settlement_status', 'retrying')
+          .eq('settlement_status', effectiveStatus)
           .lt('updated_at', staleThreshold)
           .select('id')
           .single();
-        // 0-row match means either the lease was already reclaimed/claimed
-        // by a concurrent caller, or a live process just touched it —
-        // either way, fall through to the normal 409 below.
         if (!reclaimErr && reclaimed) {
           effectiveStatus = 'failed';
         }

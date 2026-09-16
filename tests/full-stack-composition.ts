@@ -855,6 +855,40 @@ async function main() {
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
+  // 37. Stale 'pending' crash-lease reclaim — settle-game crashed after
+  // claiming 'pending' but before completing. Same 5-min timeout applies.
+  {
+    const staleUpdatedAt = new Date(Date.now() - LEASE_TIMEOUT_MS - 60_000).toISOString();
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-PENDING', 'HOST_LEASE6', 'gameover', 0, 100000, 'pending', '{"W1":50000}'::jsonb, '{"W1":{"sig":"mid_crash_sig","status":"submitted"}}'::jsonb) returning id`,
+    );
+    await db.query(`SET session_replication_role = replica`);
+    await db.query(`update games set updated_at = $2 where id = $1`, [g.id, staleUpdatedAt]);
+    await db.query(`SET session_replication_role = DEFAULT`);
+
+    const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
+    const r = await asPersist("service_role",
+      `update games set settlement_status = 'failed', lease_reclaimed_at = now()
+       where id = $1 and settlement_status = 'pending' and updated_at < $2
+       returning id`,
+      [g.id, staleThreshold],
+    );
+    report(r.ok && r.rowCount === 1, "settlement: stale 'pending' crash-lease reclaim succeeds", r.err);
+
+    const { rows: [state] } = await db.query(
+      `select settlement_status, lease_reclaimed_at, paid_tx_signatures from games where id = $1`, [g.id],
+    );
+    const w1Sig = (state.paid_tx_signatures as any).W1;
+    report(
+      state.settlement_status === 'failed' && state.lease_reclaimed_at !== null &&
+      w1Sig?.sig === 'mid_crash_sig' && w1Sig?.status === 'submitted',
+      "settlement: pending crash-lease preserves sigs and transitions to 'failed'",
+      `status=${state.settlement_status} sig=${JSON.stringify(w1Sig)}`,
+    );
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
   const { rows: policies } = await db.query(`
     select tablename, policyname, cmd, permissive, qual, with_check
     from pg_policies
