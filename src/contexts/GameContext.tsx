@@ -1227,13 +1227,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch { return; }
     if (Object.keys(freshOwed).length === 0) return;
 
-    // Atomically claim the retry by setting settlement_status to 'retrying'
-    const { error: claimErr } = await supabase
+    // Atomically claim the retry by setting settlement_status to 'retrying'.
+    // .select() forces Supabase to return matched rows — empty data means
+    // another tab/device already claimed (the eq('settlement_status','failed')
+    // filter excludes rows already set to 'retrying').
+    const { data: claimed, error: claimErr } = await supabase
       .from('games')
       .update({ settlement_status: 'retrying' })
       .eq('id', gid)
-      .eq('settlement_status', 'failed');
-    if (claimErr) return;
+      .eq('settlement_status', 'failed')
+      .select('id');
+    if (claimErr || !claimed || claimed.length === 0) return;
 
     settlementLockRef.current = true;
     setLoading(true);
