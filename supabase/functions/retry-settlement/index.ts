@@ -2,13 +2,26 @@
 // Backend-authoritative retry for failed game settlement.
 //
 // Signature reconciliation: before re-sending, unknown/submitted sigs are
-// checked on-chain via getSignatureStatuses. Only recipients with no sig
-// or a confirmed-failed sig are re-sent. Unknown sigs that still can't be
-// resolved are flagged for manual review (the function halts).
+// checked on-chain via getSignatureStatuses. Recipients with a confirmed
+// sig are dropped entirely (already paid). Recipients whose sig is still
+// unknown/submitted after the on-chain check are left un-sent for this
+// run (never resent — status unresolved means we can't rule out that the
+// prior attempt already landed) but do NOT block other recipients who
+// have a definite 'failed' sig or no sig at all from being retried.
 //
 // Setup code (keypair, PDA derivation) runs inside try/catch AFTER the
 // atomic claim. If setup throws, status reverts to 'failed' so the game
 // is never permanently stuck in 'retrying'.
+//
+// Crash-lease reclaim: the atomic claim below flips 'failed' -> 'retrying'
+// and only reverts on a thrown error. If the process is instead killed
+// (terminated, not thrown) mid-run, the row stays at 'retrying' forever —
+// the client can never re-trigger retry since it requires 'failed'. Before
+// rejecting a non-'failed' status, we check for a 'retrying' row whose
+// `updated_at` is older than LEASE_TIMEOUT_MS and reclaim it back to
+// 'failed'. The reclaim UPDATE only ever touches settlement_status +
+// lease_reclaimed_at, so any signatures a crashed run already persisted
+// are never overwritten.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -24,6 +37,11 @@ import { verifyGameAuth, corsHeaders, jsonResponse, type GameAuthToken } from '.
 
 const DEFAULT_PROGRAM_ID = '2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9';
 const DISTRIBUTE_DISCRIMINATOR = new Uint8Array([191, 44, 223, 207, 164, 236, 126, 61]);
+
+// A live retry run persists a sig update (pre-broadcast, per-recipient) at
+// least every few seconds; 5 minutes of silence means the process holding
+// the lease is dead, not just slow.
+const LEASE_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface RetryRequest {
   gameId: string;
@@ -85,7 +103,7 @@ serve(async (req) => {
     // ── Auth BEFORE mutation: reject unauthorized callers without touching DB ──
     const { data: game, error: lookupErr } = await supabase
       .from('games')
-      .select('host_wallet, settlement_status')
+      .select('host_wallet, settlement_status, updated_at')
       .eq('id', gameId)
       .single();
 
@@ -95,7 +113,37 @@ serve(async (req) => {
     if (wallet !== game.host_wallet) {
       return jsonResponse({ error: 'only the host may retry settlement' }, 403);
     }
-    if (game.settlement_status !== 'failed') {
+
+    // ── Stale crash-lease reclaim ──────────────────────────────────
+    // A 'retrying' row past LEASE_TIMEOUT_MS means the process that
+    // claimed it is dead. Reclaim it to 'failed' so the normal retry
+    // flow below can run. This UPDATE only sets settlement_status +
+    // lease_reclaimed_at — paid_tx_signatures and pending_payouts are
+    // never touched, so signatures already persisted by the dead run
+    // are preserved exactly as-is.
+    let effectiveStatus = game.settlement_status;
+    if (effectiveStatus === 'retrying') {
+      const leaseAgeMs = Date.now() - new Date(game.updated_at).getTime();
+      if (leaseAgeMs > LEASE_TIMEOUT_MS) {
+        const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
+        const { data: reclaimed, error: reclaimErr } = await supabase
+          .from('games')
+          .update({ settlement_status: 'failed', lease_reclaimed_at: new Date().toISOString() })
+          .eq('id', gameId)
+          .eq('settlement_status', 'retrying')
+          .lt('updated_at', staleThreshold)
+          .select('id')
+          .single();
+        // 0-row match means either the lease was already reclaimed/claimed
+        // by a concurrent caller, or a live process just touched it —
+        // either way, fall through to the normal 409 below.
+        if (!reclaimErr && reclaimed) {
+          effectiveStatus = 'failed';
+        }
+      }
+    }
+
+    if (effectiveStatus !== 'failed') {
       return jsonResponse({ error: 'retry claim failed — game is not in failed state or another retry is in progress' }, 409);
     }
 
@@ -151,54 +199,49 @@ serve(async (req) => {
     const sigRecords = normalizeSigRecords(claimed.paid_tx_signatures);
 
     // ── Reconcile unknown/submitted sigs on-chain before deciding who to skip ──
+    // Never-resend-unknown rule: a recipient whose sig is still unresolved
+    // after this check may already have been paid by a prior run — treat
+    // it as potentially sent and never resend, but do NOT let it block
+    // OTHER recipients (definite 'failed' sig, or no sig at all) from
+    // being retried in this same call.
     const unresolvedEntries = Object.entries(sigRecords).filter(
       ([_, r]) => r.status === 'unknown' || r.status === 'submitted',
     );
+    const doNotResend = new Set<string>();
     if (unresolvedEntries.length > 0) {
       try {
         const sigStrings = unresolvedEntries.map(([_, r]) => r.sig);
         const statuses = await connection.getSignatureStatuses(sigStrings);
-        let hasUnrecoverable = false;
 
         unresolvedEntries.forEach(([w, record], i) => {
           const status = statuses.value[i];
           if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) {
             record.status = status.err ? 'failed' : 'confirmed';
           } else {
-            hasUnrecoverable = true;
+            // Still unknown after the on-chain check — may have landed.
+            doNotResend.add(w);
           }
         });
 
         // Persist reconciled sig statuses
         await supabase.from('games').update({ paid_tx_signatures: sigRecords }).eq('id', gameId);
-
-        if (hasUnrecoverable) {
-          const unresolved = unresolvedEntries
-            .filter(([_, r]) => r.status === 'unknown' || r.status === 'submitted')
-            .map(([w, r]) => `${w}:${r.sig}`);
-          await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId);
-          return jsonResponse({
-            error: `Cannot safely retry — ${unresolved.length} transaction(s) have unknown on-chain status. Manual verification required.`,
-            unresolved,
-            signatures: sigRecords,
-          }, 500);
-        }
       } catch (reconcileErr) {
         console.error('[retry-settlement] On-chain reconciliation failed:', reconcileErr);
-        await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId);
-        return jsonResponse({
-          error: `On-chain signature reconciliation failed: ${(reconcileErr as Error).message}`,
-          signatures: sigRecords,
-        }, 500);
+        // Could not verify any of these — never resend any of them this run.
+        for (const [w] of unresolvedEntries) doNotResend.add(w);
       }
     }
 
-    // Only skip confirmed recipients — failed sigs mean the recipient is still owed
+    // Confirmed recipients are fully paid — drop from owed entirely.
     for (const [w, record] of Object.entries(sigRecords)) {
       if (record.status === 'confirmed') {
         delete pendingPayouts[w];
       }
     }
+    // NOTE: doNotResend wallets are deliberately left IN pendingPayouts —
+    // they stay "owed" for bookkeeping (so the game is never marked
+    // 'settled' while their outcome is unknown) even though the send loop
+    // below skips them.
 
     if (Object.keys(pendingPayouts).length === 0) {
       const { error: finalErr } = await supabase.from('games').update({
@@ -219,6 +262,11 @@ serve(async (req) => {
     const stillOwed = { ...pendingPayouts };
 
     for (const [recipient, lamports] of Object.entries(pendingPayouts)) {
+      if (doNotResend.has(recipient)) {
+        // Never resend — prior outcome is still unknown after on-chain
+        // reconciliation. Leave it in stillOwed for manual review.
+        continue;
+      }
       if (!Number.isInteger(lamports) || lamports <= 0) {
         delete stillOwed[recipient];
         continue;

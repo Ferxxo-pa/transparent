@@ -30,13 +30,18 @@ export interface GameRow {
   question_pick_votes?: Record<string, number> | null;
   storyteller_choice?: 'truth' | 'fake' | null;
   game_pda?: string | null;
-  settlement_status?: 'none' | 'pending' | 'settled' | 'failed' | null;
+  settlement_status?: 'none' | 'pending' | 'settled' | 'failed' | 'retrying' | null;
   pending_payouts?: Record<string, number> | null;
   /** Wallet -> confirmed on-chain tx signature. Durable per-recipient payout
    *  record, checked ahead of pending_payouts on retry so a wallet already
    *  paid is never re-sent to, even if the pending_payouts write after it
    *  failed to land. */
   paid_tx_signatures?: Record<string, string> | null;
+  /** Auto-touched on every row update — used by retry-settlement to detect
+   *  a 'retrying' lease whose owning process died mid-run. */
+  updated_at?: string;
+  /** Set by retry-settlement when it reclaims a stale 'retrying' lease. */
+  lease_reclaimed_at?: string | null;
   created_at: string;
 }
 

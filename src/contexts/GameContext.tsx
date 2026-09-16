@@ -1252,18 +1252,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Retry Failed Settlement ─────────────────────────────
   const settlementLockRef = useRef(false);
 
+  // Crash-lease recovery: retry-settlement claims by flipping
+  // settlement_status 'failed' -> 'retrying' server-side, and reclaims a
+  // 'retrying' row back to 'failed' if it's been stuck longer than this
+  // (see LEASE_TIMEOUT_MS in supabase/functions/retry-settlement). The
+  // client mirrors that same timeout only to decide whether to bother
+  // calling the edge function at all — the edge function is the sole
+  // authority on whether a lease is actually stale.
+  const RETRY_LEASE_TIMEOUT_MS = 5 * 60 * 1000;
+
   const retrySettlement = useCallback(async () => {
-    // KNOWN GAP — no crash lease recovery: retry-settlement claims by
-    // flipping settlement_status 'failed' -> 'retrying' server-side, and
-    // only reverts to 'failed' if its own setup throws. If that edge
-    // function's process is killed (not thrown, just terminated) mid-run,
-    // the row is stuck at 'retrying' forever — this guard below requires
-    // settlementStatus === 'failed', so the host can never re-trigger a
-    // retry and the game is unrecoverable without a manual DB fix. A real
-    // fix needs a server-side lease timeout (e.g. reclaim 'retrying' rows
-    // whose updated_at is older than N minutes) since the client can't be
-    // trusted to self-report a stale lease. Out of scope here — this file
-    // only owns the client call site, not the edge function's claim logic.
     if (settlementLockRef.current) return;
     const wallet = walletRef.current;
     if (!wallet || !gameState) return;
@@ -1271,7 +1269,34 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const hostWallet = (gameState as any).hostWallet;
     const isHost = wallet.publicKey.toBase58() === hostWallet;
     if (!gid || !isHost) return;
-    if (gameState.settlementStatus !== 'failed') return;
+
+    // The client can't be trusted to self-report a stale lease from local
+    // cache — fetch fresh state so a crashed run from moments ago (which
+    // our last poll/realtime update may predate) is detected correctly.
+    const { data: freshGame, error: freshErr } = await supabase
+      .from('games')
+      .select('settlement_status, updated_at')
+      .eq('id', gid)
+      .single();
+    if (freshErr || !freshGame) {
+      setError('Unable to verify settlement state before retry.');
+      return;
+    }
+
+    const freshStatus = (freshGame as any).settlement_status;
+    if (freshStatus !== 'failed') {
+      if (freshStatus === 'retrying') {
+        const leaseAgeMs = Date.now() - new Date((freshGame as any).updated_at).getTime();
+        if (leaseAgeMs < RETRY_LEASE_TIMEOUT_MS) {
+          // Genuinely in progress — not stuck yet.
+          return;
+        }
+        setError('Settlement may have stalled — retrying safely.');
+        // Stale lease — fall through and let the edge function reclaim it.
+      } else {
+        return;
+      }
+    }
 
     settlementLockRef.current = true;
     setLoading(true);
@@ -1281,6 +1306,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setError(result.error || 'Settlement retry failed');
         return;
       }
+      setError(null);
       setGameState((prev) =>
         prev ? {
           ...prev,

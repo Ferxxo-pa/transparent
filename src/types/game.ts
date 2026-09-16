@@ -151,8 +151,12 @@ export interface GameState {
   currentRoundMode?: 'classic' | 'exposer' | 'storyteller';
   /** Whether the host controls question author visibility in exposer mode */
   exposerShowAuthors?: boolean;
-  /** Settlement state: whether on-chain distribute() actually landed after gameover */
-  settlementStatus?: 'none' | 'pending' | 'settled' | 'failed';
+  /** Settlement state: whether on-chain distribute() actually landed after gameover.
+   *  'retrying' is a transient claim held by retry-settlement while it runs;
+   *  the edge function reclaims a stale 'retrying' row back to 'failed' on
+   *  its own (see LEASE_TIMEOUT_MS) — clients should never assume 'retrying'
+   *  means a live process is still working it. */
+  settlementStatus?: 'none' | 'pending' | 'settled' | 'failed' | 'retrying';
   /** Wallet -> lamports still owed when settlementStatus is 'failed'; retry-safe, cleared once paid */
   pendingPayouts?: Record<string, number> | null;
   /** Wallet -> tx signature record for a payout attempt. Durable proof of

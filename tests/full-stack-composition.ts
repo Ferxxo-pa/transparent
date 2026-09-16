@@ -52,6 +52,7 @@ const FULL_STACK = [
   "supabase/migrations/20260915_fix_policy_status_mismatch.sql",
   "supabase/migrations/20260915_settlement_retrying_check.sql",
   "supabase/migrations/20260915_question_submitter_verification.sql",
+  "supabase/migrations/20260916_settlement_lease_reclaim.sql",
 ];
 
 // Phase 2: auth binding drops anon INSERT on question_submissions entirely
@@ -699,7 +700,160 @@ async function main() {
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
+  console.log("\n── Crash-lease reclaim (retry-settlement stale 'retrying' recovery) ──\n");
 
+  const LEASE_TIMEOUT_MS = 5 * 60 * 1000;
+
+  // 31. Stale lease reclaim preserves existing signatures — the reclaim
+  // UPDATE only ever touches settlement_status + lease_reclaimed_at, so a
+  // sig persisted by the dead run must survive byte-for-byte.
+  {
+    const staleUpdatedAt = new Date(Date.now() - LEASE_TIMEOUT_MS - 60_000).toISOString();
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-STALE', 'HOST_LEASE1', 'gameover', 0, 100000, 'retrying', '{"W1":50000,"W2":50000}'::jsonb, '{"W1":{"sig":"pre_crash_sig","status":"submitted"}}'::jsonb) returning id`,
+    );
+    // Force updated_at to look stale (bypassing the touch trigger via a raw postgres update).
+    // The touch trigger fires on every UPDATE for every role — disable it
+    // just for this test-only backdate so we can simulate "time has passed".
+    await db.query(`SET session_replication_role = replica`);
+    await db.query(`update games set updated_at = $2 where id = $1`, [g.id, staleUpdatedAt]);
+    await db.query(`SET session_replication_role = DEFAULT`);
+
+    const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
+    const r = await asPersist("service_role",
+      `update games set settlement_status = 'failed', lease_reclaimed_at = now()
+       where id = $1 and settlement_status = 'retrying' and updated_at < $2
+       returning id`,
+      [g.id, staleThreshold],
+    );
+    report(r.ok && r.rowCount === 1, "settlement: stale-lease reclaim UPDATE succeeds", r.err);
+
+    const { rows: [state] } = await db.query(
+      `select settlement_status, lease_reclaimed_at, pending_payouts, paid_tx_signatures from games where id = $1`, [g.id],
+    );
+    const w1Sig = (state.paid_tx_signatures as any).W1;
+    report(
+      w1Sig?.sig === 'pre_crash_sig' && w1Sig?.status === 'submitted' &&
+      (state.pending_payouts as any).W1 === 50000 && (state.pending_payouts as any).W2 === 50000,
+      "settlement: reclaim preserves existing signatures and pending_payouts untouched",
+      `sig=${JSON.stringify(w1Sig)} pending=${JSON.stringify(state.pending_payouts)}`,
+    );
+
+    // 32. Reclaimed row is 'failed' (retriable), not 'none' (would allow
+    // a fresh settle-game claim and risk re-derivation of payouts/duplicate send).
+    report(
+      state.settlement_status === 'failed' && state.lease_reclaimed_at !== null,
+      "settlement: reclaimed row is 'failed' (not 'none'), lease_reclaimed_at audit field set",
+      `status=${state.settlement_status} lease_reclaimed_at=${state.lease_reclaimed_at}`,
+    );
+
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 33. Non-stale 'retrying' lease is NOT reclaimed — a genuinely in-progress
+  // run must not be yanked out from under itself.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-FRESH', 'HOST_LEASE2', 'gameover', 0, 100000, 'retrying', '{"W1":50000}'::jsonb, '{}'::jsonb) returning id`,
+    );
+    // updated_at defaults to now() — well within the lease window.
+    const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
+    const r = await as("service_role",
+      `update games set settlement_status = 'failed', lease_reclaimed_at = now()
+       where id = $1 and settlement_status = 'retrying' and updated_at < $2
+       returning id`,
+      [g.id, staleThreshold],
+    );
+    report(r.rowCount === 0, "settlement: fresh (non-stale) 'retrying' lease is not reclaimed", `rowCount=${r.rowCount}`);
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 34. Concurrent reclaim attempts on the same stale lease — only one
+  // succeeds (atomic UPDATE ... WHERE settlement_status='retrying' means
+  // the second caller's WHERE no longer matches once the first commits).
+  {
+    const staleUpdatedAt = new Date(Date.now() - LEASE_TIMEOUT_MS - 60_000).toISOString();
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-RACE', 'HOST_LEASE3', 'gameover', 0, 100000, 'retrying', '{"W1":50000}'::jsonb, '{}'::jsonb) returning id`,
+    );
+    // The touch trigger fires on every UPDATE for every role — disable it
+    // just for this test-only backdate so we can simulate "time has passed".
+    await db.query(`SET session_replication_role = replica`);
+    await db.query(`update games set updated_at = $2 where id = $1`, [g.id, staleUpdatedAt]);
+    await db.query(`SET session_replication_role = DEFAULT`);
+    const staleThreshold = new Date(Date.now() - LEASE_TIMEOUT_MS).toISOString();
+
+    const r1 = await asPersist("service_role",
+      `update games set settlement_status = 'failed', lease_reclaimed_at = now()
+       where id = $1 and settlement_status = 'retrying' and updated_at < $2 returning id`,
+      [g.id, staleThreshold],
+    );
+    report(r1.ok && r1.rowCount === 1, "settlement: first concurrent reclaim succeeds", r1.err);
+
+    const r2 = await as("service_role",
+      `update games set settlement_status = 'failed', lease_reclaimed_at = now()
+       where id = $1 and settlement_status = 'retrying' and updated_at < $2 returning id`,
+      [g.id, staleThreshold],
+    );
+    report(r2.rowCount === 0, "settlement: second concurrent reclaim gets 0 rows (already reclaimed)", `rowCount=${r2.rowCount}`);
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 35. Retry after reclaim skips players with confirmed/submitted/unknown
+  // sigs — only a definite 'failed' sig or no sig entry at all is re-sent.
+  // This mirrors retry-settlement's doNotResend logic post-reconciliation.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-RECLAIM-SKIP', 'HOST_LEASE4', 'gameover', 0, 400000, 'failed',
+         '{"CONFIRMED_W":100000,"SUBMITTED_W":100000,"UNKNOWN_W":100000,"FAILED_W":100000,"NOSIG_W":100000}'::jsonb,
+         '{"CONFIRMED_W":{"sig":"s1","status":"confirmed"},"SUBMITTED_W":{"sig":"s2","status":"submitted"},"UNKNOWN_W":{"sig":"s3","status":"unknown"},"FAILED_W":{"sig":"s4","status":"failed"}}'::jsonb
+       ) returning id`,
+    );
+    const { rows: [claimed] } = await db.query(`select pending_payouts, paid_tx_signatures from games where id = $1`, [g.id]);
+    const pendingPayouts: Record<string, number> = { ...claimed.pending_payouts };
+    const sigRecords: Record<string, { sig: string; status: string }> = { ...claimed.paid_tx_signatures };
+
+    // Simulate reconciliation: getSignatureStatuses returns nothing new for
+    // SUBMITTED_W/UNKNOWN_W (still unresolved) — never-resend-unknown rule.
+    const unresolved = Object.entries(sigRecords).filter(([, r]) => r.status === 'unknown' || r.status === 'submitted');
+    const doNotResend = new Set(unresolved.map(([w]) => w));
+
+    // Confirmed recipients are fully paid — drop from owed entirely.
+    for (const [w, r] of Object.entries(sigRecords)) {
+      if (r.status === 'confirmed') delete pendingPayouts[w];
+    }
+
+    const sendable = Object.keys(pendingPayouts).filter((w) => !doNotResend.has(w));
+    report(
+      sendable.length === 2 && sendable.includes('FAILED_W') && sendable.includes('NOSIG_W') &&
+      !sendable.includes('CONFIRMED_W') && !sendable.includes('SUBMITTED_W') && !sendable.includes('UNKNOWN_W'),
+      "settlement: retry sendable set is exactly {failed sig, no sig} — confirmed/submitted/unknown all skipped",
+      `sendable=${JSON.stringify(sendable)}`,
+    );
+    // doNotResend wallets stay "owed" for bookkeeping even though un-sent.
+    report(
+      pendingPayouts['SUBMITTED_W'] === 100000 && pendingPayouts['UNKNOWN_W'] === 100000,
+      "settlement: unresolved-after-check wallets remain in pending_payouts (never marked settled while unknown)",
+    );
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 36. Fresh retry (no stale lease involved) still works exactly as
+  // before — 'failed' -> atomic claim to 'retrying' succeeds normally.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEASE-NOOP', 'HOST_LEASE5', 'gameover', 0, 100000, 'failed', '{"W1":50000}'::jsonb, '{}'::jsonb) returning id`,
+    );
+    const r = await asPersist("service_role",
+      `update games set settlement_status = 'retrying' where id = $1 and settlement_status = 'failed' returning id`, [g.id]);
+    report(r.ok && r.rowCount === 1, "settlement: fresh retry claim (no reclaim needed) still succeeds", r.err);
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
 
   const { rows: policies } = await db.query(`
     select tablename, policyname, cmd, permissive, qual, with_check
