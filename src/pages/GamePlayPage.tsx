@@ -15,7 +15,7 @@ import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
 export const GamePlayPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote, submitQuestion, voteForQuestion, resetGame } = useGame();
+  const { gameState, error, castVote, advanceHotTakePhase, forceAdvanceRound, endGameNow, pollGameState, hostPickQuestion, sendQuestionsToVote, storytellerChoose, storytellerAdvance, skipQuestion, castStakeVote, testAutoVote, submitQuestion, voteForQuestion, resetGame } = useGame();
   const { publicKey } = usePrivyWallet();
 
   const isTestMode = gameState?.roomCode === '000-000';
@@ -568,6 +568,31 @@ export const GamePlayPage: React.FC = () => {
               </div>
               <span className="mono" style={{ fontSize: 9, color: 'var(--ink-faint)' }}>{votesIn}/{voterCount}</span>
             </div>
+
+            {/* Round-advance error + retry — the DB save happens before local
+                state moves on, so a failure here means the round is still
+                stuck at the current question. Never advance silently. */}
+            {error && (
+              <div
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 8,
+                  padding: '10px 12px', borderRadius: 12,
+                  background: 'rgba(255,80,80,0.08)', border: '1px solid rgba(255,80,80,0.25)',
+                }}
+              >
+                <p className="mono" style={{ fontSize: 11, color: 'var(--tangerine)', margin: 0 }}>
+                  {error}
+                </p>
+                <motion.button
+                  className="btn-degen"
+                  onClick={forceAdvanceRound}
+                  whileTap={{ scale: 0.96 }}
+                  style={{ width: '100%' }}
+                >
+                  retry
+                </motion.button>
+              </div>
+            )}
 
             {/* Host controls */}
             <motion.button

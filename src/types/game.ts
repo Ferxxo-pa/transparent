@@ -155,6 +155,10 @@ export interface GameState {
   settlementStatus?: 'none' | 'pending' | 'settled' | 'failed';
   /** Wallet -> lamports still owed when settlementStatus is 'failed'; retry-safe, cleared once paid */
   pendingPayouts?: Record<string, number> | null;
+  /** Wallet -> confirmed on-chain tx signature for a landed payout. Durable
+   *  proof a recipient was already paid — checked ahead of pendingPayouts so
+   *  a retry can never re-send to a wallet whose payment already landed. */
+  paidTxSignatures?: Record<string, string> | null;
 }
 
 // ── 30+ Party Questions ─────────────────────────────────────

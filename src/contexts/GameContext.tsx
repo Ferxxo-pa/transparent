@@ -226,6 +226,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
               settlementStatus: (game as any).settlement_status ?? prev.settlementStatus,
               pendingPayouts: (game as any).pending_payouts ?? prev.pendingPayouts,
+              paidTxSignatures: (game as any).paid_tx_signatures ?? prev.paidTxSignatures,
               // Clear votes for all clients when round or player changes
               ...(roundChanged || playerChanged ? { votes: {}, voteCount: 0 } : {}),
               // Restore storyteller choice from DB so hot-seat player can't cheat by refreshing
@@ -1024,6 +1025,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // become "gameover" with money still owed.
         let settlementOutcome: 'none' | 'settled' | 'failed' = 'none';
         let unpaidLamports: Record<string, number> = {};
+        let paidSignatures: Record<string, string> = {};
 
         // Only attempt on-chain distribution if there's an actual buy-in and we're the host
         if (gameState.buyInAmount > 0 && isHost) {
@@ -1092,22 +1094,30 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
+                  let sig: string;
                   if (USE_ESCROW) {
-                    await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
+                    sig = await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
                   } else {
                     try {
-                      await distributeViaMagicBlock(wallet, playerPubkey, lamports);
+                      sig = await distributeViaMagicBlock(wallet, playerPubkey, lamports);
                     } catch (mbErr) {
                       console.warn('[MagicBlock] ER distribute failed, falling back:', mbErr);
-                      await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+                      sig = await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
                     }
                   }
+                  // Record the signature the instant the send confirms —
+                  // before the DB write below, which can itself fail. Even
+                  // if that write is lost, retrySettlement's fresh fetch
+                  // checks paid_tx_signatures first and will never re-send
+                  // to this wallet.
                   delete stillOwed[playerWallet];
+                  paidSignatures[playerWallet] = sig;
                   if (gid) {
                     await updateGameStatus(gid, {
                       settlement_status: 'failed',
                       pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
-                    }).catch(dbErr => console.error(`[settle] DB write after paying ${playerWallet} failed — payout was sent:`, dbErr));
+                      paid_tx_signatures: paidSignatures,
+                    }).catch(dbErr => console.error(`[settle] DB write after paying ${playerWallet} (tx ${sig}) failed — payout was sent:`, dbErr));
                   }
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
@@ -1145,6 +1155,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ...(settlementOutcome !== 'none' ? {
               settlement_status: settlementOutcome,
               pending_payouts: settlementOutcome === 'failed' ? unpaidLamports : null,
+              paid_tx_signatures: Object.keys(paidSignatures).length > 0 ? paidSignatures : null,
             } : {}),
           });
         }
@@ -1157,6 +1168,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ...(settlementOutcome !== 'none' ? {
               settlementStatus: settlementOutcome,
               pendingPayouts: settlementOutcome === 'failed' ? unpaidLamports : null,
+              paidTxSignatures: Object.keys(paidSignatures).length > 0 ? paidSignatures : null,
             } : {}),
           } : null,
         );
@@ -1220,11 +1232,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Re-fetch DB state to get authoritative pending_payouts (guards
     // against stale local state and concurrent retry from another tab)
     let freshOwed: Record<string, number>;
+    let freshPaidSignatures: Record<string, string>;
     try {
-      const { data } = await supabase.from('games').select('pending_payouts, settlement_status').eq('id', gid).single();
+      const { data } = await supabase.from('games').select('pending_payouts, paid_tx_signatures, settlement_status').eq('id', gid).single();
       if (!data || data.settlement_status !== 'failed') return;
       freshOwed = (data.pending_payouts as Record<string, number>) ?? {};
+      freshPaidSignatures = (data.paid_tx_signatures as Record<string, string>) ?? {};
     } catch { return; }
+    // A wallet with a recorded signature was already paid — never re-send to
+    // it even if a prior partial DB write left it stranded in pending_payouts.
+    for (const paidWallet of Object.keys(freshPaidSignatures)) delete freshOwed[paidWallet];
     if (Object.keys(freshOwed).length === 0) return;
 
     // Atomically claim the retry by setting settlement_status to 'retrying'.
@@ -1248,25 +1265,29 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         : deriveGamePDA(hostPubkey, gameState.roomName);
 
       const stillOwed: Record<string, number> = { ...freshOwed };
+      const paidSignatures: Record<string, string> = { ...freshPaidSignatures };
       for (const [playerWallet, lamports] of Object.entries(freshOwed)) {
         if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
         try {
           const playerPubkey = new PublicKey(playerWallet);
+          let sig: string;
           if (USE_ESCROW) {
-            await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
+            sig = await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
           } else {
             try {
-              await distributeViaMagicBlock(wallet, playerPubkey, lamports);
+              sig = await distributeViaMagicBlock(wallet, playerPubkey, lamports);
             } catch (mbErr) {
               console.warn('[MagicBlock] ER retry failed, falling back:', mbErr);
-              await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
+              sig = await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
             }
           }
           delete stillOwed[playerWallet];
+          paidSignatures[playerWallet] = sig;
           await updateGameStatus(gid, {
             settlement_status: 'retrying',
             pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
-          }).catch(dbErr => console.error(`[retrySettle] DB write after paying ${playerWallet} failed — payout was sent:`, dbErr));
+            paid_tx_signatures: paidSignatures,
+          }).catch(dbErr => console.error(`[retrySettle] DB write after paying ${playerWallet} (tx ${sig}) failed — payout was sent:`, dbErr));
         } catch (sendErr) {
           console.warn(`[retrySettlement] Failed to send to ${playerWallet}:`, sendErr);
         }
@@ -1276,12 +1297,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await updateGameStatus(gid, {
         settlement_status: settled ? 'settled' : 'failed',
         pending_payouts: settled ? null : stillOwed,
+        paid_tx_signatures: paidSignatures,
       });
       setGameState((prev) =>
         prev ? {
           ...prev,
           settlementStatus: settled ? 'settled' : 'failed',
           pendingPayouts: settled ? null : stillOwed,
+          paidTxSignatures: paidSignatures,
         } : null,
       );
     } catch (err: any) {
@@ -1750,6 +1773,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             questionPickVotes: gameData.question_pick_votes ?? prev.questionPickVotes,
             settlementStatus: (gameData as any).settlement_status ?? prev.settlementStatus,
             pendingPayouts: (gameData as any).pending_payouts ?? prev.pendingPayouts,
+            paidTxSignatures: (gameData as any).paid_tx_signatures ?? prev.paidTxSignatures,
           } : {}),
         };
       });
@@ -1861,6 +1885,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           questionPickVotes: game.question_pick_votes ?? prev.questionPickVotes,
           settlementStatus: (game as any).settlement_status ?? prev.settlementStatus,
           pendingPayouts: (game as any).pending_payouts ?? prev.pendingPayouts,
+          paidTxSignatures: (game as any).paid_tx_signatures ?? prev.paidTxSignatures,
           // Clear votes on round change, otherwise update
           ...(roundChanged ? { votes: {}, voteCount: 0 } : { votes: voteMap, voteCount: votesRes.length }),
         };
@@ -1963,38 +1988,19 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
 
-        // Remove player from DB (Edge Function handles delete + host cancel)
-        if (USE_EDGE_GAME_AUTH) {
-          if (isHost && channelRef.current) {
-            channelRef.current.send({
-              type: 'broadcast',
-              event: 'host_leaving',
-              payload: {},
-            });
-          }
-          await leaveGameViaEdge(gameId);
-        } else {
-          await supabase
-            .from('players')
-            .delete()
-            .eq('game_id', gameId)
-            .eq('wallet_address', wallet.publicKey.toBase58());
-
-          if (isHost) {
-            if (channelRef.current) {
-              channelRef.current.send({
-                type: 'broadcast',
-                event: 'host_leaving',
-                payload: {},
-              });
-            }
-
-            await supabase
-              .from('games')
-              .update({ status: 'cancelled' })
-              .eq('id', gameId);
-          }
+        // Remove player from DB. Always via the leave-game Edge Function —
+        // RLS blocks anon DELETE on players entirely (players_delete_lockdown
+        // migration), since a raw client DELETE can't prove wallet ownership.
+        // The Edge Function verifies an ed25519 signature from this wallet
+        // and does the delete + host cancel atomically with service_role.
+        if (isHost && channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'host_leaving',
+            payload: {},
+          });
         }
+        await leaveGameViaEdge(gameId);
       } catch (err) {
         console.warn('Failed to remove player from DB:', err);
       }
@@ -2048,17 +2054,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
-    // Remove player from DB
+    // Remove player from DB. Always via the leave-game Edge Function — see
+    // leaveGame() above for why a raw client DELETE no longer works.
     try {
-      if (USE_EDGE_GAME_AUTH) {
-        await leaveGameViaEdge(gameId, playerWallet);
-      } else {
-        await supabase
-          .from('players')
-          .delete()
-          .eq('game_id', gameId)
-          .eq('wallet_address', playerWallet);
-      }
+      await leaveGameViaEdge(gameId, playerWallet);
     } catch (err) {
       console.warn('[approveLeave] Remove failed:', err);
     }

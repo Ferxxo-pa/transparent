@@ -32,6 +32,11 @@ export interface GameRow {
   game_pda?: string | null;
   settlement_status?: 'none' | 'pending' | 'settled' | 'failed' | null;
   pending_payouts?: Record<string, number> | null;
+  /** Wallet -> confirmed on-chain tx signature. Durable per-recipient payout
+   *  record, checked ahead of pending_payouts on retry so a wallet already
+   *  paid is never re-sent to, even if the pending_payouts write after it
+   *  failed to land. */
+  paid_tx_signatures?: Record<string, string> | null;
   created_at: string;
 }
 
@@ -138,6 +143,7 @@ const PROTECTED_GAME_COLUMNS = new Set([
   'current_pot',
   'settlement_status',
   'pending_payouts',
+  'paid_tx_signatures',
 ]);
 
 export async function updateGameStatus(
