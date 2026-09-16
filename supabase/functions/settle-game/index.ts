@@ -169,10 +169,11 @@ serve(async (req) => {
     }
 
     // ── ATOMIC CLAIM: .select().single() ensures exactly one caller proceeds ──
+    // Do NOT reset paid_tx_signatures here — a manual status reset to 'none'
+    // after a partial crash would lose already-sent sigs.
     const { data: claimData, error: claimErr } = await supabase.from('games').update({
       settlement_status: 'pending',
       pending_payouts: validPayouts,
-      paid_tx_signatures: {},
     }).eq('id', gameId).eq('settlement_status', 'none').select('id').single();
 
     if (claimErr || !claimData) {
