@@ -143,50 +143,129 @@ serve(async (req) => {
       programId,
     );
 
-    // The escrow program independently enforces: game status, settlement
-    // authority match, and total_pot limits. This function cannot overdraw.
-    const signatures: string[] = [];
+    // Filter valid payouts upfront
+    const validPayouts: Record<string, number> = {};
     for (const [recipient, lamports] of Object.entries(payouts)) {
-      if (!Number.isInteger(lamports) || lamports <= 0) continue;
-
-      const data = new Uint8Array(16);
-      data.set(DISTRIBUTE_DISCRIMINATOR, 0);
-      data.set(encodeU64LE(lamports), 8);
-
-      const ix = new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: gamePDA, isSigner: false, isWritable: true },
-          { pubkey: escrowPDA, isSigner: false, isWritable: true },
-          { pubkey: new PublicKey(recipient), isSigner: false, isWritable: true },
-          { pubkey: settlementKeypair.publicKey, isSigner: true, isWritable: false },
-          { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false },
-        ],
-        data,
-      });
-
-      const tx = new Transaction().add(ix);
-      tx.feePayer = settlementKeypair.publicKey;
-      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
-      tx.recentBlockhash = blockhash;
-      tx.sign(settlementKeypair);
-
-      const sig = await connection.sendRawTransaction(tx.serialize());
-      await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, 'confirmed');
-      signatures.push(sig);
+      if (Number.isInteger(lamports) && lamports > 0) validPayouts[recipient] = lamports;
     }
-
-    if (signatures.length === 0) {
+    if (Object.keys(validPayouts).length === 0) {
       return jsonResponse({ error: 'no valid payouts' }, 400);
     }
 
-    const { error: updateErr } = await supabase
-      .from('games')
-      .update({ status: 'gameover' })
-      .eq('id', gameId);
-    if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
+    // Durable pre-broadcast: record intent before sending anything on-chain
+    const { error: claimErr } = await supabase.from('games').update({
+      settlement_status: 'settling',
+      pending_payouts: validPayouts,
+      paid_tx_signatures: {},
+    }).eq('id', gameId);
+    if (claimErr) return jsonResponse({ error: 'failed to claim settlement' }, 500);
 
-    return jsonResponse({ ok: true, signatures });
+    const paidSignatures: Record<string, string> = {};
+    const stillOwed = { ...validPayouts };
+
+    for (const [recipient, lamports] of Object.entries(validPayouts)) {
+      try {
+        const data = new Uint8Array(16);
+        data.set(DISTRIBUTE_DISCRIMINATOR, 0);
+        data.set(encodeU64LE(lamports), 8);
+
+        const ix = new TransactionInstruction({
+          programId,
+          keys: [
+            { pubkey: gamePDA, isSigner: false, isWritable: true },
+            { pubkey: escrowPDA, isSigner: false, isWritable: true },
+            { pubkey: new PublicKey(recipient), isSigner: false, isWritable: true },
+            { pubkey: settlementKeypair.publicKey, isSigner: true, isWritable: false },
+            { pubkey: new PublicKey('11111111111111111111111111111111'), isSigner: false, isWritable: false },
+          ],
+          data,
+        });
+
+        const tx = new Transaction().add(ix);
+        tx.feePayer = settlementKeypair.publicKey;
+        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+        tx.recentBlockhash = blockhash;
+        tx.sign(settlementKeypair);
+
+        const sig = await connection.sendRawTransaction(tx.serialize());
+
+        // Record sig BEFORE confirm — if confirm times out the tx may still
+        // land on-chain. Without recording here, a retry would re-send.
+        paidSignatures[recipient] = sig;
+
+        const confirmation = await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight }, 'confirmed',
+        );
+
+        if (confirmation.value.err) {
+          console.warn(`[settle-game] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${sig}`);
+          continue;
+        }
+
+        delete stillOwed[recipient];
+
+        // Per-recipient crash-safe persist
+        const { error: persistErr } = await supabase.from('games').update({
+          settlement_status: 'settling',
+          pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
+          paid_tx_signatures: paidSignatures,
+        }).eq('id', gameId);
+
+        if (persistErr) {
+          console.error(`[settle-game] CRITICAL: chain send to ${recipient} succeeded (sig=${sig}) but DB persist failed:`, persistErr);
+          await supabase.from('games').update({
+            settlement_status: 'failed',
+            paid_tx_signatures: paidSignatures,
+          }).eq('id', gameId).catch(() => {});
+          return jsonResponse({
+            error: `Payout to ${recipient} confirmed on-chain (${sig}) but DB update failed. Manual reconciliation needed.`,
+            signatures: paidSignatures,
+            remaining: stillOwed,
+          }, 500);
+        }
+      } catch (sendErr) {
+        console.warn(`[settle-game] Failed to send to ${recipient}:`, sendErr);
+        // Unknown outcome: sig recorded but confirm timed out
+        if (paidSignatures[recipient]) {
+          await supabase.from('games').update({
+            settlement_status: 'failed',
+            pending_payouts: stillOwed,
+            paid_tx_signatures: paidSignatures,
+          }).eq('id', gameId).catch((e) => {
+            console.error(`[settle-game] CRITICAL: sig ${paidSignatures[recipient]} for ${recipient} not persisted to DB`);
+          });
+          return jsonResponse({
+            error: `Transaction to ${recipient} sent but confirmation timed out (sig=${paidSignatures[recipient]}). Verify on-chain before retrying.`,
+            signatures: paidSignatures,
+            remaining: stillOwed,
+          }, 500);
+        }
+      }
+    }
+
+    const settled = Object.keys(stillOwed).length === 0;
+    const { error: finalErr } = await supabase.from('games').update({
+      status: settled ? 'gameover' : game.status,
+      settlement_status: settled ? 'settled' : 'failed',
+      pending_payouts: settled ? null : stillOwed,
+      paid_tx_signatures: paidSignatures,
+    }).eq('id', gameId);
+
+    if (finalErr) {
+      console.error('[settle-game] Final DB update failed:', finalErr);
+      return jsonResponse({
+        error: 'Settlement payouts sent but final DB update failed. Manual reconciliation needed.',
+        signatures: paidSignatures,
+        remaining: settled ? undefined : stillOwed,
+      }, 500);
+    }
+
+    return jsonResponse({
+      ok: true,
+      settled,
+      signatures: paidSignatures,
+      ...(settled ? {} : { remaining: stillOwed }),
+    });
   } catch (e) {
     return jsonResponse({ error: (e as Error).message ?? 'internal error' }, 500);
   }

@@ -200,7 +200,10 @@ serve(async (req) => {
           // Revert to failed so retry can re-claim, but we can't guarantee
           // the revert succeeds either. The tx signature is logged above
           // for manual reconciliation.
-          await supabase.from('games').update({ settlement_status: 'failed' }).eq('id', gameId).catch(() => {});
+          await supabase.from('games').update({
+            settlement_status: 'failed',
+            paid_tx_signatures: paidSignatures,
+          }).eq('id', gameId).catch(() => {});
           return jsonResponse({
             error: `Payout to ${recipient} confirmed on-chain (${sig}) but DB update failed. Manual reconciliation needed.`,
             signatures: paidSignatures,
