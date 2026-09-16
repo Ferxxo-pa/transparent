@@ -9,6 +9,14 @@
 //      settlement_authority — it can only pay out, never mutate the game)
 //   4. marks the game settled in the DB with the service role
 //
+// CRASH DURABILITY BOUNDARY: paidSignatures lives in JS memory between
+// the sendRawTransaction return and the next DB write. If the Edge Function
+// process crashes in that window, the tx exists on-chain but the DB has no
+// record — retry will re-send. This is inherent to serverless (no local WAL).
+// Mitigation: per-recipient persist after each confirmed send, plus the sig
+// is recorded BEFORE confirmTransaction so a confirm-timeout still persists it.
+// The one uncoverable gap is process death between send and persist.
+//
 // DEVNET ONLY: refuses to run against any mainnet RPC.
 //
 // Secrets (supabase secrets set):
