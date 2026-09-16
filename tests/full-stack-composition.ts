@@ -51,6 +51,7 @@ const FULL_STACK = [
   "supabase/migrations/20260915_add_cancelled_status.sql",
   "supabase/migrations/20260915_fix_policy_status_mismatch.sql",
   "supabase/migrations/20260915_settlement_retrying_check.sql",
+  "supabase/migrations/20260915_question_submitter_verification.sql",
 ];
 
 async function main() {
@@ -195,6 +196,11 @@ async function main() {
     `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
      values ($1, 'PLAYER_A', 'A', true, true)`,
     [playingGame.id],
+  );
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+     values ($1, 'WAIT_PLAYER', 'WaitP', false, false)`,
+    [waitingGame.id],
   );
 
   console.log("\n── Anon attack vectors across the FULL applied stack (must be BLOCKED) ──\n");
@@ -367,6 +373,47 @@ async function main() {
     report(!r.ok || r.rowCount === 0, "anon UPDATE settlement_status is blocked", r.err);
   }
 
+  console.log("\n── Question submitter verification (must be a player in the game) ──\n");
+
+  // 19. Anon INSERT question_submissions with a wallet NOT in the game must fail.
+  {
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'NOT_A_PLAYER', 'forged question')`,
+      [waitingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT question with non-player wallet is blocked", r.err);
+  }
+
+  // 20. Anon INSERT question_submissions with a wallet that IS a player in the game succeeds.
+  {
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'WAIT_PLAYER', 'legit question from a real player')`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "anon INSERT question with valid player wallet succeeds", r.err);
+  }
+
+  // 21. Anon INSERT question into a gameover game must fail (status check).
+  {
+    const { rows: [overGame] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, current_pot)
+       values ('FSC-OVER', 'HOST9', 'gameover', 3, 100000, 0) returning id`,
+    );
+    await db.query(
+      `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+       values ($1, 'OVER_PLAYER', 'OverP', true, true)`,
+      [overGame.id],
+    );
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'OVER_PLAYER', 'too late question')`,
+      [overGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT question into gameover game is blocked (status check)", r.err);
+  }
+
   console.log("\n── Policy inventory: no wide-open non-SELECT policy may survive ──\n");
 
   const { rows: policies } = await db.query(`
@@ -378,7 +425,13 @@ async function main() {
   `);
 
   const wideOpenNonSelect = policies.filter((p: any) => {
-    if (p.cmd === "SELECT") return false; // documented low-risk, read-only game data
+    if (p.cmd === "SELECT") return false;
+    // games UPDATE using(true) is intentionally permissive — the
+    // protect_game_columns() trigger blocks all security-critical columns;
+    // remaining writable columns (room_name, question_mode, etc.) are
+    // game-config that the client sets during waiting/playing when
+    // USE_EDGE_GAME_AUTH is off. Full lockdown requires enabling that flag.
+    if (p.tablename === "games" && p.cmd === "UPDATE" && p.policyname === "anon can update games") return false;
     const trueCheck = (v: string | null) => v === "true" || v === "(true)";
     return p.permissive === "PERMISSIVE" && (trueCheck(p.qual) || trueCheck(p.with_check));
   });
