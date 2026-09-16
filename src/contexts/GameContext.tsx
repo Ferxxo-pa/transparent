@@ -46,7 +46,7 @@ import {
   deriveGamePDA as deriveEscrowGamePDA,
 } from '../lib/anchor-escrow';
 import { USE_ESCROW, USE_EDGE_GAME_AUTH } from '../lib/config';
-import { setGameAuthSigner, settleGameViaEdge, leaveGameViaEdge } from '../lib/gameAuth';
+import { setGameAuthSigner, settleGameViaEdge, retrySettlementViaEdge, leaveGameViaEdge } from '../lib/gameAuth';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -1229,88 +1229,25 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!gid || !isHost) return;
     if (gameState.settlementStatus !== 'failed') return;
 
-    // Re-fetch DB state to get authoritative pending_payouts (guards
-    // against stale local state and concurrent retry from another tab)
-    let freshOwed: Record<string, number>;
-    let freshPaidSignatures: Record<string, string>;
-    try {
-      const { data } = await supabase.from('games').select('pending_payouts, paid_tx_signatures, settlement_status').eq('id', gid).single();
-      if (!data || data.settlement_status !== 'failed') return;
-      freshOwed = (data.pending_payouts as Record<string, number>) ?? {};
-      freshPaidSignatures = (data.paid_tx_signatures as Record<string, string>) ?? {};
-    } catch { return; }
-    // A wallet with a recorded signature was already paid — never re-send to
-    // it even if a prior partial DB write left it stranded in pending_payouts.
-    for (const paidWallet of Object.keys(freshPaidSignatures)) delete freshOwed[paidWallet];
-    if (Object.keys(freshOwed).length === 0) return;
-
-    // Atomically claim the retry by setting settlement_status to 'retrying'.
-    // .select() forces Supabase to return matched rows — empty data means
-    // another tab/device already claimed (the eq('settlement_status','failed')
-    // filter excludes rows already set to 'retrying').
-    const { data: claimed, error: claimErr } = await supabase
-      .from('games')
-      .update({ settlement_status: 'retrying' })
-      .eq('id', gid)
-      .eq('settlement_status', 'failed')
-      .select('id');
-    if (claimErr || !claimed || claimed.length === 0) return;
-
     settlementLockRef.current = true;
     setLoading(true);
     try {
-      const hostPubkey = new PublicKey(hostWallet);
-      const [gamePDA] = USE_ESCROW
-        ? deriveEscrowGamePDA(hostPubkey, gameState.roomCode)
-        : deriveGamePDA(hostPubkey, gameState.roomName);
-
-      const stillOwed: Record<string, number> = { ...freshOwed };
-      const paidSignatures: Record<string, string> = { ...freshPaidSignatures };
-      for (const [playerWallet, lamports] of Object.entries(freshOwed)) {
-        if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
-        try {
-          const playerPubkey = new PublicKey(playerWallet);
-          let sig: string;
-          if (USE_ESCROW) {
-            sig = await distributeEscrow(wallet, gamePDA, playerPubkey, lamports);
-          } else {
-            try {
-              sig = await distributeViaMagicBlock(wallet, playerPubkey, lamports);
-            } catch (mbErr) {
-              console.warn('[MagicBlock] ER retry failed, falling back:', mbErr);
-              sig = await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
-            }
-          }
-          delete stillOwed[playerWallet];
-          paidSignatures[playerWallet] = sig;
-          await updateGameStatus(gid, {
-            settlement_status: 'retrying',
-            pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
-            paid_tx_signatures: paidSignatures,
-          }).catch(dbErr => console.error(`[retrySettle] DB write after paying ${playerWallet} (tx ${sig}) failed — payout was sent:`, dbErr));
-        } catch (sendErr) {
-          console.warn(`[retrySettlement] Failed to send to ${playerWallet}:`, sendErr);
-        }
+      const result = await retrySettlementViaEdge(gid);
+      if (!result.ok) {
+        setError(result.error || 'Settlement retry failed');
+        return;
       }
-
-      const settled = Object.keys(stillOwed).length === 0;
-      await updateGameStatus(gid, {
-        settlement_status: settled ? 'settled' : 'failed',
-        pending_payouts: settled ? null : stillOwed,
-        paid_tx_signatures: paidSignatures,
-      });
       setGameState((prev) =>
         prev ? {
           ...prev,
-          settlementStatus: settled ? 'settled' : 'failed',
-          pendingPayouts: settled ? null : stillOwed,
-          paidTxSignatures: paidSignatures,
+          settlementStatus: result.settled ? 'settled' : 'failed',
+          pendingPayouts: result.remaining ?? null,
+          paidTxSignatures: result.signatures,
         } : null,
       );
     } catch (err: any) {
       console.error('retrySettlement error:', err);
-      setError(err.message || 'Failed to retry settlement');
-      await updateGameStatus(gid, { settlement_status: 'failed' }).catch(() => {});
+      setError(err.message || 'Settlement retry failed — check game status before retrying again.');
     } finally {
       settlementLockRef.current = false;
       setLoading(false);
@@ -1993,6 +1930,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // migration), since a raw client DELETE can't prove wallet ownership.
         // The Edge Function verifies an ed25519 signature from this wallet
         // and does the delete + host cancel atomically with service_role.
+        await leaveGameViaEdge(gameId);
         if (isHost && channelRef.current) {
           channelRef.current.send({
             type: 'broadcast',
@@ -2000,12 +1938,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             payload: {},
           });
         }
-        await leaveGameViaEdge(gameId);
       } catch (err) {
         console.warn('Failed to remove player from DB:', err);
+        setError('Leave failed — you are still in the game. Try again.');
+        return;
       }
     }
-    // Then reset local state
+    // Only reset local state after confirmed leave
     if (channelRef.current) {
       unsubscribeFromGame(channelRef.current);
       channelRef.current = null;

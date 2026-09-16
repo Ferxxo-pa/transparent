@@ -175,6 +175,19 @@ export async function readyUpViaEdge(gameId: string): Promise<{ ok: boolean; alr
   return callEdgeFunction('ready-up-player', { gameId, auth });
 }
 
+export interface RetrySettlementResponse {
+  ok: boolean;
+  settled: boolean;
+  signatures: Record<string, string>;
+  remaining?: Record<string, number>;
+  error?: string;
+}
+
+export async function retrySettlementViaEdge(gameId: string): Promise<RetrySettlementResponse> {
+  const auth = await getActionToken(gameId, 'settle', true);
+  return callEdgeFunction<RetrySettlementResponse>('retry-settlement', { gameId, auth });
+}
+
 export async function leaveGameViaEdge(gameId: string, targetWallet?: string): Promise<{ ok: boolean; hostLeft?: boolean; error?: string }> {
   // Destructive + single-use: always mint a fresh 'leave' token.
   const auth = await getActionToken(gameId, 'leave', true);
