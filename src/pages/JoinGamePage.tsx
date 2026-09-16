@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, BackButton, SolMark, WalletChip } from '../components';
+import { Blobs, BackButton, WalletChip } from '../components';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
@@ -109,13 +109,16 @@ export const JoinGamePage: React.FC = () => {
             </div>
 
             {/* title */}
-            <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 22, lineHeight: 1 }}>
+            <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 8, lineHeight: 1 }}>
               drop the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>digits</span>
             </h2>
+            <p className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', margin: '0 0 22px', lineHeight: 1.5, letterSpacing: '0.02em' }}>
+              enter the 6-digit room code from the host — you'll confirm the buy-in after joining
+            </p>
 
             {/* 6 digit inputs */}
             <div
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 28 }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'clamp(4px, 1.5vw, 8px)', marginBottom: 28 }}
               onPaste={handlePaste}
             >
               {digits.map((d, i) => (
@@ -130,8 +133,8 @@ export const JoinGamePage: React.FC = () => {
                     onChange={e => handleDigitChange(i, e.target.value)}
                     onKeyDown={e => handleKeyDown(i, e)}
                     style={{
-                      width: 38,
-                      height: 56,
+                      width: 'clamp(34px, 10vw, 44px)',
+                      height: 'clamp(48px, 14vw, 60px)',
                       borderRadius: 14,
                       background: d ? 'rgba(77,168,255,0.15)' : 'rgba(255,255,255,0.04)',
                       border: d ? '1.5px solid rgba(77,168,255,0.6)' : '1px solid rgba(255,255,255,0.12)',
@@ -205,11 +208,7 @@ export const JoinGamePage: React.FC = () => {
               whileTap={allFilled && !loading ? { scale: 0.96 } : {}}
               style={{ opacity: !allFilled || loading ? 0.4 : 1, cursor: !allFilled || loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
-              {loading ? 'joining...' : (
-                <>
-                  ape in · <SolMark size={14} tone="dark" /> —
-                </>
-              )}
+              {loading ? 'joining...' : 'join room'}
             </motion.button>
           </div>
         </div>
