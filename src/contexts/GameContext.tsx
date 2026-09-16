@@ -1087,9 +1087,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               // Host-signed path: distribute directly (escrow program still
               // enforces host authority on-chain). Track per-recipient outcome
               // so a partial failure doesn't get reported as a full success.
-              const stillOwed: Record<string, number> = {};
+              const stillOwed: Record<string, number> = { ...payoutsLamports };
               for (const [playerWallet, lamports] of Object.entries(payoutsLamports)) {
-                if (lamports <= 0) continue;
+                if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
                 try {
                   const playerPubkey = new PublicKey(playerWallet);
                   if (USE_ESCROW) {
@@ -1102,9 +1102,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                       await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
                     }
                   }
+                  delete stillOwed[playerWallet];
+                  if (gid) {
+                    await updateGameStatus(gid, {
+                      settlement_status: 'failed',
+                      pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
+                    }).catch(dbErr => console.error(`[settle] DB write after paying ${playerWallet} failed — payout was sent:`, dbErr));
+                  }
                 } catch (sendErr) {
                   console.warn(`[distribute] Failed to send to ${playerWallet}:`, sendErr);
-                  stillOwed[playerWallet] = lamports;
                 }
               }
               unpaidLamports = stillOwed;
@@ -1210,8 +1216,24 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const isHost = wallet.publicKey.toBase58() === hostWallet;
     if (!gid || !isHost) return;
     if (gameState.settlementStatus !== 'failed') return;
-    const owed = gameState.pendingPayouts ?? {};
-    if (Object.keys(owed).length === 0) return;
+
+    // Re-fetch DB state to get authoritative pending_payouts (guards
+    // against stale local state and concurrent retry from another tab)
+    let freshOwed: Record<string, number>;
+    try {
+      const { data } = await supabase.from('games').select('pending_payouts, settlement_status').eq('id', gid).single();
+      if (!data || data.settlement_status !== 'failed') return;
+      freshOwed = (data.pending_payouts as Record<string, number>) ?? {};
+    } catch { return; }
+    if (Object.keys(freshOwed).length === 0) return;
+
+    // Atomically claim the retry by setting settlement_status to 'retrying'
+    const { error: claimErr } = await supabase
+      .from('games')
+      .update({ settlement_status: 'retrying' })
+      .eq('id', gid)
+      .eq('settlement_status', 'failed');
+    if (claimErr) return;
 
     settlementLockRef.current = true;
     setLoading(true);
@@ -1221,9 +1243,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         ? deriveEscrowGamePDA(hostPubkey, gameState.roomCode)
         : deriveGamePDA(hostPubkey, gameState.roomName);
 
-      const stillOwed: Record<string, number> = {};
-      for (const [playerWallet, lamports] of Object.entries(owed)) {
-        if (lamports <= 0) continue;
+      const stillOwed: Record<string, number> = { ...freshOwed };
+      for (const [playerWallet, lamports] of Object.entries(freshOwed)) {
+        if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
         try {
           const playerPubkey = new PublicKey(playerWallet);
           if (USE_ESCROW) {
@@ -1236,9 +1258,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               await distributeOnChain(wallet, gamePDA, playerPubkey, lamports);
             }
           }
+          delete stillOwed[playerWallet];
+          await updateGameStatus(gid, {
+            settlement_status: 'retrying',
+            pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
+          }).catch(dbErr => console.error(`[retrySettle] DB write after paying ${playerWallet} failed — payout was sent:`, dbErr));
         } catch (sendErr) {
           console.warn(`[retrySettlement] Failed to send to ${playerWallet}:`, sendErr);
-          stillOwed[playerWallet] = lamports;
         }
       }
 
@@ -1257,6 +1283,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err: any) {
       console.error('retrySettlement error:', err);
       setError(err.message || 'Failed to retry settlement');
+      await updateGameStatus(gid, { settlement_status: 'failed' }).catch(() => {});
     } finally {
       settlementLockRef.current = false;
       setLoading(false);
