@@ -1902,6 +1902,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const readiedPlayers = gs.players.filter(
             p => p.isReady && p.id !== gs.hostWallet
           );
+          const failedRefunds: string[] = [];
           for (const player of readiedPlayers) {
             try {
               const playerPubkey = new PublicKey(player.id);
@@ -1915,7 +1916,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               }
             } catch (err) {
               console.warn(`[hostLeave] Failed to refund ${player.name}:`, err);
+              failedRefunds.push(player.name ?? player.id);
             }
+          }
+          if (failedRefunds.length > 0) {
+            setError(`Cannot leave — refund failed for: ${failedRefunds.join(', ')}. Try again.`);
+            return;
           }
         }
 
