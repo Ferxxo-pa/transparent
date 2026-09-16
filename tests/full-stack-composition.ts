@@ -42,10 +42,15 @@ const FULL_STACK = [
   "supabase/migrations/predictions.sql",
   "supabase/migrations/20260701_escrow_hardening.sql",
   "supabase/migrations/20260915_server_authoritative_pot_settlement.sql",
+  "supabase/migrations/20260915_settlement_tx_signature_tracking.sql",
   "supabase/migrations/20260915_delete_policy_reconciliation.sql",
   "supabase/migrations/20260915_policy_reconciliation.sql",
   "supabase/migrations/20260915_comprehensive_legacy_alias_cleanup.sql",
   "supabase/migrations/20260915_policy_alias_review_closeout.sql",
+  "supabase/migrations/20260915_players_delete_lockdown.sql",
+  "supabase/migrations/20260915_add_cancelled_status.sql",
+  "supabase/migrations/20260915_fix_policy_status_mismatch.sql",
+  "supabase/migrations/20260915_settlement_retrying_check.sql",
 ];
 
 async function main() {
@@ -111,6 +116,7 @@ async function main() {
     "supabase/migrations/20260915_delete_policy_reconciliation.sql",
     "supabase/migrations/20260915_policy_reconciliation.sql",
     "supabase/migrations/20260915_policy_alias_review_closeout.sql",
+    "supabase/migrations/20260915_players_delete_lockdown.sql",
   ]) {
     await db.query(readFileSync(f, "utf8"));
   }
@@ -122,6 +128,7 @@ async function main() {
     drop policy if exists "predictions_insert" on public.predictions;
     drop policy if exists "question_submissions_insert" on public.question_submissions;
     drop policy if exists "anon can insert questions" on public.question_submissions;
+    drop policy if exists "players_delete" on public.players;
   `);
   console.log("re-applied alias-dropping migrations against the seeded legacy lineage\n");
 
@@ -274,10 +281,16 @@ async function main() {
     report(r.ok && r.rowCount === 1, "anon INSERT players(unpaid, not ready) into a waiting game still works", r.err);
   }
 
-  // 10. Anon DELETE on their own player row in a waiting game still succeeds (leave flow).
+  // 10. Anon DELETE on their own player row in a waiting game is BLOCKED (leave goes through Edge Function).
   {
     const r = await as("anon", `delete from players where game_id = $1 and wallet_address = 'LEGIT_JOIN'`, [waitingGame.id]);
-    report(r.ok && r.rowCount === 1, "anon DELETE players in a waiting game (leave flow) still works", r.err);
+    report(r.rowCount === 0, "anon DELETE players in a waiting game is blocked (leave via Edge Function only)", r.err);
+  }
+
+  // 10b. service_role DELETE (Edge Function leave_game_player RPC) still works.
+  {
+    const r = await asPersist("service_role", `delete from players where game_id = $1 and wallet_address = 'LEGIT_JOIN'`, [waitingGame.id]);
+    report(r.ok && r.rowCount === 1, "service_role DELETE players still works (Edge Function path)", r.err);
   }
 
   console.log("\n── service_role must retain full write access (Edge Functions) ──\n");
@@ -297,6 +310,61 @@ async function main() {
   {
     const r = await asPersist("service_role", `delete from games where room_code = 'SVC-GAME'`);
     report(r.ok && r.rowCount === 1, "service_role DELETE games still works", r.err);
+  }
+
+  console.log("\n── CHECK constraint coverage (settlement + game status) ──\n");
+
+  // 14. settlement_status='retrying' must be valid (used by retry-settlement Edge Function).
+  {
+    const r = await asPersist("service_role",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status)
+       values ('CHECK-RETRY', 'HOST5', 'gameover', 0, 0, 'retrying')`,
+    );
+    report(r.ok && r.rowCount === 1, "service_role INSERT games(settlement_status='retrying') succeeds", r.err);
+    if (r.ok) await db.query(`delete from games where room_code = 'CHECK-RETRY'`);
+  }
+
+  // 15. status='cancelled' must be valid (used by leave_game_player RPC).
+  {
+    const r = await asPersist("service_role",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       values ('CHECK-CANCEL', 'HOST6', 'cancelled', 0, 0)`,
+    );
+    report(r.ok && r.rowCount === 1, "service_role INSERT games(status='cancelled') succeeds", r.err);
+    if (r.ok) await db.query(`delete from games where room_code = 'CHECK-CANCEL'`);
+  }
+
+  // 16. Predictions INSERT into a 'playing' game must work (was broken when policies used 'active').
+  {
+    const r = await as("anon",
+      `insert into predictions (game_id, bettor_wallet, predicted_winner_wallet, amount_lamports)
+       values ($1, 'PLAYER_A', 'PLAYER_A', 100)`,
+      [playingGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "anon INSERT predictions into 'playing' game succeeds", r.err);
+  }
+
+  // 17. service_role can claim retry (settlement_status 'failed' → 'retrying').
+  {
+    const { rows: [failedGame] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status)
+       values ('RETRY-CLAIM', 'HOST7', 'gameover', 0, 0, 'failed') returning id`,
+    );
+    const r = await asPersist("service_role",
+      `update games set settlement_status = 'retrying' where id = $1 and settlement_status = 'failed'`,
+      [failedGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "service_role UPDATE settlement_status 'failed' → 'retrying' succeeds", r.err);
+    await db.query(`delete from games where id = $1`, [failedGame.id]);
+  }
+
+  // 18. Anon cannot mutate settlement_status (trigger guard).
+  {
+    const r = await as("anon",
+      `update games set settlement_status = 'settled' where id = $1`,
+      [playingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon UPDATE settlement_status is blocked", r.err);
   }
 
   console.log("\n── Policy inventory: no wide-open non-SELECT policy may survive ──\n");

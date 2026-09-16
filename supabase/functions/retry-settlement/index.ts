@@ -160,12 +160,29 @@ serve(async (req) => {
         delete stillOwed[recipient];
         paidSignatures[recipient] = sig;
 
-        // Persist after EACH successful send — crash-safe progress
-        await supabase.from('games').update({
+        // Persist after EACH successful send — crash-safe progress.
+        // If this DB write fails, we MUST stop: the chain send succeeded
+        // but DB doesn't know about it yet. Continuing would leave us in
+        // an inconsistent state where a future retry could double-send
+        // to this recipient (they're still in pending_payouts in DB).
+        const { error: persistErr } = await supabase.from('games').update({
           settlement_status: 'retrying',
           pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
           paid_tx_signatures: paidSignatures,
         }).eq('id', gameId);
+
+        if (persistErr) {
+          console.error(`[retry-settlement] CRITICAL: chain send to ${recipient} succeeded (sig=${sig}) but DB persist failed:`, persistErr);
+          // Revert to failed so retry can re-claim, but we can't guarantee
+          // the revert succeeds either. The tx signature is logged above
+          // for manual reconciliation.
+          await supabase.from('games').update({ settlement_status: 'failed' }).eq('id', gameId).catch(() => {});
+          return jsonResponse({
+            error: `Payout to ${recipient} confirmed on-chain (${sig}) but DB update failed. Manual reconciliation needed.`,
+            signatures: paidSignatures,
+            remaining: stillOwed,
+          }, 500);
+        }
       } catch (sendErr) {
         console.warn(`[retry-settlement] Failed to send to ${recipient}:`, sendErr);
       }
