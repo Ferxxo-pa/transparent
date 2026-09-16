@@ -1420,40 +1420,40 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const currentIdx = gameState.players.findIndex(p => p.id === hotSeatWallet);
     const nextRoundNum = (gameState.currentRound ?? 0) + 1;
     const totalRounds = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+    setError(null);
 
-    if (nextRoundNum >= totalRounds) {
-      setGameState(prev => prev ? { ...prev, gameStatus: 'gameover' as const } : null);
-      if (gid) {
-        try { await updateGameStatus(gid, { status: 'gameover' }); } catch (e) { console.error('forceAdvanceRound gameover write failed:', e); }
+    try {
+      if (nextRoundNum >= totalRounds) {
+        if (gid) await updateGameStatus(gid, { status: 'gameover' });
+        setGameState(prev => prev && prev.gameId === gid ? { ...prev, gameStatus: 'gameover' as const } : prev);
+        return;
       }
-      return;
-    }
 
-    const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
-    const nextPlayer = gameState.players[nextPlayerIdx];
-    const usedIdxs = gameState.usedQuestionIndices || [];
-    const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+      const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
+      const nextPlayer = gameState.players[nextPlayerIdx];
+      const usedIdxs = gameState.usedQuestionIndices || [];
+      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
 
-    setGameState(prev => prev ? {
-      ...prev,
-      currentPlayerInHotSeat: nextPlayer.id,
-      currentQuestion: QUESTIONS[nextQIdx],
-      currentRound: nextRoundNum,
-      votes: {}, voteCount: 0,
-      gamePhase: 'answering' as GamePhase,
-      usedQuestionIndices: [...usedIdxs, nextQIdx],
-    } : null);
-
-    if (gid) {
-      try {
+      if (gid) {
         await updateGameStatus(gid, {
           current_round: nextRoundNum,
+          current_question_index: nextQIdx,
           game_phase: 'answering',
           current_hot_seat_player: nextPlayer.id,
         });
-      } catch (e) {
-        console.error('forceAdvanceRound DB write failed:', e);
       }
+      setGameState(prev => prev && prev.gameId === gid ? {
+        ...prev,
+        currentPlayerInHotSeat: nextPlayer.id,
+        currentQuestion: QUESTIONS[nextQIdx],
+        currentRound: nextRoundNum,
+        votes: {}, voteCount: 0,
+        gamePhase: 'answering' as GamePhase,
+        usedQuestionIndices: [...usedIdxs, nextQIdx],
+      } : prev);
+    } catch (e) {
+      setError('The round change could not be confirmed. Refresh the game before trying again.');
+      console.error('forceAdvanceRound save failed:', e);
     }
   }, [gameState]);
 
