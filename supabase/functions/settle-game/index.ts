@@ -182,7 +182,7 @@ serve(async (req) => {
 
     // Read any existing sigs (in case of a previous partial run that left state)
     const existingSigs = normalizeSigRecords(game.paid_tx_signatures);
-    const sigRecords: Record<string, SigRecord> = { ...existingSigs };
+    const sigRecords: Record<string, SigRecord> = existingSigs ? { ...existingSigs } : {};
     const stillOwed = { ...validPayouts };
 
     // Skip recipients already confirmed from a prior run
@@ -288,11 +288,12 @@ serve(async (req) => {
     }
 
     const settled = Object.keys(stillOwed).length === 0;
+    const hasSigs = Object.keys(sigRecords).length > 0;
     const { error: finalErr } = await supabase.from('games').update({
       status: settled ? 'gameover' : game.status,
       settlement_status: settled ? 'settled' : 'failed',
       pending_payouts: settled ? null : stillOwed,
-      paid_tx_signatures: sigRecords,
+      ...(hasSigs ? { paid_tx_signatures: sigRecords } : {}),
     }).eq('id', gameId);
 
     if (finalErr) {
@@ -307,7 +308,7 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       settled,
-      signatures: sigRecords,
+      ...(hasSigs ? { signatures: sigRecords } : {}),
       ...(settled ? {} : { remaining: stillOwed }),
     });
   } catch (e) {
