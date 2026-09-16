@@ -18,7 +18,7 @@ const FLAVOR = [
 
 export const GameOverPage: React.FC = () => {
   const navigate = useNavigate();
-  const { gameState, resetGame, distributeWinnings, distributePredictions, predictions, predictionPot, pollGameState } = useGame();
+  const { gameState, resetGame, distributeWinnings, retrySettlement, distributePredictions, predictions, predictionPot, pollGameState, loading, error } = useGame();
   const { publicKey } = usePrivyWallet();
   const solPrice = useSolPrice();
   const [selected, setSelected] = useState<string | null>(null);
@@ -305,11 +305,56 @@ export const GameOverPage: React.FC = () => {
               {distErr}
             </div>
           )}
+
+          {/* ── settlement status banner ── */}
+          {gameState.settlementStatus === 'failed' && isHost && (
+            <motion.div
+              className="glass-flat"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              style={{ padding: '10px 14px', borderRadius: 12, borderColor: 'rgba(255,92,92,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--coral)' }}>settlement failed — some payouts didn't land</span>
+              <motion.button
+                className="btn btn-ghost"
+                onClick={retrySettlement}
+                disabled={loading}
+                whileTap={{ scale: 0.96 }}
+                style={{ fontSize: 11, padding: '4px 12px', minWidth: 'auto' }}
+              >
+                {loading ? 'retrying…' : 'retry'}
+              </motion.button>
+            </motion.div>
+          )}
+          {(gameState.settlementStatus === 'pending' || gameState.settlementStatus === 'retrying') && isHost && (
+            <motion.div
+              className="glass-flat"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              style={{ padding: '10px 14px', borderRadius: 12, borderColor: 'rgba(255,165,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--ink-soft)' }}>
+                {gameState.settlementStatus === 'pending' ? 'settlement in progress…' : 'retrying settlement…'}
+              </span>
+              <motion.button
+                className="btn btn-ghost"
+                onClick={retrySettlement}
+                disabled={loading}
+                whileTap={{ scale: 0.96 }}
+                style={{ fontSize: 11, padding: '4px 12px', minWidth: 'auto' }}
+              >
+                {loading ? 'checking…' : 'recover'}
+              </motion.button>
+            </motion.div>
+          )}
+          {error && !distErr && (
+            <div className="glass-flat" style={{ padding: '10px 14px', borderRadius: 12, borderColor: 'rgba(255,165,0,0.3)', color: 'var(--ink-soft)', fontSize: 12 }}>
+              {error}
+            </div>
+          )}
         </div>
 
         {/* ── CTAs ── */}
         <div style={{ width: '100%', paddingTop: 14, paddingBottom: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {isHost && !confirmed && (
+          {isHost && !confirmed && gameState.settlementStatus !== 'failed' && (
             <motion.button
               className="btn btn-degen"
               onClick={distribute}
@@ -323,7 +368,7 @@ export const GameOverPage: React.FC = () => {
                   {usdEstimate(gameState.currentPot, 'sol', solPrice) && (
                     <span> ({usdEstimate(gameState.currentPot, 'sol', solPrice)})</span>
                   )}
-                  {' '}🤑
+                  {' '}
                 </>
               )}
             </motion.button>

@@ -1285,14 +1285,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const freshStatus = (freshGame as any).settlement_status;
     if (freshStatus !== 'failed') {
-      if (freshStatus === 'retrying') {
+      if (freshStatus === 'retrying' || freshStatus === 'pending') {
         const leaseAgeMs = Date.now() - new Date((freshGame as any).updated_at).getTime();
         if (leaseAgeMs < RETRY_LEASE_TIMEOUT_MS) {
-          // Genuinely in progress — not stuck yet.
           return;
         }
-        setError('Settlement may have stalled — retrying safely.');
-        // Stale lease — fall through and let the edge function reclaim it.
+        setError(freshStatus === 'pending'
+          ? 'Initial settlement crashed — recovering safely.'
+          : 'Settlement may have stalled — retrying safely.');
       } else {
         return;
       }

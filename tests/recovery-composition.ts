@@ -418,6 +418,75 @@ async function main() {
     report(guardPresent, 'C3: source still contains the documented silent-return guard at GameContext.tsx (drift check)');
   }
 
+  // ════════════════════════════════════════════════════════════════
+  // Section D — client retrySettlement handles stale 'pending'
+  //
+  // Before fix: retrySettlement's freshStatus check only handled
+  // 'retrying' for stale-lease detection. A stale 'pending' (crashed
+  // initial settlement) fell through to a silent return — the user
+  // could never trigger recovery from the UI.
+  //
+  // After fix: the client check mirrors the server
+  // (freshStatus === 'retrying' || freshStatus === 'pending').
+  // ════════════════════════════════════════════════════════════════
+  console.log('\n── Section D: client retrySettlement covers stale pending ──\n');
+
+  {
+    const RETRY_LEASE_TIMEOUT_MS = 5 * 60 * 1000;
+
+    function simulateRetrySettlementGuard(freshStatus: string, updatedAt: Date): 'blocked' | 'in-progress' | 'allowed' {
+      if (freshStatus !== 'failed') {
+        if (freshStatus === 'retrying' || freshStatus === 'pending') {
+          const leaseAgeMs = Date.now() - updatedAt.getTime();
+          if (leaseAgeMs < RETRY_LEASE_TIMEOUT_MS) {
+            return 'in-progress';
+          }
+          return 'allowed';
+        } else {
+          return 'blocked';
+        }
+      }
+      return 'allowed';
+    }
+
+    const staleTime = new Date(Date.now() - RETRY_LEASE_TIMEOUT_MS - 60_000);
+    const freshTime = new Date(Date.now() - 30_000);
+
+    report(
+      simulateRetrySettlementGuard('pending', staleTime) === 'allowed',
+      'D1: stale pending (>5min) allows retry — user can recover from crashed initial settlement',
+    );
+    report(
+      simulateRetrySettlementGuard('pending', freshTime) === 'in-progress',
+      'D2: fresh pending (<5min) returns in-progress — does not interfere with active settlement',
+    );
+    report(
+      simulateRetrySettlementGuard('retrying', staleTime) === 'allowed',
+      'D3: stale retrying (>5min) allows retry (unchanged behavior)',
+    );
+    report(
+      simulateRetrySettlementGuard('retrying', freshTime) === 'in-progress',
+      'D4: fresh retrying (<5min) returns in-progress (unchanged behavior)',
+    );
+    report(
+      simulateRetrySettlementGuard('settled', staleTime) === 'blocked',
+      'D5: settled status blocks retry regardless of age',
+    );
+    report(
+      simulateRetrySettlementGuard('none', staleTime) === 'blocked',
+      'D6: none status blocks retry regardless of age',
+    );
+    report(
+      simulateRetrySettlementGuard('failed', freshTime) === 'allowed',
+      'D7: failed status always allows retry (direct path)',
+    );
+
+    // D8: cross-check the real source matches the fixed guard shape
+    const retrySrc = readFileSync('src/contexts/GameContext.tsx', 'utf8');
+    const pendingGuardPresent = /freshStatus === 'retrying' \|\| freshStatus === 'pending'/.test(retrySrc);
+    report(pendingGuardPresent, 'D8: source contains the fixed retrySettlement guard covering both retrying and pending (drift check)');
+  }
+
   await db.end();
 
   console.log(`\n${passed} passed, ${failed} failed`);
