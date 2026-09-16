@@ -150,8 +150,10 @@ export async function updateGameStatus(
   gameId: string,
   updates: Partial<GameRow>
 ) {
-  const touchesProtected = Object.keys(updates).some((k) => PROTECTED_GAME_COLUMNS.has(k));
-  if (USE_EDGE_GAME_AUTH && touchesProtected) {
+  // All game mutations route through the auth-verified Edge Function.
+  // Protected columns always required it; config columns now do too
+  // because anon RLS cannot verify wallet identity (no Supabase Auth).
+  if (USE_EDGE_GAME_AUTH) {
     await advancePhaseViaEdge(gameId, updates as Record<string, unknown>);
     return;
   }

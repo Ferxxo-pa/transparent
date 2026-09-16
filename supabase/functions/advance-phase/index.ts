@@ -30,6 +30,20 @@ const UPDATABLE_COLUMNS = new Set([
   'pending_payouts',
   'question_options',
   'question_pick_votes',
+  // Config columns — host-only, enforced below
+  'room_name',
+  'question_mode',
+  'custom_questions',
+  'num_questions',
+  'payout_mode',
+]);
+
+const CONFIG_COLUMNS = new Set([
+  'room_name',
+  'question_mode',
+  'custom_questions',
+  'num_questions',
+  'payout_mode',
 ]);
 
 const STORYTELLER_PHASES = new Set([
@@ -82,6 +96,11 @@ serve(async (req) => {
     if (gameErr || !game) return jsonResponse({ error: 'game not found' }, 404);
 
     const isHost = wallet === game.host_wallet;
+
+    // Config columns are host-only — reject non-hosts immediately
+    if (!isHost && keys.some(k => CONFIG_COLUMNS.has(k))) {
+      return jsonResponse({ error: 'only the host may update game config' }, 403);
+    }
 
     if (!isHost) {
       // Non-host callers must be players in this game.

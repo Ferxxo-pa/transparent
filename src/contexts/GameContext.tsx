@@ -10,7 +10,6 @@ import {
   getPlayersForGame,
   insertVote,
   getVotesForRound,
-  submitQuestionToDB,
   voteForQuestionInDB,
   readyUpPlayer,
   placePrediction as placePredictionInDB,
@@ -46,7 +45,7 @@ import {
   deriveGamePDA as deriveEscrowGamePDA,
 } from '../lib/anchor-escrow';
 import { USE_ESCROW, USE_EDGE_GAME_AUTH } from '../lib/config';
-import { setGameAuthSigner, settleGameViaEdge, retrySettlementViaEdge, leaveGameViaEdge } from '../lib/gameAuth';
+import { setGameAuthSigner, settleGameViaEdge, retrySettlementViaEdge, leaveGameViaEdge, submitQuestionViaEdge } from '../lib/gameAuth';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -844,12 +843,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       try {
         const round = gameState.currentRound ?? 0;
-        await submitQuestionToDB({
-          game_id: gid,
-          round,
-          submitter_wallet: myWalletId,
-          question_text: text,
-        });
+        await submitQuestionViaEdge(gid, round, text);
       } catch (err: any) {
         console.error('Submit question error:', err);
         setError(err.message || 'Failed to submit question');

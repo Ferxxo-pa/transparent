@@ -213,3 +213,12 @@ export async function verifyPaymentViaEdge(
   const auth = await getActionToken(gameId, 'pay', true);
   return callEdgeFunction<VerifyPaymentResponse>('verify-payment', { gameId, auth, txSignature });
 }
+
+export async function submitQuestionViaEdge(
+  gameId: string,
+  round: number,
+  questionText: string,
+): Promise<{ question: { id: string; game_id: string; round: number; submitter_wallet: string; question_text: string; votes: number; created_at: string } }> {
+  const auth = await getGameAuthToken(gameId);
+  return callEdgeFunction('submit-question', { gameId, round, questionText, auth });
+}
