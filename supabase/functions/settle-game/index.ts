@@ -1,30 +1,24 @@
 // Supabase Edge Function: validated game settlement
 //
-// The client never settles by itself in hardened mode. The host requests
-// settlement here; this function:
-//   1. verifies an ed25519 signature from the HOST wallet (trust root)
-//   2. validates game state (exists, active, payout recipients are players)
-//   3. triggers on-chain `distribute` from the escrow PDA, signed by the
-//      SETTLEMENT keypair (which the program accepts as the game's
-//      settlement_authority — it can only pay out, never mutate the game)
-//   4. marks the game settled in the DB with the service role
+// Settlement lifecycle:
+//   1. Verify ed25519 HOST wallet signature (trust root)
+//   2. Atomic claim: UPDATE ... WHERE settlement_status='none' RETURNING id
+//      — exactly one caller proceeds; 0-row match = 409
+//   3. For each recipient:
+//      a. Build + sign tx
+//      b. Persist sig as {sig, status:'submitted'} BEFORE broadcast
+//      c. sendRawTransaction
+//      d. confirmTransaction → update to 'confirmed'/'failed'/'unknown'
+//      e. Persist after each recipient (crash-safe progress)
+//   4. Final state: 'settled' or 'failed' with all sig records
 //
-// CRASH DURABILITY BOUNDARY: paidSignatures lives in JS memory between
-// the sendRawTransaction return and the next DB write. If the Edge Function
-// process crashes in that window, the tx exists on-chain but the DB has no
-// record — retry will re-send. This is inherent to serverless (no local WAL).
-// Mitigation: per-recipient persist after each confirmed send, plus the sig
-// is recorded BEFORE confirmTransaction so a confirm-timeout still persists it.
-// The one uncoverable gap is process death between send and persist.
+// Signature statuses:
+//   submitted — tx identity persisted, broadcast may or may not have happened
+//   confirmed — on-chain confirmation received, no errors
+//   failed    — on-chain confirmation shows value.err (program error, etc.)
+//   unknown   — sendRawTransaction returned but confirmTransaction timed out
 //
 // DEVNET ONLY: refuses to run against any mainnet RPC.
-//
-// Secrets (supabase secrets set):
-//   SETTLEMENT_SECRET_KEY — base58 or JSON-array ed25519 secret key (devnet!)
-//   SOLANA_RPC            — optional, defaults to devnet public RPC
-//   ESCROW_PROGRAM_ID     — optional, defaults to the deployed devnet program
-//
-// Deploy: supabase functions deploy settle-game
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -49,6 +43,11 @@ interface RequestBody {
   auth: GameAuthToken;
 }
 
+interface SigRecord {
+  sig: string;
+  status: 'submitted' | 'confirmed' | 'failed' | 'unknown';
+}
+
 function loadSettlementKeypair(): Keypair {
   const raw = Deno.env.get('SETTLEMENT_SECRET_KEY');
   if (!raw) throw new Error('SETTLEMENT_SECRET_KEY not configured');
@@ -62,6 +61,19 @@ function encodeU64LE(n: number): Uint8Array {
   const buf = new Uint8Array(8);
   new DataView(buf.buffer).setBigUint64(0, BigInt(n), true);
   return buf;
+}
+
+function normalizeSigRecords(raw: unknown): Record<string, SigRecord> {
+  const out: Record<string, SigRecord> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [wallet, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof val === 'string') {
+      out[wallet] = { sig: val, status: 'unknown' };
+    } else if (val && typeof val === 'object' && 'sig' in val) {
+      out[wallet] = val as SigRecord;
+    }
+  }
+  return out;
 }
 
 serve(async (req) => {
@@ -90,7 +102,6 @@ serve(async (req) => {
       .single();
     if (gameErr || !game) return jsonResponse({ error: 'game not found' }, 404);
 
-    // Settlement is HOST-only. This is the core authority check.
     if (wallet !== game.host_wallet) {
       return jsonResponse({ error: 'only the host may settle the game' }, 403);
     }
@@ -116,7 +127,6 @@ serve(async (req) => {
       return jsonResponse({ error: 'payouts required' }, 400);
     }
 
-    // Every recipient must be a player in this game.
     const { data: players, error: playersErr } = await supabase
       .from('players')
       .select('wallet_address')
@@ -138,7 +148,6 @@ serve(async (req) => {
     const connection = new Connection(rpcUrl, 'confirmed');
     const settlementKeypair = loadSettlementKeypair();
 
-    // Game PDA: stored at creation, or derived from host + room_code.
     const hostPubkey = new PublicKey(game.host_wallet);
     const gamePDA = game.game_pda
       ? new PublicKey(game.game_pda)
@@ -151,7 +160,6 @@ serve(async (req) => {
       programId,
     );
 
-    // Filter valid payouts upfront
     const validPayouts: Record<string, number> = {};
     for (const [recipient, lamports] of Object.entries(payouts)) {
       if (Number.isInteger(lamports) && lamports > 0) validPayouts[recipient] = lamports;
@@ -160,19 +168,30 @@ serve(async (req) => {
       return jsonResponse({ error: 'no valid payouts' }, 400);
     }
 
-    // Durable pre-broadcast: record intent before sending anything on-chain.
-    // Use 'pending' (valid CHECK value) — 'settling' is not in the constraint.
-    const { error: claimErr } = await supabase.from('games').update({
+    // ── ATOMIC CLAIM: .select().single() ensures exactly one caller proceeds ──
+    const { data: claimData, error: claimErr } = await supabase.from('games').update({
       settlement_status: 'pending',
       pending_payouts: validPayouts,
       paid_tx_signatures: {},
-    }).eq('id', gameId).eq('settlement_status', 'none');
-    if (claimErr) return jsonResponse({ error: 'failed to claim settlement' }, 500);
+    }).eq('id', gameId).eq('settlement_status', 'none').select('id').single();
 
-    const paidSignatures: Record<string, string> = {};
+    if (claimErr || !claimData) {
+      return jsonResponse({ error: 'settlement already in progress or claimed' }, 409);
+    }
+
+    // Read any existing sigs (in case of a previous partial run that left state)
+    const existingSigs = normalizeSigRecords(game.paid_tx_signatures);
+    const sigRecords: Record<string, SigRecord> = { ...existingSigs };
     const stillOwed = { ...validPayouts };
 
-    for (const [recipient, lamports] of Object.entries(validPayouts)) {
+    // Skip recipients already confirmed from a prior run
+    for (const [wallet, record] of Object.entries(sigRecords)) {
+      if (record.status === 'confirmed' && wallet in stillOwed) {
+        delete stillOwed[wallet];
+      }
+    }
+
+    for (const [recipient, lamports] of Object.entries(stillOwed)) {
       try {
         const data = new Uint8Array(16);
         data.set(DISTRIBUTE_DISCRIMINATOR, 0);
@@ -196,59 +215,70 @@ serve(async (req) => {
         tx.recentBlockhash = blockhash;
         tx.sign(settlementKeypair);
 
-        const sig = await connection.sendRawTransaction(tx.serialize());
-
-        // Record sig BEFORE confirm — if confirm times out the tx may still
-        // land on-chain. Without recording here, a retry would re-send.
-        paidSignatures[recipient] = sig;
-
-        const confirmation = await connection.confirmTransaction(
-          { signature: sig, blockhash, lastValidBlockHeight }, 'confirmed',
-        );
-
-        if (confirmation.value.err) {
-          console.warn(`[settle-game] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${sig}`);
-          delete paidSignatures[recipient];
+        // ── PRE-BROADCAST PERSIST: write sig identity BEFORE sendRawTransaction ──
+        const txSig = bs58.encode(tx.signature!);
+        sigRecords[recipient] = { sig: txSig, status: 'submitted' };
+        const { error: preErr } = await supabase.from('games').update({
+          paid_tx_signatures: sigRecords,
+        }).eq('id', gameId);
+        if (preErr) {
+          console.error(`[settle-game] Failed to persist pre-broadcast sig for ${recipient}:`, preErr);
+          delete sigRecords[recipient];
           continue;
         }
 
+        await connection.sendRawTransaction(tx.serialize());
+
+        const confirmation = await connection.confirmTransaction(
+          { signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed',
+        );
+
+        if (confirmation.value.err) {
+          console.warn(`[settle-game] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${txSig}`);
+          sigRecords[recipient] = { sig: txSig, status: 'failed' };
+          // Per-recipient persist so retry knows this sig failed
+          await supabase.from('games').update({
+            paid_tx_signatures: sigRecords,
+          }).eq('id', gameId);
+          continue;
+        }
+
+        sigRecords[recipient] = { sig: txSig, status: 'confirmed' };
         delete stillOwed[recipient];
 
-        // Per-recipient crash-safe persist
         const { error: persistErr } = await supabase.from('games').update({
           settlement_status: 'pending',
           pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
-          paid_tx_signatures: paidSignatures,
+          paid_tx_signatures: sigRecords,
         }).eq('id', gameId);
 
         if (persistErr) {
-          console.error(`[settle-game] CRITICAL: chain send to ${recipient} succeeded (sig=${sig}) but DB persist failed:`, persistErr);
+          console.error(`[settle-game] CRITICAL: chain send to ${recipient} succeeded (sig=${txSig}) but DB persist failed:`, persistErr);
           await supabase.from('games').update({
             settlement_status: 'failed',
-            paid_tx_signatures: paidSignatures,
+            paid_tx_signatures: sigRecords,
           }).eq('id', gameId).catch(() => {});
           return jsonResponse({
-            error: `Payout to ${recipient} confirmed on-chain (${sig}) but DB update failed. Manual reconciliation needed.`,
-            signatures: paidSignatures,
+            error: `Payout to ${recipient} confirmed on-chain (${txSig}) but DB update failed. Manual reconciliation needed.`,
+            signatures: sigRecords,
             remaining: stillOwed,
           }, 500);
         }
       } catch (sendErr) {
         console.warn(`[settle-game] Failed to send to ${recipient}:`, sendErr);
-        // Unknown outcome: sig recorded but confirm timed out.
-        // MUST persist sig to DB before returning — otherwise retry re-sends.
-        if (paidSignatures[recipient]) {
+        if (sigRecords[recipient]) {
+          sigRecords[recipient].status = 'unknown';
           const { error: haltErr } = await supabase.from('games').update({
             settlement_status: 'failed',
             pending_payouts: stillOwed,
-            paid_tx_signatures: paidSignatures,
+            paid_tx_signatures: sigRecords,
           }).eq('id', gameId);
           if (haltErr) {
-            console.error(`[settle-game] CRITICAL: sig ${paidSignatures[recipient]} for ${recipient} not persisted to DB — INCLUDE IN RESPONSE FOR MANUAL RECONCILIATION`);
+            console.error(`[settle-game] CRITICAL: sig ${sigRecords[recipient].sig} for ${recipient} not persisted to DB`);
           }
           return jsonResponse({
-            error: `Transaction to ${recipient} sent but confirmation timed out (sig=${paidSignatures[recipient]}). Verify on-chain before retrying.`,
-            signatures: paidSignatures,
+            error: `Transaction to ${recipient} sent but confirmation timed out (sig=${sigRecords[recipient].sig}). Verify on-chain before retrying.`,
+            signatures: sigRecords,
             remaining: stillOwed,
             dbPersisted: !haltErr,
           }, 500);
@@ -261,14 +291,14 @@ serve(async (req) => {
       status: settled ? 'gameover' : game.status,
       settlement_status: settled ? 'settled' : 'failed',
       pending_payouts: settled ? null : stillOwed,
-      paid_tx_signatures: paidSignatures,
+      paid_tx_signatures: sigRecords,
     }).eq('id', gameId);
 
     if (finalErr) {
       console.error('[settle-game] Final DB update failed:', finalErr);
       return jsonResponse({
         error: 'Settlement payouts sent but final DB update failed. Manual reconciliation needed.',
-        signatures: paidSignatures,
+        signatures: sigRecords,
         remaining: settled ? undefined : stillOwed,
       }, 500);
     }
@@ -276,7 +306,7 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       settled,
-      signatures: paidSignatures,
+      signatures: sigRecords,
       ...(settled ? {} : { remaining: stillOwed }),
     });
   } catch (e) {

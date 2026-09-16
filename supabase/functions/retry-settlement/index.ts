@@ -1,16 +1,14 @@
 // Edge Function: retry-settlement
 // Backend-authoritative retry for failed game settlement.
 //
-// The client CANNOT mutate settlement_status, pending_payouts, or
-// paid_tx_signatures — RLS blocks all three. This function:
-//   1. Verifies ed25519 signature from the HOST wallet
-//   2. Atomically claims the retry (settlement_status 'failed' → 'retrying')
-//   3. Skips already-paid recipients (by paid_tx_signatures)
-//   4. Sends remaining payouts on-chain, recording each signature
-//   5. Updates DB state after each successful send (crash-safe)
-//   6. Returns final state with all signatures
+// Signature reconciliation: before re-sending, unknown/submitted sigs are
+// checked on-chain via getSignatureStatuses. Only recipients with no sig
+// or a confirmed-failed sig are re-sent. Unknown sigs that still can't be
+// resolved are flagged for manual review (the function halts).
 //
-// The client calls this instead of doing settlement writes directly.
+// Setup code (keypair, PDA derivation) runs inside try/catch AFTER the
+// atomic claim. If setup throws, status reverts to 'failed' so the game
+// is never permanently stuck in 'retrying'.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -32,6 +30,11 @@ interface RetryRequest {
   auth: GameAuthToken;
 }
 
+interface SigRecord {
+  sig: string;
+  status: 'submitted' | 'confirmed' | 'failed' | 'unknown';
+}
+
 function loadSettlementKeypair(): Keypair {
   const raw = Deno.env.get('SETTLEMENT_SECRET_KEY');
   if (!raw) throw new Error('SETTLEMENT_SECRET_KEY not configured');
@@ -45,6 +48,19 @@ function encodeU64LE(n: number): Uint8Array {
   const buf = new Uint8Array(8);
   new DataView(buf.buffer).setBigUint64(0, BigInt(n), true);
   return buf;
+}
+
+function normalizeSigRecords(raw: unknown): Record<string, SigRecord> {
+  const out: Record<string, SigRecord> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [wallet, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof val === 'string') {
+      out[wallet] = { sig: val, status: 'unknown' };
+    } else if (val && typeof val === 'object' && 'sig' in val) {
+      out[wallet] = val as SigRecord;
+    }
+  }
+  return out;
 }
 
 serve(async (req) => {
@@ -66,7 +82,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    // Verify host BEFORE mutating state — reject unauthorized callers without touching DB
+    // ── Auth BEFORE mutation: reject unauthorized callers without touching DB ──
     const { data: game, error: lookupErr } = await supabase
       .from('games')
       .select('host_wallet, settlement_status')
@@ -83,7 +99,7 @@ serve(async (req) => {
       return jsonResponse({ error: 'retry claim failed — game is not in failed state or another retry is in progress' }, 409);
     }
 
-    // Atomically claim: only succeeds if settlement_status is currently 'failed'
+    // ── Atomic claim: .select().single() — 0-row match = 409 ──
     const { data: claimed, error: claimErr } = await supabase
       .from('games')
       .update({ settlement_status: 'retrying' })
@@ -96,43 +112,109 @@ serve(async (req) => {
       return jsonResponse({ error: 'retry claim failed — concurrent retry or state changed' }, 409);
     }
 
-    const pendingPayouts: Record<string, number> = (claimed.pending_payouts as Record<string, number>) ?? {};
-    const paidSignatures: Record<string, string> = (claimed.paid_tx_signatures as Record<string, string>) ?? {};
+    // ── Setup inside try/catch: revert to 'failed' if anything throws ──
+    let connection: Connection;
+    let settlementKeypair: Keypair;
+    let gamePDA: PublicKey;
+    let escrowPDA: PublicKey;
+    let programId: PublicKey;
 
-    // Remove already-paid recipients
-    for (const paidWallet of Object.keys(paidSignatures)) {
-      delete pendingPayouts[paidWallet];
+    try {
+      const rpcUrl = Deno.env.get('SOLANA_RPC') || 'https://api.devnet.solana.com';
+      if (rpcUrl.includes('mainnet')) {
+        await supabase.from('games').update({ settlement_status: 'failed' }).eq('id', gameId);
+        return jsonResponse({ error: 'settlement is devnet-only' }, 500);
+      }
+
+      programId = new PublicKey(Deno.env.get('ESCROW_PROGRAM_ID') || DEFAULT_PROGRAM_ID);
+      connection = new Connection(rpcUrl, 'confirmed');
+      settlementKeypair = loadSettlementKeypair();
+
+      const hostPubkey = new PublicKey(claimed.host_wallet);
+      gamePDA = claimed.game_pda
+        ? new PublicKey(claimed.game_pda)
+        : PublicKey.findProgramAddressSync(
+            [new TextEncoder().encode('game'), hostPubkey.toBytes(), new TextEncoder().encode(claimed.room_code)],
+            programId,
+          )[0];
+      [escrowPDA] = PublicKey.findProgramAddressSync(
+        [new TextEncoder().encode('escrow'), gamePDA.toBytes()],
+        programId,
+      );
+    } catch (setupErr) {
+      console.error('[retry-settlement] Setup failed after claiming retrying:', setupErr);
+      await supabase.from('games').update({ settlement_status: 'failed' }).eq('id', gameId);
+      return jsonResponse({ error: `Setup failed: ${(setupErr as Error).message}` }, 500);
+    }
+
+    const pendingPayouts: Record<string, number> = (claimed.pending_payouts as Record<string, number>) ?? {};
+    const sigRecords = normalizeSigRecords(claimed.paid_tx_signatures);
+
+    // ── Reconcile unknown/submitted sigs on-chain before deciding who to skip ──
+    const unresolvedEntries = Object.entries(sigRecords).filter(
+      ([_, r]) => r.status === 'unknown' || r.status === 'submitted',
+    );
+    if (unresolvedEntries.length > 0) {
+      try {
+        const sigStrings = unresolvedEntries.map(([_, r]) => r.sig);
+        const statuses = await connection.getSignatureStatuses(sigStrings);
+        let hasUnrecoverable = false;
+
+        unresolvedEntries.forEach(([w, record], i) => {
+          const status = statuses.value[i];
+          if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) {
+            record.status = status.err ? 'failed' : 'confirmed';
+          } else {
+            hasUnrecoverable = true;
+          }
+        });
+
+        // Persist reconciled sig statuses
+        await supabase.from('games').update({ paid_tx_signatures: sigRecords }).eq('id', gameId);
+
+        if (hasUnrecoverable) {
+          const unresolved = unresolvedEntries
+            .filter(([_, r]) => r.status === 'unknown' || r.status === 'submitted')
+            .map(([w, r]) => `${w}:${r.sig}`);
+          await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId);
+          return jsonResponse({
+            error: `Cannot safely retry — ${unresolved.length} transaction(s) have unknown on-chain status. Manual verification required.`,
+            unresolved,
+            signatures: sigRecords,
+          }, 500);
+        }
+      } catch (reconcileErr) {
+        console.error('[retry-settlement] On-chain reconciliation failed:', reconcileErr);
+        await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId);
+        return jsonResponse({
+          error: `On-chain signature reconciliation failed: ${(reconcileErr as Error).message}`,
+          signatures: sigRecords,
+        }, 500);
+      }
+    }
+
+    // Only skip confirmed recipients — failed sigs mean the recipient is still owed
+    for (const [w, record] of Object.entries(sigRecords)) {
+      if (record.status === 'confirmed') {
+        delete pendingPayouts[w];
+      }
     }
 
     if (Object.keys(pendingPayouts).length === 0) {
-      await supabase.from('games').update({
+      const { error: finalErr } = await supabase.from('games').update({
         settlement_status: 'settled',
         pending_payouts: null,
+        paid_tx_signatures: sigRecords,
       }).eq('id', gameId);
-      return jsonResponse({ ok: true, settled: true, signatures: paidSignatures });
+      if (finalErr) {
+        console.error('[retry-settlement] Empty-pending final update failed:', finalErr);
+        return jsonResponse({
+          error: 'All payouts confirmed but DB update to settled failed. Manual reconciliation needed.',
+          signatures: sigRecords,
+        }, 500);
+      }
+      return jsonResponse({ ok: true, settled: true, signatures: sigRecords });
     }
-
-    const rpcUrl = Deno.env.get('SOLANA_RPC') || 'https://api.devnet.solana.com';
-    if (rpcUrl.includes('mainnet')) {
-      await supabase.from('games').update({ settlement_status: 'failed' }).eq('id', gameId);
-      return jsonResponse({ error: 'settlement is devnet-only' }, 500);
-    }
-
-    const programId = new PublicKey(Deno.env.get('ESCROW_PROGRAM_ID') || DEFAULT_PROGRAM_ID);
-    const connection = new Connection(rpcUrl, 'confirmed');
-    const settlementKeypair = loadSettlementKeypair();
-
-    const hostPubkey = new PublicKey(claimed.host_wallet);
-    const gamePDA = claimed.game_pda
-      ? new PublicKey(claimed.game_pda)
-      : PublicKey.findProgramAddressSync(
-          [new TextEncoder().encode('game'), hostPubkey.toBytes(), new TextEncoder().encode(claimed.room_code)],
-          programId,
-        )[0];
-    const [escrowPDA] = PublicKey.findProgramAddressSync(
-      [new TextEncoder().encode('escrow'), gamePDA.toBytes()],
-      programId,
-    );
 
     const stillOwed = { ...pendingPayouts };
 
@@ -165,69 +247,67 @@ serve(async (req) => {
         tx.recentBlockhash = blockhash;
         tx.sign(settlementKeypair);
 
-        const sig = await connection.sendRawTransaction(tx.serialize());
-
-        // Record sig immediately — if confirmTransaction times out the tx may
-        // still land on-chain. Without recording here, a retry would re-send.
-        paidSignatures[recipient] = sig;
-
-        const confirmation = await connection.confirmTransaction(
-          { signature: sig, blockhash, lastValidBlockHeight }, 'confirmed',
-        );
-
-        if (confirmation.value.err) {
-          // On-chain tx failed (program error, insufficient funds, etc.)
-          // Remove sig — a failed tx must NOT be treated as paid on next retry.
-          console.warn(`[retry-settlement] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${sig}`);
-          delete paidSignatures[recipient];
+        // ── Pre-broadcast persist ──
+        const txSig = bs58.encode(tx.signature!);
+        sigRecords[recipient] = { sig: txSig, status: 'submitted' };
+        const { error: preErr } = await supabase.from('games').update({
+          paid_tx_signatures: sigRecords,
+        }).eq('id', gameId);
+        if (preErr) {
+          console.error(`[retry-settlement] Failed to persist pre-broadcast sig for ${recipient}:`, preErr);
+          delete sigRecords[recipient];
           continue;
         }
 
+        await connection.sendRawTransaction(tx.serialize());
+
+        const confirmation = await connection.confirmTransaction(
+          { signature: txSig, blockhash, lastValidBlockHeight }, 'confirmed',
+        );
+
+        if (confirmation.value.err) {
+          console.warn(`[retry-settlement] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${txSig}`);
+          sigRecords[recipient] = { sig: txSig, status: 'failed' };
+          await supabase.from('games').update({ paid_tx_signatures: sigRecords }).eq('id', gameId);
+          continue;
+        }
+
+        sigRecords[recipient] = { sig: txSig, status: 'confirmed' };
         delete stillOwed[recipient];
 
-        // Persist after EACH successful send — crash-safe progress.
-        // If this DB write fails, we MUST stop: the chain send succeeded
-        // but DB doesn't know about it yet. Continuing would leave us in
-        // an inconsistent state where a future retry could double-send
-        // to this recipient (they're still in pending_payouts in DB).
         const { error: persistErr } = await supabase.from('games').update({
           settlement_status: 'retrying',
           pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
-          paid_tx_signatures: paidSignatures,
+          paid_tx_signatures: sigRecords,
         }).eq('id', gameId);
 
         if (persistErr) {
-          console.error(`[retry-settlement] CRITICAL: chain send to ${recipient} succeeded (sig=${sig}) but DB persist failed:`, persistErr);
-          // Revert to failed so retry can re-claim, but we can't guarantee
-          // the revert succeeds either. The tx signature is logged above
-          // for manual reconciliation.
+          console.error(`[retry-settlement] CRITICAL: chain send to ${recipient} succeeded (sig=${txSig}) but DB persist failed:`, persistErr);
           await supabase.from('games').update({
             settlement_status: 'failed',
-            paid_tx_signatures: paidSignatures,
+            paid_tx_signatures: sigRecords,
           }).eq('id', gameId).catch(() => {});
           return jsonResponse({
-            error: `Payout to ${recipient} confirmed on-chain (${sig}) but DB update failed. Manual reconciliation needed.`,
-            signatures: paidSignatures,
+            error: `Payout to ${recipient} confirmed on-chain (${txSig}) but DB update failed. Manual reconciliation needed.`,
+            signatures: sigRecords,
             remaining: stillOwed,
           }, 500);
         }
       } catch (sendErr) {
         console.warn(`[retry-settlement] Failed to send to ${recipient}:`, sendErr);
-        // If sig was already recorded (sendRawTransaction succeeded but
-        // confirmTransaction timed out), persist what we know and stop —
-        // the tx outcome is unknown and continuing could double-send.
-        if (paidSignatures[recipient]) {
+        if (sigRecords[recipient]) {
+          sigRecords[recipient].status = 'unknown';
           const { error: crashErr } = await supabase.from('games').update({
             settlement_status: 'failed',
             pending_payouts: stillOwed,
-            paid_tx_signatures: paidSignatures,
+            paid_tx_signatures: sigRecords,
           }).eq('id', gameId);
           if (crashErr) {
-            console.error(`[retry-settlement] CRITICAL: sig ${paidSignatures[recipient]} for ${recipient} recorded in memory but DB persist failed`);
+            console.error(`[retry-settlement] CRITICAL: sig ${sigRecords[recipient].sig} for ${recipient} recorded but DB persist failed`);
           }
           return jsonResponse({
-            error: `Transaction to ${recipient} sent but confirmation timed out (sig=${paidSignatures[recipient]}). Verify on-chain before retrying.`,
-            signatures: paidSignatures,
+            error: `Transaction to ${recipient} sent but confirmation timed out (sig=${sigRecords[recipient].sig}). Verify on-chain before retrying.`,
+            signatures: sigRecords,
             remaining: stillOwed,
           }, 500);
         }
@@ -238,14 +318,14 @@ serve(async (req) => {
     const { error: finalErr } = await supabase.from('games').update({
       settlement_status: settled ? 'settled' : 'failed',
       pending_payouts: settled ? null : stillOwed,
-      paid_tx_signatures: paidSignatures,
+      paid_tx_signatures: sigRecords,
     }).eq('id', gameId);
 
     if (finalErr) {
       console.error('[retry-settlement] Final DB update failed:', finalErr);
       return jsonResponse({
         error: 'Settlement payouts sent but final DB update failed. Manual reconciliation needed.',
-        signatures: paidSignatures,
+        signatures: sigRecords,
         remaining: settled ? undefined : stillOwed,
       }, 500);
     }
@@ -253,7 +333,7 @@ serve(async (req) => {
     return jsonResponse({
       ok: true,
       settled,
-      signatures: paidSignatures,
+      signatures: sigRecords,
       ...(settled ? {} : { remaining: stillOwed }),
     });
   } catch (e) {

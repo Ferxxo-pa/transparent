@@ -515,108 +515,187 @@ async function main() {
     report(r.ok && r.rowCount === 1, "service_role UPDATE games succeeds (Edge Function path)", r.err);
   }
 
-  console.log("\n── Settlement DB state machine: failure modes ──\n");
+  console.log("\n── Settlement DB state machine: failure modes (typed sig records) ──\n");
 
-  // 27. Failed-on-chain: sig recorded but on-chain tx errors out.
-  // After the Edge Function detects confirmation.value.err, it REMOVES the
-  // sig from paidSignatures — the recipient stays in stillOwed. Simulate:
-  // service_role creates a game in 'pending' settlement, writes a sig,
-  // then removes it (as the settle code does on chain failure).
+  // 27. Failed-on-chain: sig recorded with status:'failed' after value.err.
+  // Retry must treat this recipient as STILL OWED (failed sig ≠ paid).
   {
     const { rows: [g] } = await db.query(
       `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
        values ('FAIL-CHAIN', 'HOST_FAIL1', 'playing', 1, 100000, 'pending', '{"W1":50000,"W2":50000}'::jsonb, '{}'::jsonb) returning id`,
     );
-    // Simulate: W1 send succeeds → sig recorded → on-chain error → sig removed, W1 stays owed
+    // Simulate settle-game: W1 pre-broadcast persist as 'submitted', then chain error → 'failed'
     const r1 = await asPersist("service_role",
-      `update games set paid_tx_signatures = '{"W1":"sig_chain_fail"}'::jsonb where id = $1`, [g.id]);
-    report(r1.ok, "settlement: sig recorded for failed-on-chain recipient", r1.err);
-    // Chain failure detected: remove sig, keep recipient in pending
+      `update games set paid_tx_signatures = '{"W1":{"sig":"sig_chain_fail","status":"submitted"}}'::jsonb where id = $1`, [g.id]);
+    report(r1.ok, "settlement: typed sig record persisted as submitted", r1.err);
+    // Chain failure detected: update status to 'failed', keep sig for audit
     const r2 = await asPersist("service_role",
-      `update games set paid_tx_signatures = '{}'::jsonb, settlement_status = 'failed' where id = $1`, [g.id]);
-    report(r2.ok, "settlement: sig removed + status→failed after on-chain error", r2.err);
-    // Verify: W1 still owed, no sig persisted
+      `update games set paid_tx_signatures = '{"W1":{"sig":"sig_chain_fail","status":"failed"}}'::jsonb, settlement_status = 'failed' where id = $1`, [g.id]);
+    report(r2.ok, "settlement: sig status→failed after on-chain error (sig retained for audit)", r2.err);
+    // Verify: W1 still owed, sig present but marked failed
     const { rows: [state1] } = await db.query(`select pending_payouts, paid_tx_signatures, settlement_status from games where id = $1`, [g.id]);
+    const w1Sig = (state1.paid_tx_signatures as any).W1;
     report(
-      state1.settlement_status === 'failed' && (state1.pending_payouts as any).W1 === 50000 && Object.keys(state1.paid_tx_signatures as any).length === 0,
-      "settlement: failed-on-chain leaves recipient owed with no stale sig",
-      `status=${state1.settlement_status} owed=${JSON.stringify(state1.pending_payouts)} sigs=${JSON.stringify(state1.paid_tx_signatures)}`,
+      state1.settlement_status === 'failed' &&
+      (state1.pending_payouts as any).W1 === 50000 &&
+      w1Sig?.status === 'failed',
+      "settlement: failed-on-chain — recipient still owed, sig marked failed (not deleted)",
+      `status=${state1.settlement_status} sig_status=${w1Sig?.status}`,
     );
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
   // 28. Unknown outcome: sendRawTransaction succeeds but confirmTransaction times out.
-  // Sig is recorded pre-confirm. Edge Function persists sig + marks failed + returns 500.
-  // Recipient stays in stillOwed but sig is recorded for manual verification.
+  // Sig stored as {sig, status:'unknown'}. Retry MUST call getSignatureStatuses
+  // to reconcile — it cannot blindly skip or blindly re-send.
   {
     const { rows: [g] } = await db.query(
       `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
        values ('FAIL-TIMEOUT', 'HOST_FAIL2', 'playing', 1, 100000, 'pending', '{"W1":50000,"W2":50000}'::jsonb, '{}'::jsonb) returning id`,
     );
-    // W1 send succeeded, sig recorded. Confirm timeout. Edge Function persists and stops.
+    // W1 send succeeded, confirm timed out → unknown status
     const r = await asPersist("service_role",
       `update games set settlement_status = 'failed',
         pending_payouts = '{"W1":50000,"W2":50000}'::jsonb,
-        paid_tx_signatures = '{"W1":"sig_timeout_unknown"}'::jsonb
+        paid_tx_signatures = '{"W1":{"sig":"sig_timeout_unknown","status":"unknown"}}'::jsonb
        where id = $1`, [g.id]);
-    report(r.ok, "settlement: unknown-outcome sig persisted + status→failed", r.err);
+    report(r.ok, "settlement: unknown-outcome typed sig persisted + status→failed", r.err);
     const { rows: [state] } = await db.query(`select pending_payouts, paid_tx_signatures, settlement_status from games where id = $1`, [g.id]);
+    const w1Sig = (state.paid_tx_signatures as any).W1;
     report(
-      state.settlement_status === 'failed' && (state.paid_tx_signatures as any).W1 === 'sig_timeout_unknown' && (state.pending_payouts as any).W1 === 50000,
-      "settlement: unknown-outcome — sig in DB for manual verification, recipient still owed",
-      `sigs=${JSON.stringify(state.paid_tx_signatures)}`,
+      state.settlement_status === 'failed' &&
+      w1Sig?.status === 'unknown' &&
+      w1Sig?.sig === 'sig_timeout_unknown' &&
+      (state.pending_payouts as any).W1 === 50000,
+      "settlement: unknown-outcome — typed sig in DB, recipient still owed, retry must reconcile on-chain",
+      `sig=${JSON.stringify(w1Sig)}`,
     );
-    // Retry must skip W1 (sig exists) and only re-send W2
+    // Retry claim still works
     const r2 = await asPersist("service_role",
       `update games set settlement_status = 'retrying' where id = $1 and settlement_status = 'failed'`, [g.id]);
     report(r2.ok && r2.rowCount === 1, "settlement: retry claim succeeds after unknown-outcome failure", r2.err);
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
+  // 28b. Backward compat: old bare-string sigs normalized to unknown by retry.
+  // If DB has legacy format '{"W1":"old_sig_string"}', retry's normalizeSigRecords
+  // treats it as {sig:"old_sig_string", status:"unknown"} — conservative, requires
+  // on-chain verification before skipping.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('LEGACY-SIG', 'HOST_LEGACY', 'playing', 1, 100000, 'failed', '{"W1":50000}'::jsonb, '{"W1":"legacy_bare_string"}'::jsonb) returning id`,
+    );
+    const { rows: [state] } = await db.query(`select paid_tx_signatures from games where id = $1`, [g.id]);
+    report(
+      typeof (state.paid_tx_signatures as any).W1 === 'string',
+      "settlement: legacy bare-string sig format still valid in JSONB (backward compat)",
+    );
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
   // 29. DB failure after broadcast: chain send confirmed, but DB persist fails.
-  // Edge Function falls back to status='failed' with sigs in response body.
-  // Verify: the fallback DB write (status→failed + sigs) is valid through CHECK.
+  // Edge Function falls back to status='failed' with typed sig in response.
   {
     const { rows: [g] } = await db.query(
       `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
        values ('FAIL-DB', 'HOST_FAIL3', 'playing', 1, 100000, 'pending', '{"W1":50000,"W2":50000}'::jsonb, '{}'::jsonb) returning id`,
     );
-    // W1 paid on-chain (sig confirmed). Normal persist to 'pending' fails.
-    // Fallback: write sig + mark failed so retry picks it up.
+    // Fallback: write confirmed sig + mark failed
     const r = await asPersist("service_role",
       `update games set settlement_status = 'failed',
-        paid_tx_signatures = '{"W1":"sig_db_fallback"}'::jsonb
+        paid_tx_signatures = '{"W1":{"sig":"sig_db_fallback","status":"confirmed"}}'::jsonb
        where id = $1`, [g.id]);
-    report(r.ok, "settlement: DB-failure fallback (status→failed + sig) persists", r.err);
-    // Verify: W1 sig survives, W2 still in pending
+    report(r.ok, "settlement: DB-failure fallback (status→failed + confirmed sig) persists", r.err);
     const { rows: [state] } = await db.query(`select pending_payouts, paid_tx_signatures, settlement_status from games where id = $1`, [g.id]);
+    const w1Sig = (state.paid_tx_signatures as any).W1;
     report(
-      state.settlement_status === 'failed' && (state.paid_tx_signatures as any).W1 === 'sig_db_fallback',
-      "settlement: DB-failure fallback sig is durable in DB",
-      `status=${state.settlement_status} sigs=${JSON.stringify(state.paid_tx_signatures)}`,
+      state.settlement_status === 'failed' && w1Sig?.status === 'confirmed' && w1Sig?.sig === 'sig_db_fallback',
+      "settlement: DB-failure fallback sig is durable + typed in DB",
+      `status=${state.settlement_status} sig=${JSON.stringify(w1Sig)}`,
     );
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
-  // 30. Crash durability boundary: if the Edge Function process crashes after
-  // sendRawTransaction returns but BEFORE the next DB write, the signature
-  // exists ONLY on-chain — the DB has no record. This is inherent to serverless
-  // (no local WAL). The retry-settlement function's skip-by-sig logic cannot
-  // protect against this case — manual on-chain reconciliation is required.
-  // This check documents the boundary by verifying that an "empty sig" state
-  // in the DB does NOT imply "unpaid on chain".
+  // 29b. Concurrent claim rejection: two settle-game calls for the same game.
+  // .select().single() on UPDATE ... WHERE settlement_status='none' means
+  // only one caller gets a row back. Second caller gets 0 rows → 409.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status)
+       values ('CONC-CLAIM', 'HOST_CONC', 'playing', 1, 100000, 'none') returning id`,
+    );
+    // First claim succeeds
+    const r1 = await asPersist("service_role",
+      `update games set settlement_status = 'pending' where id = $1 and settlement_status = 'none' returning id`, [g.id]);
+    report(r1.ok && r1.rowCount === 1, "settlement: first atomic claim succeeds (1 row returned)", r1.err);
+    // Second claim: status is now 'pending', not 'none' → 0 rows
+    const r2 = await as("service_role",
+      `update games set settlement_status = 'pending' where id = $1 and settlement_status = 'none' returning id`, [g.id]);
+    report(r2.rowCount === 0, "settlement: concurrent second claim returns 0 rows (would be 409)", `rowCount=${r2.rowCount}`);
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 29c. Pre-broadcast sig persistence: sig identity written to DB BEFORE
+  // sendRawTransaction. This reduces the crash window to between the pre-persist
+  // DB write and the sendRawTransaction call — if the function crashes after
+  // send, the sig is already in DB as 'submitted' and retry can reconcile.
   {
     const { rows: [g] } = await db.query(
       `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
-       values ('CRASH-GAP', 'HOST_CRASH', 'playing', 1, 100000, 'pending', '{"W1":50000}'::jsonb, '{}'::jsonb) returning id`,
+       values ('PRE-PERSIST', 'HOST_PRE', 'playing', 1, 100000, 'pending', '{"W1":50000}'::jsonb, '{}'::jsonb) returning id`,
     );
-    // Process crash: DB still shows W1 owed with no sig. A retry WILL re-send.
-    // This is the documented limitation — the DB state alone is ambiguous.
-    const { rows: [state] } = await db.query(`select pending_payouts, paid_tx_signatures from games where id = $1`, [g.id]);
+    // Simulate: sig extracted from signed tx, persisted as 'submitted' before broadcast
+    const r = await asPersist("service_role",
+      `update games set paid_tx_signatures = '{"W1":{"sig":"pre_broadcast_sig","status":"submitted"}}'::jsonb where id = $1`, [g.id]);
+    report(r.ok, "settlement: pre-broadcast sig persisted as submitted before sendRawTransaction", r.err);
+    // If process crashes here, retry sees 'submitted' → reconciles on-chain
+    const { rows: [state] } = await db.query(`select paid_tx_signatures from games where id = $1`, [g.id]);
+    const w1 = (state.paid_tx_signatures as any).W1;
     report(
-      (state.pending_payouts as any).W1 === 50000 && Object.keys(state.paid_tx_signatures as any).length === 0,
-      "DOCUMENTED LIMITATION: process crash after send leaves DB with no sig — retry will double-send (requires on-chain reconciliation)",
+      w1?.sig === 'pre_broadcast_sig' && w1?.status === 'submitted',
+      "settlement: crash after pre-persist leaves recoverable submitted sig in DB",
     );
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 30. Remaining crash boundary: process death between pre-persist DB write
+  // and sendRawTransaction means DB has 'submitted' sig but tx never went
+  // on-chain. Retry's getSignatureStatuses returns null → sig stays 'submitted'.
+  // Retry halts with "unknown on-chain status" error — no blind re-send.
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status, pending_payouts, paid_tx_signatures)
+       values ('CRASH-GAP', 'HOST_CRASH', 'playing', 1, 100000, 'failed', '{"W1":50000}'::jsonb, '{"W1":{"sig":"never_sent","status":"submitted"}}'::jsonb) returning id`,
+    );
+    const { rows: [state] } = await db.query(`select pending_payouts, paid_tx_signatures from games where id = $1`, [g.id]);
+    const w1 = (state.paid_tx_signatures as any).W1;
+    report(
+      (state.pending_payouts as any).W1 === 50000 && w1?.status === 'submitted',
+      "DOCUMENTED: crash after pre-persist but before send — retry must reconcile via getSignatureStatuses (halts on unresolvable)",
+    );
+    await db.query(`delete from games where id = $1`, [g.id]);
+  }
+
+  // 30b. Setup failure recovery: if keypair/PDA derivation throws after
+  // claiming 'retrying', status must revert to 'failed' (not stuck forever).
+  {
+    const { rows: [g] } = await db.query(
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status)
+       values ('SETUP-FAIL', 'HOST_SETUP', 'playing', 1, 100000, 'failed') returning id`,
+    );
+    // Claim retrying
+    const r1 = await asPersist("service_role",
+      `update games set settlement_status = 'retrying' where id = $1 and settlement_status = 'failed'`, [g.id]);
+    report(r1.ok && r1.rowCount === 1, "settlement: claim retrying for setup-failure test", r1.err);
+    // Setup throws → revert to failed
+    const r2 = await asPersist("service_role",
+      `update games set settlement_status = 'failed' where id = $1 and settlement_status = 'retrying'`, [g.id]);
+    report(r2.ok && r2.rowCount === 1, "settlement: setup failure reverts retrying→failed (not stuck)", r2.err);
+    // Can be re-claimed
+    const r3 = await as("service_role",
+      `update games set settlement_status = 'retrying' where id = $1 and settlement_status = 'failed' returning id`, [g.id]);
+    report(r3.rowCount === 1, "settlement: game recoverable after setup-failure revert", `rowCount=${r3.rowCount}`);
     await db.query(`delete from games where id = $1`, [g.id]);
   }
 
