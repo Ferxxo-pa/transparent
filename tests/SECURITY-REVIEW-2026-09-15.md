@@ -67,11 +67,16 @@ This is a **duplicate-payment RISK**, not a proven live double payment. The code
 
 **Fix needed:** Before retry, reconcile the existing transaction (query recent tx signatures for the wallet, check on-chain balance delta). If the first transfer's outcome is ambiguous, halt and surface a `needs_reconciliation` state instead of blindly retrying. `joined`/`paid`/`ready`/`settled` must be distinct states tracked independently.
 
-## Medium: votes/question_submissions
+## Critical (was "Medium — Acceptable"): votes/question_submissions policy-name mismatch
 
-Votes: INSERT gated to `playing/voting` status. UPDATE/DELETE dropped. Unique constraint prevents double-voting. **Acceptable.**
+**Correction (rev 4):** the "Acceptable" verdict below assumed the hardening migration's drop/replace by name actually removed the original permissive policy. It only does so on a DB bootstrapped from `supabase/schema.sql`'s naming (`"anon can insert votes"`, `"anon can update questions"`). A DB bootstrapped from the `src/lib/schema.sql` / `src/lib/schema-full.sql` lineage instead has policies named `"votes_insert"` and `"question_submissions_update"` — names the hardening migration never references. Postgres ORs permissive policies together, so on that lineage the original wide-open policy survives underneath the new scoped one:
 
-Question_submissions: UPDATE/DELETE dropped. `increment_question_votes()` is security definer. **Acceptable.**
+- **votes INSERT** — legacy `"votes_insert"` (`WITH CHECK (true)`) lets anon insert a vote for *any* game regardless of status, bypassing the `playing/voting` gate. Unique `(game_id, round, voter_wallet)` still prevents double-voting, but the status gate itself was silently defeated.
+- **question_submissions UPDATE** — legacy `"question_submissions_update"` (`USING (true) WITH CHECK (true)`) lets anon rewrite `votes` (and any other column) directly, bypassing `increment_question_votes()` entirely. This was **not** "Acceptable" — it was a live vote-count forgery path.
+
+**Fix:** `supabase/migrations/20260915_policy_reconciliation.sql` drops both legacy policies by their real names (plus the equivalent `players_insert` / `players_update` leftovers, closing the same gap on `players`). Proven by `tests/policy-reconciliation.ts` (5/5 passing).
+
+Same root cause and same fix pattern as the DELETE-policy gap in `supabase/migrations/20260915_delete_policy_reconciliation.sql`.
 
 ## RPC ownership validation: CRITICAL GAP
 
@@ -108,6 +113,18 @@ Current client calls that **will break** when anon UPDATE/DELETE is blocked:
 5. **Only then** apply the RLS lockdown migration
 
 Applying the migration before step 3 **will break the live app**.
+
+## Residual (documented, not fixed): advance-phase non-host gameover branch lacks column filtering
+
+**Location:** `supabase/functions/advance-phase/index.ts` L109-133
+
+The non-host, non-storyteller branch permits a request once `isGameover` (`status === 'gameover'`) or `isRoundAdvance` is true and the server-verified vote count is complete. Unlike the storyteller branch — which restricts `touched` to exactly `{game_phase, storyteller_choice}` — this branch never restricts which of the `UPDATABLE_COLUMNS` keys may ride along once `isGameover`/`isRoundAdvance` passes. A non-host player whose votes are complete could submit `updates` containing `status: 'gameover'` *plus* `current_pot`, `settlement_status`, or `pending_payouts` in the same payload, and all of them get written via `supabase.from('games').update(updates)` — only `status`/`current_round` are validated, not the full key set.
+
+**Not fixed in this pass** (flagged, per scope, as the next hardening candidate). Suggested fix: mirror the storyteller branch's pattern — require `touched` to be a subset of an explicit allowlist for each transition type (e.g. `{status}` only for gameover, `{current_round, current_question_index, current_hot_seat_player}` only for round-advance) before applying the update.
+
+## Test coverage (rev 4)
+
+**`tests/policy-reconciliation.ts`** — 5 tests, all passing. Proves the `votes_insert` / `question_submissions_update` / `players_insert` / `players_update` legacy policy-name gaps (see "Critical: votes/question_submissions policy-name mismatch" above) are closed by `20260915_policy_reconciliation.sql`, and that the legitimate scoped players-INSERT path is untouched. Bounded scope — does not re-run the full anon-player-fixed suite.
 
 ## Test coverage (rev 3)
 
