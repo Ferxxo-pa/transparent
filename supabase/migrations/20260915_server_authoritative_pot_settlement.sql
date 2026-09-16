@@ -135,3 +135,39 @@ create policy "anon can insert players" on public.players
     and has_paid = false
     and is_ready = false
   );
+
+-- ── games: close the INSERT-time forgery gap ────────────────
+-- The UPDATE trigger protects current_pot / settlement_status /
+-- pending_payouts from anon writes, but INSERT bypasses triggers.
+-- Legacy "games_insert" (WITH CHECK true) or any surviving permissive
+-- INSERT policy lets anon create a game with current_pot=999 or
+-- settlement_status='settled'. Gate INSERT to safe initial values.
+-- The comprehensive_legacy_alias_cleanup migration removes the INSERT
+-- policy entirely; this is defense-in-depth for environments where
+-- that cleanup hasn't been applied yet.
+
+create or replace function public.protect_game_insert()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  if coalesce(auth.role(), 'postgres') not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  if new.current_pot is distinct from 0
+     or new.settlement_status is distinct from 'none'
+     or new.pending_payouts is not null
+  then
+    raise exception 'games must be created with current_pot=0, settlement_status=none, pending_payouts=null';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_protect_game_insert on public.games;
+create trigger trg_protect_game_insert
+  before insert on public.games
+  for each row execute function public.protect_game_insert();
