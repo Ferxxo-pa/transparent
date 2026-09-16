@@ -124,6 +124,7 @@ $$;
 -- only paths that can flip either flag afterward (via the UPDATE trigger
 -- above).
 
+drop policy if exists "players_insert" on public.players;
 drop policy if exists "anon can insert players" on public.players;
 create policy "anon can insert players" on public.players
   for insert with check (
