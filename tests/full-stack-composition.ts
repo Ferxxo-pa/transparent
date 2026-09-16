@@ -1,0 +1,337 @@
+/**
+ * Full-stack composition regression test.
+ *
+ * Every other test file in this directory applies a PARTIAL migration
+ * stack (whatever set of files that specific fix needed). That's fine for
+ * proving an individual fix works in isolation, but it is exactly the
+ * blind spot that let the historical schema-full.sql-lineage policies
+ * ("players_insert" WITH CHECK true, "games_insert" WITH CHECK true, …)
+ * survive silently for months — Postgres ORs permissive policies
+ * together, so a scoped policy added in one migration does nothing if an
+ * older permissive alias for the same command is still present under a
+ * different name.
+ *
+ * This test applies EVERY migration file in the repo, in dependency
+ * order, exactly once — the actual upgrade path a real environment goes
+ * through — then re-verifies the full set of anon attack vectors closed
+ * across all of them. It also asserts, from pg_policies directly, that no
+ * permissive non-SELECT policy with an unconditional `true` check remains
+ * on any game table.
+ *
+ * Run against a DISPOSABLE local Postgres:
+ *   docker run -d --name rls-full-stack -e POSTGRES_PASSWORD=postgres -p 55445:5432 postgres:16
+ *   DSN=postgres://postgres:postgres@127.0.0.1:55445/postgres npx tsx tests/full-stack-composition.ts
+ */
+
+import { readFileSync } from "node:fs";
+import pg from "pg";
+
+const DSN = process.env.DSN ?? "postgres://postgres:postgres@127.0.0.1:55445/postgres";
+
+let passed = 0;
+let failed = 0;
+function report(ok: boolean, name: string, detail = "") {
+  ok ? passed++ : failed++;
+  console.log(`  ${ok ? "✓" : "✗"} ${name}${detail ? `  (${detail})` : ""}`);
+}
+
+// The full, ordered upgrade path: base schema lineage, then every
+// 20260915 hardening migration in the order they must be applied.
+const FULL_STACK = [
+  "supabase/schema.sql",
+  "supabase/migrations/predictions.sql",
+  "supabase/migrations/20260701_escrow_hardening.sql",
+  "supabase/migrations/20260915_server_authoritative_pot_settlement.sql",
+  "supabase/migrations/20260915_delete_policy_reconciliation.sql",
+  "supabase/migrations/20260915_policy_reconciliation.sql",
+  "supabase/migrations/20260915_comprehensive_legacy_alias_cleanup.sql",
+  "supabase/migrations/20260915_policy_alias_review_closeout.sql",
+];
+
+async function main() {
+  const db = new pg.Client({ connectionString: DSN });
+  await db.connect();
+
+  await db.query(`
+    do $$ begin
+      if not exists (select from pg_roles where rolname = 'anon') then create role anon nologin; end if;
+      if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
+      if not exists (select from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
+    end $$;
+    create schema if not exists auth;
+    create or replace function auth.role() returns text language sql stable
+      as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
+    grant usage on schema auth to anon, authenticated, service_role;
+    do $$ begin
+      if not exists (select from pg_publication where pubname = 'supabase_realtime') then
+        create publication supabase_realtime;
+      end if;
+    end $$;
+  `);
+
+  for (const f of FULL_STACK) {
+    await db.query(readFileSync(f, "utf8"));
+    console.log(`applied ${f}`);
+  }
+
+  // Reproduce the historical schema-full.sql-lineage leftovers that a
+  // real environment bootstrapped from that file (instead of
+  // supabase/schema.sql) would still have at this exact point in the
+  // upgrade path. Every migration above claims to drop these by name —
+  // this proves it.
+  await db.query(`
+    create policy "games_insert" on public.games for insert with check (true);
+    create policy "games_update" on public.games for update using (true) with check (true);
+    create policy "games_delete" on public.games for delete using (true);
+    create policy "players_insert" on public.players for insert with check (true);
+    create policy "players_update" on public.players for update using (true) with check (true);
+    create policy "players_delete" on public.players for delete using (true);
+    create policy "votes_insert" on public.votes for insert with check (true);
+    create policy "question_submissions_update" on public.question_submissions for update using (true) with check (true);
+    create policy "question_submissions_insert" on public.question_submissions for insert with check (true);
+    create policy "predictions_insert" on public.predictions for insert with check (true);
+    create policy "predictions_update" on public.predictions for update using (true) with check (true);
+  `);
+  console.log("seeded schema-full.sql-lineage legacy aliases (simulating a real bootstrapped-from-schema-full.sql environment)\n");
+
+  // Re-run the alias-dropping migrations again, exactly as an operator
+  // would if they discovered the legacy lineage was still present.
+  // 20260915_delete_policy_reconciliation.sql and
+  // 20260915_policy_reconciliation.sql are fully idempotent (every drop is
+  // `if exists`, and any recreated policy drops its own name first) so
+  // they're re-sourced whole. 20260915_comprehensive_legacy_alias_cleanup.sql
+  // is NOT fully idempotent — its `create policy` statements for "anon can
+  // update games" / "anon can insert predictions" / "anon can insert
+  // question_submissions" don't drop-if-exists their own name first, so
+  // re-running the whole file errors once those already exist (see
+  // POLICY-ALIAS-REVIEW.md, "non-idempotent recreate" finding). Only its
+  // `drop policy if exists` lines — the actual alias-cleanup guarantee —
+  // are replayed here.
+  for (const f of [
+    "supabase/migrations/20260915_delete_policy_reconciliation.sql",
+    "supabase/migrations/20260915_policy_reconciliation.sql",
+    "supabase/migrations/20260915_policy_alias_review_closeout.sql",
+  ]) {
+    await db.query(readFileSync(f, "utf8"));
+  }
+  await db.query(`
+    drop policy if exists "games_insert" on public.games;
+    drop policy if exists "games_update" on public.games;
+    drop policy if exists "player_stats_insert" on public.player_stats;
+    drop policy if exists "player_stats_update" on public.player_stats;
+    drop policy if exists "predictions_insert" on public.predictions;
+    drop policy if exists "question_submissions_insert" on public.question_submissions;
+    drop policy if exists "anon can insert questions" on public.question_submissions;
+  `);
+  console.log("re-applied alias-dropping migrations against the seeded legacy lineage\n");
+
+  await db.query(`
+    grant usage on schema public to anon, service_role;
+    grant select, insert, update, delete on all tables in schema public to anon, service_role;
+  `);
+
+  async function as(role: "anon" | "service_role", sql: string, params: unknown[] = []) {
+    await db.query("BEGIN");
+    try {
+      await db.query(`SET LOCAL ROLE ${role}`);
+      await db.query(`SET LOCAL request.jwt.claim.role = '${role}'`);
+      const { rows } = await db.query(`SELECT current_user AS cu, auth.role() AS ar`);
+      if (rows[0].cu !== role || rows[0].ar !== role) {
+        await db.query("ROLLBACK");
+        throw new Error(`FATAL: role not applied — got cu=${rows[0].cu} ar=${rows[0].ar}, expected ${role}`);
+      }
+      try {
+        const r = await db.query(sql, params);
+        await db.query("ROLLBACK");
+        return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows, err: "" };
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      }
+    } catch (e: any) {
+      try { await db.query("ROLLBACK"); } catch {}
+      throw e;
+    }
+  }
+
+  // Like `as()`, but COMMITs instead of ROLLBACK — used where a later
+  // assertion depends on the row actually persisting (e.g. inserting a
+  // row here, then deleting it in a later positive-control check).
+  async function asPersist(role: "anon" | "service_role", sql: string, params: unknown[] = []) {
+    await db.query("BEGIN");
+    try {
+      await db.query(`SET LOCAL ROLE ${role}`);
+      await db.query(`SET LOCAL request.jwt.claim.role = '${role}'`);
+      try {
+        const r = await db.query(sql, params);
+        await db.query("COMMIT");
+        return { ok: true, rowCount: r.rowCount ?? 0, rows: r.rows, err: "" };
+      } catch (e: any) {
+        await db.query("ROLLBACK");
+        return { ok: false, err: e.message, rowCount: 0, rows: [] };
+      }
+    } catch (e: any) {
+      try { await db.query("ROLLBACK"); } catch {}
+      throw e;
+    }
+  }
+
+  const { rows: [waitingGame] } = await db.query(
+    `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, current_pot)
+     values ('FSC-WAIT', 'HOST1', 'waiting', 0, 100000, 0) returning id`,
+  );
+  const { rows: [playingGame] } = await db.query(
+    `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, current_pot)
+     values ('FSC-PLAY', 'HOST2', 'playing', 1, 100000, 0.5) returning id`,
+  );
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+     values ($1, 'PLAYER_A', 'A', true, true)`,
+    [playingGame.id],
+  );
+
+  console.log("\n── Anon attack vectors across the FULL applied stack (must be BLOCKED) ──\n");
+
+  // 1. Anon INSERT players with has_paid=true must fail.
+  {
+    const r = await as("anon",
+      `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+       values ($1, 'FORGE1', 'Forger', true, false)`,
+      [waitingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT players(has_paid=true) is blocked", r.err || `rowCount=${r.rowCount}`);
+  }
+
+  // 2. Anon INSERT players with is_ready=true must fail.
+  {
+    const r = await as("anon",
+      `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+       values ($1, 'FORGE2', 'Forger2', false, true)`,
+      [waitingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT players(is_ready=true) is blocked", r.err || `rowCount=${r.rowCount}`);
+  }
+
+  // 3. Anon INSERT games with current_pot=999 must fail.
+  {
+    const r = await as("anon",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, current_pot)
+       values ('FORGE-POT', 'ATTACKER', 'waiting', 0, 0, 999)`,
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT games(current_pot=999) is blocked", r.err || `rowCount=${r.rowCount}`);
+  }
+
+  // 4. Anon INSERT games with settlement_status='settled' must fail.
+  {
+    const r = await as("anon",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, settlement_status)
+       values ('FORGE-SETL', 'ATTACKER', 'waiting', 0, 0, 'settled')`,
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT games(settlement_status='settled') is blocked", r.err || `rowCount=${r.rowCount}`);
+  }
+
+  // 5. Anon INSERT games with a non-null pending_payouts must fail.
+  {
+    const r = await as("anon",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, pending_payouts)
+       values ('FORGE-PEND', 'ATTACKER', 'waiting', 0, 0, '{"X":1}'::jsonb)`,
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT games(pending_payouts non-null) is blocked", r.err || `rowCount=${r.rowCount}`);
+  }
+
+  // 6. Anon DELETE on games must fail (host cancel is a status change, not a row delete).
+  {
+    const r = await as("anon", `delete from games where id = $1`, [waitingGame.id]);
+    report(r.rowCount === 0, "anon DELETE games is blocked", r.err);
+  }
+
+  // 7. Anon DELETE on players in a non-waiting game must fail.
+  {
+    const r = await as("anon", `delete from players where game_id = $1`, [playingGame.id]);
+    report(r.rowCount === 0, "anon DELETE players in a non-waiting game is blocked", r.err);
+  }
+
+  console.log("\n── Positive controls (legitimate anon paths must still work) ──\n");
+
+  // 8. Anon INSERT games with safe defaults still succeeds (real client behavior — see
+  //    src/lib/supabase.ts createGameInDB, which never sets these columns).
+  {
+    const r = await as("anon",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports)
+       values ('LEGIT-GAME', 'HOST3', 'waiting', 0, 100000)`,
+    );
+    report(r.ok && r.rowCount === 1, "anon INSERT games with safe defaults (current_pot=0 etc) still works", r.err);
+  }
+
+  // 9. Anon INSERT players with unpaid/not-ready shape into a waiting game still succeeds.
+  // (asPersist: check 10 deletes this exact row, so it must actually commit.)
+  {
+    const r = await asPersist("anon",
+      `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+       values ($1, 'LEGIT_JOIN', 'NewPlayer', false, false)`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "anon INSERT players(unpaid, not ready) into a waiting game still works", r.err);
+  }
+
+  // 10. Anon DELETE on their own player row in a waiting game still succeeds (leave flow).
+  {
+    const r = await as("anon", `delete from players where game_id = $1 and wallet_address = 'LEGIT_JOIN'`, [waitingGame.id]);
+    report(r.ok && r.rowCount === 1, "anon DELETE players in a waiting game (leave flow) still works", r.err);
+  }
+
+  console.log("\n── service_role must retain full write access (Edge Functions) ──\n");
+
+  // 11. service_role INSERT games with a forged pot (recovery/import tooling) still succeeds —
+  //     the trigger only restricts anon/authenticated, matching protect_game_columns' own bypass.
+  // (asPersist: check 12 deletes this exact row, so it must actually commit.)
+  {
+    const r = await asPersist("service_role",
+      `insert into games (room_code, host_wallet, status, current_round, buy_in_lamports, current_pot)
+       values ('SVC-GAME', 'HOST4', 'playing', 1, 100000, 5)`,
+    );
+    report(r.ok && r.rowCount === 1, "service_role INSERT games with non-zero current_pot still works", r.err);
+  }
+
+  // 12. service_role DELETE on games/players still succeeds (admin/cleanup tooling).
+  {
+    const r = await asPersist("service_role", `delete from games where room_code = 'SVC-GAME'`);
+    report(r.ok && r.rowCount === 1, "service_role DELETE games still works", r.err);
+  }
+
+  console.log("\n── Policy inventory: no wide-open non-SELECT policy may survive ──\n");
+
+  const { rows: policies } = await db.query(`
+    select tablename, policyname, cmd, permissive, qual, with_check
+    from pg_policies
+    where schemaname = 'public'
+      and tablename in ('games', 'players', 'votes', 'question_submissions', 'predictions', 'player_stats')
+    order by tablename, cmd, policyname
+  `);
+
+  const wideOpenNonSelect = policies.filter((p: any) => {
+    if (p.cmd === "SELECT") return false; // documented low-risk, read-only game data
+    const trueCheck = (v: string | null) => v === "true" || v === "(true)";
+    return p.permissive === "PERMISSIVE" && (trueCheck(p.qual) || trueCheck(p.with_check));
+  });
+
+  for (const p of policies) {
+    const flag = wideOpenNonSelect.includes(p) ? " ⚠ WIDE-OPEN" : "";
+    console.log(`  ${p.tablename}.${p.cmd}: ${p.policyname} [${p.permissive}] qual=${p.qual} check=${p.with_check}${flag}`);
+  }
+
+  report(
+    wideOpenNonSelect.length === 0,
+    "no wide-open (permissive, unconditional true) non-SELECT policy remains on any game table",
+    wideOpenNonSelect.length > 0
+      ? wideOpenNonSelect.map((p: any) => `${p.tablename}.${p.cmd}:${p.policyname}`).join(", ")
+      : "",
+  );
+
+  await db.end();
+
+  console.log(`\n${passed} passed, ${failed} failed`);
+  if (failed > 0) process.exit(1);
+}
+
+main().catch((err) => { console.error(err); process.exit(1); });

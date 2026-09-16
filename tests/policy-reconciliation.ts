@@ -32,6 +32,10 @@ async function main() {
       if not exists (select from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
       if not exists (select from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
     end $$;
+    create schema if not exists auth;
+    create or replace function auth.role() returns text language sql stable
+      as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
+    grant usage on schema auth to anon, authenticated, service_role;
     do $$ begin
       if not exists (select from pg_publication where pubname = 'supabase_realtime') then
         create publication supabase_realtime;
