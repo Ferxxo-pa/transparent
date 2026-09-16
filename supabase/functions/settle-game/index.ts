@@ -152,12 +152,13 @@ serve(async (req) => {
       return jsonResponse({ error: 'no valid payouts' }, 400);
     }
 
-    // Durable pre-broadcast: record intent before sending anything on-chain
+    // Durable pre-broadcast: record intent before sending anything on-chain.
+    // Use 'pending' (valid CHECK value) — 'settling' is not in the constraint.
     const { error: claimErr } = await supabase.from('games').update({
-      settlement_status: 'settling',
+      settlement_status: 'pending',
       pending_payouts: validPayouts,
       paid_tx_signatures: {},
-    }).eq('id', gameId);
+    }).eq('id', gameId).eq('settlement_status', 'none');
     if (claimErr) return jsonResponse({ error: 'failed to claim settlement' }, 500);
 
     const paidSignatures: Record<string, string> = {};
@@ -199,6 +200,7 @@ serve(async (req) => {
 
         if (confirmation.value.err) {
           console.warn(`[settle-game] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${sig}`);
+          delete paidSignatures[recipient];
           continue;
         }
 
@@ -206,7 +208,7 @@ serve(async (req) => {
 
         // Per-recipient crash-safe persist
         const { error: persistErr } = await supabase.from('games').update({
-          settlement_status: 'settling',
+          settlement_status: 'pending',
           pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
           paid_tx_signatures: paidSignatures,
         }).eq('id', gameId);
@@ -225,19 +227,22 @@ serve(async (req) => {
         }
       } catch (sendErr) {
         console.warn(`[settle-game] Failed to send to ${recipient}:`, sendErr);
-        // Unknown outcome: sig recorded but confirm timed out
+        // Unknown outcome: sig recorded but confirm timed out.
+        // MUST persist sig to DB before returning — otherwise retry re-sends.
         if (paidSignatures[recipient]) {
-          await supabase.from('games').update({
+          const { error: haltErr } = await supabase.from('games').update({
             settlement_status: 'failed',
             pending_payouts: stillOwed,
             paid_tx_signatures: paidSignatures,
-          }).eq('id', gameId).catch((e) => {
-            console.error(`[settle-game] CRITICAL: sig ${paidSignatures[recipient]} for ${recipient} not persisted to DB`);
-          });
+          }).eq('id', gameId);
+          if (haltErr) {
+            console.error(`[settle-game] CRITICAL: sig ${paidSignatures[recipient]} for ${recipient} not persisted to DB — INCLUDE IN RESPONSE FOR MANUAL RECONCILIATION`);
+          }
           return jsonResponse({
             error: `Transaction to ${recipient} sent but confirmation timed out (sig=${paidSignatures[recipient]}). Verify on-chain before retrying.`,
             signatures: paidSignatures,
             remaining: stillOwed,
+            dbPersisted: !haltErr,
           }, 500);
         }
       }

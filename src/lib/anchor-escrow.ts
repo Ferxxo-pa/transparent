@@ -57,17 +57,16 @@ async function buildAndSend(wallet: WalletAdapter, tx: Transaction): Promise<str
 
   const sig = await wallet.sendTransaction(tx);
 
-  try {
-    const confirmPromise = connection.confirmTransaction(
-      { signature: sig, blockhash, lastValidBlockHeight },
-      'confirmed',
-    );
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Confirmation timeout')), 30000),
-    );
-    await Promise.race([confirmPromise, timeoutPromise]);
-  } catch {
-    // tx already sent
+  const confirmPromise = connection.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    'confirmed',
+  );
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error('Confirmation timeout')), 30000),
+  );
+  const confirmation = await Promise.race([confirmPromise, timeoutPromise]);
+  if (confirmation.value.err) {
+    throw new Error(`Transaction failed on-chain: ${JSON.stringify(confirmation.value.err)}`);
   }
 
   return sig;

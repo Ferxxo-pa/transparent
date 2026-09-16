@@ -177,8 +177,9 @@ serve(async (req) => {
 
         if (confirmation.value.err) {
           // On-chain tx failed (program error, insufficient funds, etc.)
-          // Sig is recorded but recipient stays in stillOwed for manual review.
+          // Remove sig — a failed tx must NOT be treated as paid on next retry.
           console.warn(`[retry-settlement] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${sig}`);
+          delete paidSignatures[recipient];
           continue;
         }
 
