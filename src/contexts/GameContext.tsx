@@ -1059,19 +1059,30 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // wallet signature + game state, then triggers on-chain distribution
             // from the escrow PDA via the settlement authority.
             let settledViaEdge = false;
+            let edgeUnknown = false;
             if (USE_ESCROW && USE_EDGE_GAME_AUTH && gid) {
               try {
                 await settleGameViaEdge({ gameId: gid, action: 'distribute', payouts: payoutsLamports });
                 settledViaEdge = true;
-              } catch (edgeErr) {
-                console.warn('[settle] Edge settlement failed, falling back to host-signed distribute:', edgeErr);
+              } catch (edgeErr: any) {
+                const isNetworkError = edgeErr?.name === 'TypeError' || edgeErr?.message?.includes('timeout') || edgeErr?.message?.includes('network');
+                if (isNetworkError) {
+                  edgeUnknown = true;
+                  console.warn('[settle] Edge settlement result unknown (network/timeout) — marking pending, NOT falling back:', edgeErr);
+                  settlementOutcome = 'failed';
+                  unpaidLamports = { ...payoutsLamports };
+                } else {
+                  console.warn('[settle] Edge settlement explicitly failed, falling back to host-signed distribute:', edgeErr);
+                }
               }
             }
 
             if (settledViaEdge) {
-              // settle-game only reports success after every payout instruction
-              // is confirmed on-chain (it throws otherwise) — safe to trust.
               settlementOutcome = 'settled';
+            } else if (edgeUnknown) {
+              // Network/timeout: edge may have succeeded — do NOT re-send
+              // via host path. Settlement stays 'failed' with full owed map
+              // so retry can reconcile after checking on-chain state.
             } else {
               // Host-signed path: distribute directly (escrow program still
               // enforces host authority on-chain). Track per-recipient outcome
@@ -1100,14 +1111,20 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               settlementOutcome = Object.keys(stillOwed).length === 0 ? 'settled' : 'failed';
             }
 
-            // Broadcast payout results to all clients
-            if (channelRef.current) {
+            // Broadcast only confirmed payout amounts — never intended
+            if (channelRef.current && settlementOutcome === 'settled') {
               channelRef.current.send({
                 type: 'broadcast',
                 event: 'payout_distributed',
                 payload: gameState.payoutMode === 'split-pot'
                   ? { mode: 'split-pot', payouts: splitPayoutsSol ?? {} }
                   : { mode: 'winner-takes-all', payouts: { [winnerWallet]: gameState.currentPot } },
+              });
+            } else if (channelRef.current && settlementOutcome === 'failed') {
+              channelRef.current.send({
+                type: 'broadcast',
+                event: 'payout_pending',
+                payload: { status: 'failed', owed: unpaidLamports },
               });
             }
           } catch (chainErr) {
@@ -1138,32 +1155,35 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           } : null,
         );
 
-        // Record persistent player stats (non-fatal)
+        // Record gameplay stats (votes/rounds) always; financial stats
+        // only from confirmed settlement, never from intended amounts
         try {
           const allScores = gameState.scores ?? {};
           const hostW = (gameState as any).hostWallet ?? '';
-          const isSplit = gameState.payoutMode === 'split-pot';
-          const totalR = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
-          const playerScoresForCalc: Record<string, any> = {};
-          for (const [w, s] of Object.entries(allScores)) {
-            if (w !== hostW) playerScoresForCalc[w] = s;
-          }
-          const payoutsMap = isSplit
-            ? calculateSplitPayouts(playerScoresForCalc, gameState.buyInAmount, totalR)
-            : { [winnerWallet]: gameState.currentPot };
-
           for (const player of gameState.players) {
-            if (player.id === hostW) continue; // host isn't a player
+            if (player.id === hostW) continue;
             const score = allScores[player.id] ?? { transparent: 0, fake: 0, rounds: 0 };
-            const payout = payoutsMap[player.id] ?? 0;
-            const net = payout - gameState.buyInAmount;
-            await upsertPlayerStats(player.id, player.name, {
+            const gameplayStats: Record<string, number> = {
               games: 1,
-              solWon: Math.max(0, net),
-              solLost: Math.max(0, -net),
               transparentVotes: score.transparent,
               fakeVotes: score.fake,
-            });
+            };
+            if (settlementOutcome === 'settled') {
+              const isSplit = gameState.payoutMode === 'split-pot';
+              const totalR = gameState.numQuestions > 0 ? gameState.numQuestions : gameState.players.length;
+              const playerScoresForCalc: Record<string, any> = {};
+              for (const [w, s] of Object.entries(allScores)) {
+                if (w !== hostW) playerScoresForCalc[w] = s;
+              }
+              const payoutsMap = isSplit
+                ? calculateSplitPayouts(playerScoresForCalc, gameState.buyInAmount, totalR)
+                : { [winnerWallet]: gameState.currentPot };
+              const payout = payoutsMap[player.id] ?? 0;
+              const net = payout - gameState.buyInAmount;
+              gameplayStats.solWon = Math.max(0, net);
+              gameplayStats.solLost = Math.max(0, -net);
+            }
+            await upsertPlayerStats(player.id, player.name, gameplayStats);
           }
         } catch (statsErr) {
           console.warn('[stats] Failed to record game stats:', statsErr);
@@ -1179,12 +1199,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   );
 
   // ── Retry Failed Settlement ─────────────────────────────
-  // Idempotent by construction: only re-sends to wallets still present in
-  // pendingPayouts. A wallet that already got paid on a prior attempt was
-  // removed from that set before it was persisted, so retrying never
-  // double-pays a wallet this client already confirmed a send to.
+  const settlementLockRef = useRef(false);
 
   const retrySettlement = useCallback(async () => {
+    if (settlementLockRef.current) return;
     const wallet = walletRef.current;
     if (!wallet || !gameState) return;
     const gid = (gameState as any).gameId;
@@ -1195,6 +1213,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const owed = gameState.pendingPayouts ?? {};
     if (Object.keys(owed).length === 0) return;
 
+    settlementLockRef.current = true;
     setLoading(true);
     try {
       const hostPubkey = new PublicKey(hostWallet);
@@ -1239,6 +1258,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('retrySettlement error:', err);
       setError(err.message || 'Failed to retry settlement');
     } finally {
+      settlementLockRef.current = false;
       setLoading(false);
     }
   }, [gameState]);
