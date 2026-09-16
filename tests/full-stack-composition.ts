@@ -54,6 +54,11 @@ const FULL_STACK = [
   "supabase/migrations/20260915_question_submitter_verification.sql",
 ];
 
+// Phase 2: auth binding drops anon INSERT on question_submissions entirely
+// and restricts games UPDATE to service_role. Applied AFTER membership-only
+// tests prove the wallet-forgery gap.
+const AUTH_BINDING_MIGRATION = "supabase/migrations/20260915_question_auth_binding.sql";
+
 async function main() {
   const db = new pg.Client({ connectionString: DSN });
   await db.connect();
@@ -117,10 +122,12 @@ async function main() {
     "supabase/migrations/20260915_delete_policy_reconciliation.sql",
     "supabase/migrations/20260915_policy_reconciliation.sql",
     "supabase/migrations/20260915_policy_alias_review_closeout.sql",
-    "supabase/migrations/20260915_players_delete_lockdown.sql",
   ]) {
     await db.query(readFileSync(f, "utf8"));
   }
+  // players_delete_lockdown.sql is NOT replayed here — its CREATE POLICY
+  // is not idempotent (no IF NOT EXISTS in Postgres), and it is not an
+  // alias-dropper. The initial stack already applied it above.
   await db.query(`
     drop policy if exists "games_insert" on public.games;
     drop policy if exists "games_update" on public.games;
@@ -130,6 +137,10 @@ async function main() {
     drop policy if exists "question_submissions_insert" on public.question_submissions;
     drop policy if exists "anon can insert questions" on public.question_submissions;
     drop policy if exists "players_delete" on public.players;
+    -- delete_policy_reconciliation.sql recreated "anon can delete players" which
+    -- players_delete_lockdown.sql originally dropped. Re-drop it here since
+    -- players_delete_lockdown is not idempotent enough to re-apply.
+    drop policy if exists "anon can delete players" on public.players;
   `);
   console.log("re-applied alias-dropping migrations against the seeded legacy lineage\n");
 
@@ -373,7 +384,7 @@ async function main() {
     report(!r.ok || r.rowCount === 0, "anon UPDATE settlement_status is blocked", r.err);
   }
 
-  console.log("\n── Question submitter verification (must be a player in the game) ──\n");
+  console.log("\n── Question submitter verification (membership-only, pre-auth-binding) ──\n");
 
   // 19. Anon INSERT question_submissions with a wallet NOT in the game must fail.
   {
@@ -395,6 +406,25 @@ async function main() {
     report(r.ok && r.rowCount === 1, "anon INSERT question with valid player wallet succeeds", r.err);
   }
 
+  // 20b. WALLET FORGERY: another player claims an existing player's wallet.
+  // Under the membership-only policy this SUCCEEDS — proving membership
+  // alone does not prove caller identity. This is why auth_binding is needed.
+  await db.query(
+    `insert into players (game_id, wallet_address, display_name, has_paid, is_ready)
+     values ($1, 'PLAYER_B', 'PlayerB', false, false)`,
+    [waitingGame.id],
+  );
+  {
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'WAIT_PLAYER', 'forged by PLAYER_B claiming WAIT_PLAYER wallet')`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1,
+      "VULNERABILITY: anon INSERT question claiming another player's wallet succeeds (membership-only gap)",
+      r.err);
+  }
+
   // 21. Anon INSERT question into a gameover game must fail (status check).
   {
     const { rows: [overGame] } = await db.query(
@@ -414,6 +444,77 @@ async function main() {
     report(!r.ok || r.rowCount === 0, "anon INSERT question into gameover game is blocked (status check)", r.err);
   }
 
+  // 21b. Anon can still UPDATE games config (pre-binding, using(true) policy active).
+  {
+    const r = await as("anon",
+      `update games set room_name = 'hacked-name' where id = $1`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1,
+      "VULNERABILITY: anon UPDATE games config columns succeeds (pre-binding, no actor enforcement)",
+      r.err);
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // Phase 2: Apply auth binding migration — drops anon question INSERT,
+  // restricts games UPDATE to service_role.
+  // ────────────────────────────────────────────────────────────────────────
+  console.log("\n── Applying auth binding migration ──\n");
+  await db.query(readFileSync(AUTH_BINDING_MIGRATION, "utf8"));
+  console.log(`applied ${AUTH_BINDING_MIGRATION}`);
+
+  console.log("\n── Post-auth-binding: anon question INSERT fully blocked ──\n");
+
+  // 22. After auth binding, anon INSERT question is completely blocked (no policy exists).
+  {
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'WAIT_PLAYER', 'should be blocked entirely now')`,
+      [waitingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT question fully blocked after auth binding", r.err);
+  }
+
+  // 23. After auth binding, wallet forgery via anon INSERT also blocked.
+  {
+    const r = await as("anon",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'WAIT_PLAYER', 'forged by another player after binding')`,
+      [waitingGame.id],
+    );
+    report(!r.ok || r.rowCount === 0, "anon INSERT question claiming another player's wallet blocked after auth binding", r.err);
+  }
+
+  // 24. service_role INSERT question still works (Edge Function path).
+  {
+    const r = await as("service_role",
+      `insert into question_submissions (game_id, round, submitter_wallet, question_text)
+       values ($1, 1, 'WAIT_PLAYER', 'submitted via Edge Function with wallet signature')`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "service_role INSERT question succeeds (Edge Function path)", r.err);
+  }
+
+  console.log("\n── Post-auth-binding: games UPDATE restricted to service_role ──\n");
+
+  // 25. Anon UPDATE games config columns blocked after auth binding.
+  {
+    const r = await as("anon",
+      `update games set room_name = 'anon-edit-attempt' where id = $1`,
+      [waitingGame.id],
+    );
+    report(r.rowCount === 0, "anon UPDATE games config columns blocked after auth binding", r.err);
+  }
+
+  // 26. service_role UPDATE games still works (Edge Function path).
+  {
+    const r = await as("service_role",
+      `update games set room_name = 'edge-function-edit' where id = $1`,
+      [waitingGame.id],
+    );
+    report(r.ok && r.rowCount === 1, "service_role UPDATE games succeeds (Edge Function path)", r.err);
+  }
+
   console.log("\n── Policy inventory: no wide-open non-SELECT policy may survive ──\n");
 
   const { rows: policies } = await db.query(`
@@ -426,12 +527,6 @@ async function main() {
 
   const wideOpenNonSelect = policies.filter((p: any) => {
     if (p.cmd === "SELECT") return false;
-    // games UPDATE using(true) is intentionally permissive — the
-    // protect_game_columns() trigger blocks all security-critical columns;
-    // remaining writable columns (room_name, question_mode, etc.) are
-    // game-config that the client sets during waiting/playing when
-    // USE_EDGE_GAME_AUTH is off. Full lockdown requires enabling that flag.
-    if (p.tablename === "games" && p.cmd === "UPDATE" && p.policyname === "anon can update games") return false;
     const trueCheck = (v: string | null) => v === "true" || v === "(true)";
     return p.permissive === "PERMISSIVE" && (trueCheck(p.qual) || trueCheck(p.with_check));
   });
