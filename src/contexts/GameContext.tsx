@@ -1976,7 +1976,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const gs = gameStateRef.current;
     if (!wallet || !gameId || !gs) return;
 
-    // Refund the player's buy-in
+    // Refund the player's buy-in — must succeed before removing from game
     if (gs.buyInAmount > 0) {
       try {
         const playerPubkey = new PublicKey(playerWallet);
@@ -1989,7 +1989,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await joinGameOnChainWithAmount(wallet, playerPubkey, lamports);
         }
       } catch (err) {
-        console.warn('[approveLeave] Refund failed:', err);
+        console.warn('[approveLeave] Refund failed — player NOT removed:', err);
+        return;
       }
     }
 
@@ -1999,6 +2000,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await leaveGameViaEdge(gameId, playerWallet);
     } catch (err) {
       console.warn('[approveLeave] Remove failed:', err);
+      return;
     }
 
     // Notify the player they've been approved via broadcast
