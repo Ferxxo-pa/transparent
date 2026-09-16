@@ -185,7 +185,49 @@ serve(async (req) => {
     const sigRecords: Record<string, SigRecord> = existingSigs ? { ...existingSigs } : {};
     const stillOwed = { ...validPayouts };
 
-    // Skip recipients already confirmed from a prior run
+    // ── Reconcile existing unknown/submitted sigs on-chain before proceeding ──
+    // A game may have been reset to 'none' after a partial run that left
+    // submitted/unknown sigs. Without reconciliation, the send loop below
+    // would overwrite those sigs with new ones, potentially double-paying
+    // recipients whose prior tx already landed.
+    const unresolvedEntries = Object.entries(sigRecords).filter(
+      ([_, r]) => r.status === 'unknown' || r.status === 'submitted',
+    );
+    if (unresolvedEntries.length > 0) {
+      try {
+        const sigStrings = unresolvedEntries.map(([_, r]) => r.sig);
+        const statuses = await connection.getSignatureStatuses(sigStrings);
+        let hasUnresolved = false;
+
+        unresolvedEntries.forEach(([w, record], i) => {
+          const status = statuses.value[i];
+          if (status && (status.confirmationStatus === 'confirmed' || status.confirmationStatus === 'finalized')) {
+            record.status = status.err ? 'failed' : 'confirmed';
+          } else {
+            hasUnresolved = true;
+          }
+        });
+
+        await supabase.from('games').update({ paid_tx_signatures: sigRecords }).eq('id', gameId).eq('settlement_status', 'pending');
+
+        if (hasUnresolved) {
+          await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId).eq('settlement_status', 'pending');
+          return jsonResponse({
+            error: 'Existing unresolved signatures from a prior run — use retry-settlement to reconcile before re-settling.',
+            signatures: sigRecords,
+          }, 409);
+        }
+      } catch (reconcileErr) {
+        console.error('[settle-game] On-chain reconciliation of prior sigs failed:', reconcileErr);
+        await supabase.from('games').update({ settlement_status: 'failed', paid_tx_signatures: sigRecords }).eq('id', gameId).eq('settlement_status', 'pending');
+        return jsonResponse({
+          error: 'Could not verify prior signatures on-chain — use retry-settlement to reconcile.',
+          signatures: sigRecords,
+        }, 409);
+      }
+    }
+
+    // Skip recipients already confirmed from a prior or reconciled run
     for (const [wallet, record] of Object.entries(sigRecords)) {
       if (record.status === 'confirmed' && wallet in stillOwed) {
         delete stillOwed[wallet];
@@ -217,15 +259,17 @@ serve(async (req) => {
         tx.sign(settlementKeypair);
 
         // ── PRE-BROADCAST PERSIST: write sig identity BEFORE sendRawTransaction ──
+        // Fenced by settlement_status='pending' — if another worker reclaimed
+        // the lease, this returns 0 rows and we abort rather than double-broadcast.
         const txSig = bs58.encode(tx.signature!);
         sigRecords[recipient] = { sig: txSig, status: 'submitted' };
-        const { error: preErr } = await supabase.from('games').update({
+        const { data: preData, error: preErr } = await supabase.from('games').update({
           paid_tx_signatures: sigRecords,
-        }).eq('id', gameId);
-        if (preErr) {
-          console.error(`[settle-game] Failed to persist pre-broadcast sig for ${recipient}:`, preErr);
+        }).eq('id', gameId).eq('settlement_status', 'pending').select('id').single();
+        if (preErr || !preData) {
+          console.error(`[settle-game] Lease lost or pre-broadcast persist failed for ${recipient}`);
           delete sigRecords[recipient];
-          continue;
+          return jsonResponse({ error: 'Settlement lease lost — another process reclaimed this game.', signatures: sigRecords }, 409);
         }
 
         await connection.sendRawTransaction(tx.serialize());
@@ -237,24 +281,23 @@ serve(async (req) => {
         if (confirmation.value.err) {
           console.warn(`[settle-game] On-chain tx to ${recipient} failed:`, confirmation.value.err, `sig=${txSig}`);
           sigRecords[recipient] = { sig: txSig, status: 'failed' };
-          // Per-recipient persist so retry knows this sig failed
           await supabase.from('games').update({
             paid_tx_signatures: sigRecords,
-          }).eq('id', gameId);
+          }).eq('id', gameId).eq('settlement_status', 'pending');
           continue;
         }
 
         sigRecords[recipient] = { sig: txSig, status: 'confirmed' };
         delete stillOwed[recipient];
 
-        const { error: persistErr } = await supabase.from('games').update({
+        const { data: persistData, error: persistErr } = await supabase.from('games').update({
           settlement_status: 'pending',
           pending_payouts: Object.keys(stillOwed).length > 0 ? stillOwed : null,
           paid_tx_signatures: sigRecords,
-        }).eq('id', gameId);
+        }).eq('id', gameId).eq('settlement_status', 'pending').select('id').single();
 
-        if (persistErr) {
-          console.error(`[settle-game] CRITICAL: chain send to ${recipient} succeeded (sig=${txSig}) but DB persist failed:`, persistErr);
+        if (persistErr || !persistData) {
+          console.error(`[settle-game] CRITICAL: chain send to ${recipient} succeeded (sig=${txSig}) but DB persist failed or lease lost:`, persistErr);
           await supabase.from('games').update({
             settlement_status: 'failed',
             paid_tx_signatures: sigRecords,
@@ -273,7 +316,7 @@ serve(async (req) => {
             settlement_status: 'failed',
             pending_payouts: stillOwed,
             paid_tx_signatures: sigRecords,
-          }).eq('id', gameId);
+          }).eq('id', gameId).eq('settlement_status', 'pending');
           if (haltErr) {
             console.error(`[settle-game] CRITICAL: sig ${sigRecords[recipient].sig} for ${recipient} not persisted to DB`);
           }
