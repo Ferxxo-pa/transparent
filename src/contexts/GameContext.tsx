@@ -365,10 +365,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const gs = JSON.parse(saved) as GameState;
         if (gs.gameId && gs.gameStatus !== 'gameover') {
           setupSubscription(gs.gameId, gs.hostWallet ?? '');
+          gameIdRef.current = gs.gameId;
+          pollGameState();
         }
       } catch { /* ignore */ }
     }
   }, [setupSubscription]);
+
+  // ── Catch-up poll on tab visibility restore ───────────
+  // Supabase realtime can miss postgres_changes events during
+  // network outages or background tab throttling. Poll fresh
+  // state whenever the tab regains focus so the client never
+  // shows stale data from localStorage / last realtime event.
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && gameIdRef.current) {
+        pollGameState();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [pollGameState]);
 
   // ── Create Game ────────────────────────────────────────
 
@@ -1005,7 +1022,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const distributeWinnings = useCallback(
     async (winnerWallet: string) => {
       const wallet = walletRef.current;
-      if (!wallet || !gameState) return;
+      if (!wallet) {
+        setError('Wallet not connected — please reconnect your wallet before distributing.');
+        return;
+      }
+      if (!gameState) return;
 
       setLoading(true);
       try {
@@ -1264,7 +1285,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const retrySettlement = useCallback(async () => {
     if (settlementLockRef.current) return;
     const wallet = walletRef.current;
-    if (!wallet || !gameState) return;
+    if (!wallet) {
+      setError('Wallet not connected — please reconnect your wallet before retrying settlement.');
+      return;
+    }
+    if (!gameState) return;
     const gid = (gameState as any).gameId;
     const hostWallet = (gameState as any).hostWallet;
     const isHost = wallet.publicKey.toBase58() === hostWallet;
