@@ -45,7 +45,7 @@ import {
   deriveGamePDA as deriveEscrowGamePDA,
 } from '../lib/anchor-escrow';
 import { USE_ESCROW, USE_EDGE_GAME_AUTH } from '../lib/config';
-import { setGameAuthSigner, settleGameViaEdge, retrySettlementViaEdge, leaveGameViaEdge, submitQuestionViaEdge } from '../lib/gameAuth';
+import { setGameAuthSigner, settleGameViaEdge, retrySettlementViaEdge, leaveGameViaEdge, submitQuestionViaEdge, normalizeSigRecords, EdgeFunctionError, type SigRecord } from '../lib/gameAuth';
 
 // ============================================================
 // Game Context — Real multiplayer via Supabase + Solana
@@ -1020,6 +1020,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let settlementOutcome: 'none' | 'settled' | 'failed' = 'none';
         let unpaidLamports: Record<string, number> = {};
         let paidSignatures: Record<string, string> = {};
+        // Typed sig records returned by the edge function (settle-game/retry).
+        // Kept separate from paidSignatures (host-path bare sigs) so the final
+        // DB write can merge both without losing edge-side records.
+        let edgeSigRecords: Record<string, SigRecord> | null = null;
 
         // Only attempt on-chain distribution if there's an actual buy-in and we're the host
         if (gameState.buyInAmount > 0 && isHost) {
@@ -1054,35 +1058,56 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             // Hardened path: the settle-game Edge Function verifies the host's
             // wallet signature + game state, then triggers on-chain distribution
             // from the escrow PDA via the settlement authority.
-            let settledViaEdge = false;
-            let edgeUnknown = false;
-            if (USE_ESCROW && USE_EDGE_GAME_AUTH && gid) {
+            //
+            // Once the edge function has been called — success, explicit
+            // failure, or timeout — the client MUST NOT fall back to the
+            // host-signed path below. The edge function may have already
+            // broadcast some or all payouts on-chain (and persisted sigs)
+            // before returning an error; re-issuing via a second authority
+            // risks a double payout. Any non-`settled:true` outcome here
+            // stays 'failed' and can only be resolved by retrySettlement,
+            // which reconciles on-chain state before re-sending.
+            const edgeAttempted = USE_ESCROW && USE_EDGE_GAME_AUTH && !!gid;
+            if (edgeAttempted) {
               try {
-                await settleGameViaEdge({ gameId: gid, action: 'distribute', payouts: payoutsLamports });
-                settledViaEdge = true;
-              } catch (edgeErr: any) {
-                const isNetworkError = edgeErr?.name === 'TypeError' || edgeErr?.message?.includes('timeout') || edgeErr?.message?.includes('network');
-                if (isNetworkError) {
-                  edgeUnknown = true;
-                  console.warn('[settle] Edge settlement result unknown (network/timeout) — marking pending, NOT falling back:', edgeErr);
-                  settlementOutcome = 'failed';
-                  unpaidLamports = { ...payoutsLamports };
+                const result = await settleGameViaEdge({ gameId: gid, action: 'distribute', payouts: payoutsLamports });
+                // A resolved (non-throwing) response is NOT automatically a
+                // success — settle-game can return 200 with `settled: false`
+                // when some recipients are still owed. Only `settled: true`
+                // may flip the game to settled.
+                edgeSigRecords = normalizeSigRecords(result.signatures);
+                if (result.settled) {
+                  settlementOutcome = 'settled';
+                  unpaidLamports = {};
                 } else {
-                  console.warn('[settle] Edge settlement explicitly failed, falling back to host-signed distribute:', edgeErr);
+                  settlementOutcome = 'failed';
+                  unpaidLamports = result.remaining ?? { ...payoutsLamports };
+                  console.warn('[settle] Edge settlement resolved but not fully settled:', result);
+                }
+              } catch (edgeErr: any) {
+                settlementOutcome = 'failed';
+                // Prefer the structured body (signatures/remaining) the edge
+                // function attaches to its error responses — "confirmation
+                // timed out" or a 500 can still mean money already moved.
+                if (edgeErr instanceof EdgeFunctionError) {
+                  edgeSigRecords = normalizeSigRecords(edgeErr.body?.signatures);
+                  unpaidLamports = edgeErr.body?.remaining ?? { ...payoutsLamports };
+                  console.warn('[settle] Edge settlement failed — reconciliation required, no fallback authority:', edgeErr.message, edgeErr.body);
+                } else {
+                  // Network/timeout before any response body was received —
+                  // edge may still have broadcast. Same rule applies: no
+                  // fallback, full owed map so retry re-checks on-chain state.
+                  unpaidLamports = { ...payoutsLamports };
+                  console.warn('[settle] Edge settlement result unknown (network/timeout) — marking pending, NOT falling back:', edgeErr);
                 }
               }
-            }
-
-            if (settledViaEdge) {
-              settlementOutcome = 'settled';
-            } else if (edgeUnknown) {
-              // Network/timeout: edge may have succeeded — do NOT re-send
-              // via host path. Settlement stays 'failed' with full owed map
-              // so retry can reconcile after checking on-chain state.
             } else {
-              // Host-signed path: distribute directly (escrow program still
-              // enforces host authority on-chain). Track per-recipient outcome
-              // so a partial failure doesn't get reported as a full success.
+              // Host-signed path: only reachable when the edge settlement
+              // path is disabled/unconfigured for this deployment, never as
+              // a fallback after an edge attempt. Distribute directly
+              // (escrow program still enforces host authority on-chain).
+              // Track per-recipient outcome so a partial failure doesn't get
+              // reported as a full success.
               const stillOwed: Record<string, number> = { ...payoutsLamports };
               for (const [playerWallet, lamports] of Object.entries(payoutsLamports)) {
                 if (lamports <= 0) { delete stillOwed[playerWallet]; continue; }
@@ -1143,13 +1168,26 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
 
+        // Merge host-path sigs (bare strings) with any typed records the edge
+        // function returned. Only produces a value when we actually have new
+        // signature data from THIS call — an empty result here must never be
+        // written as `null`, or it wipes out sig records the edge function
+        // already persisted pre-broadcast (e.g. on a partial/failed run where
+        // this client-side var never got populated for edge-confirmed sigs).
+        const newSigRecords: Record<string, SigRecord> | null =
+          edgeSigRecords || Object.keys(paidSignatures).length > 0
+            ? { ...(edgeSigRecords ?? {}), ...normalizeSigRecords(paidSignatures) }
+            : null;
+
         if (gid) {
           await updateGameStatus(gid, {
             status: 'gameover',
             ...(settlementOutcome !== 'none' ? {
               settlement_status: settlementOutcome,
               pending_payouts: settlementOutcome === 'failed' ? unpaidLamports : null,
-              paid_tx_signatures: Object.keys(paidSignatures).length > 0 ? paidSignatures : null,
+              // Omit the key entirely when there's nothing new to record —
+              // do NOT write null, which would overwrite DB-side records.
+              ...(newSigRecords ? { paid_tx_signatures: newSigRecords } : {}),
             } : {}),
           });
         }
@@ -1162,7 +1200,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             ...(settlementOutcome !== 'none' ? {
               settlementStatus: settlementOutcome,
               pendingPayouts: settlementOutcome === 'failed' ? unpaidLamports : null,
-              paidTxSignatures: Object.keys(paidSignatures).length > 0 ? paidSignatures : null,
+              paidTxSignatures: newSigRecords ?? prev.paidTxSignatures,
             } : {}),
           } : null,
         );
@@ -1214,6 +1252,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const settlementLockRef = useRef(false);
 
   const retrySettlement = useCallback(async () => {
+    // KNOWN GAP — no crash lease recovery: retry-settlement claims by
+    // flipping settlement_status 'failed' -> 'retrying' server-side, and
+    // only reverts to 'failed' if its own setup throws. If that edge
+    // function's process is killed (not thrown, just terminated) mid-run,
+    // the row is stuck at 'retrying' forever — this guard below requires
+    // settlementStatus === 'failed', so the host can never re-trigger a
+    // retry and the game is unrecoverable without a manual DB fix. A real
+    // fix needs a server-side lease timeout (e.g. reclaim 'retrying' rows
+    // whose updated_at is older than N minutes) since the client can't be
+    // trusted to self-report a stale lease. Out of scope here — this file
+    // only owns the client call site, not the edge function's claim logic.
     if (settlementLockRef.current) return;
     const wallet = walletRef.current;
     if (!wallet || !gameState) return;
@@ -1236,7 +1285,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ...prev,
           settlementStatus: result.settled ? 'settled' : 'failed',
           pendingPayouts: result.remaining ?? null,
-          paidTxSignatures: result.signatures,
+          paidTxSignatures: normalizeSigRecords(result.signatures),
         } : null,
       );
     } catch (err: any) {

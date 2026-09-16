@@ -113,6 +113,24 @@ export async function getActionToken(
   return token;
 }
 
+/**
+ * Thrown when an edge function responds with a non-2xx status. Unlike a plain
+ * Error, this carries the parsed response body — callers that need to
+ * reconcile settlement state (e.g. after a 500 mid-payout) must inspect
+ * `body.signatures` / `body.remaining` rather than treating the failure as
+ * "nothing happened".
+ */
+export class EdgeFunctionError extends Error {
+  status: number;
+  body: any;
+  constructor(message: string, status: number, body: any) {
+    super(message);
+    this.name = 'EdgeFunctionError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function callEdgeFunction<T>(name: string, body: unknown): Promise<T> {
   if (!SUPABASE_FUNCTIONS_URL) throw new Error('Supabase Functions URL not configured');
   const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${name}`, {
@@ -126,9 +144,41 @@ async function callEdgeFunction<T>(name: string, body: unknown): Promise<T> {
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error((json as { error?: string }).error || `${name} failed (${res.status})`);
+    throw new EdgeFunctionError(
+      (json as { error?: string }).error || `${name} failed (${res.status})`,
+      res.status,
+      json,
+    );
   }
   return json as T;
+}
+
+/** Sig record shape written by settle-game / retry-settlement. */
+export interface SigRecord {
+  sig: string;
+  status: 'submitted' | 'confirmed' | 'failed' | 'unknown';
+}
+
+/**
+ * Normalize inbound paid_tx_signatures data into typed records. DB rows may
+ * still hold the legacy bare-string format (`{wallet: "sig"}`); those are
+ * conservatively mapped to status 'unknown' since we can't tell if they
+ * landed on-chain without a lookup. Client code must call this on any
+ * signature map (from a DB read or an edge response) before comparing
+ * against or merging into it — writing an un-normalized map back can
+ * silently drop or misclassify records.
+ */
+export function normalizeSigRecords(raw: unknown): Record<string, SigRecord> {
+  const out: Record<string, SigRecord> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [wallet, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof val === 'string') {
+      out[wallet] = { sig: val, status: 'unknown' };
+    } else if (val && typeof val === 'object' && 'sig' in (val as any)) {
+      out[wallet] = val as SigRecord;
+    }
+  }
+  return out;
 }
 
 /** Apply a protected game update (phase/status/round) via the advance-phase function. */
@@ -149,7 +199,15 @@ export interface SettleRequest {
 
 export interface SettleResponse {
   ok: boolean;
-  signatures?: string[];
+  /**
+   * True only when every payout in the request is confirmed on-chain.
+   * `ok: true` alone does NOT mean settled — a 200 response can still carry
+   * `settled: false` with a `remaining` map when some recipients are still
+   * owed. Callers must branch on `settled`, not on the call not throwing.
+   */
+  settled?: boolean;
+  signatures?: Record<string, SigRecord>;
+  remaining?: Record<string, number>;
   error?: string;
 }
 
@@ -178,7 +236,7 @@ export async function readyUpViaEdge(gameId: string): Promise<{ ok: boolean; alr
 export interface RetrySettlementResponse {
   ok: boolean;
   settled: boolean;
-  signatures: Record<string, string>;
+  signatures: Record<string, SigRecord>;
   remaining?: Record<string, number>;
   error?: string;
 }
