@@ -168,9 +168,9 @@ export interface SigRecord {
  * against or merging into it — writing an un-normalized map back can
  * silently drop or misclassify records.
  */
-export function normalizeSigRecords(raw: unknown): Record<string, SigRecord> {
+export function normalizeSigRecords(raw: unknown): Record<string, SigRecord> | null {
+  if (!raw || typeof raw !== 'object') return null;
   const out: Record<string, SigRecord> = {};
-  if (!raw || typeof raw !== 'object') return out;
   for (const [wallet, val] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof val === 'string') {
       out[wallet] = { sig: val, status: 'unknown' };
@@ -178,7 +178,7 @@ export function normalizeSigRecords(raw: unknown): Record<string, SigRecord> {
       out[wallet] = val as SigRecord;
     }
   }
-  return out;
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /** Apply a protected game update (phase/status/round) via the advance-phase function. */

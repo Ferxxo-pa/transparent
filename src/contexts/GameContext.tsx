@@ -1174,9 +1174,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // written as `null`, or it wipes out sig records the edge function
         // already persisted pre-broadcast (e.g. on a partial/failed run where
         // this client-side var never got populated for edge-confirmed sigs).
+        const normalizedPaid = normalizeSigRecords(paidSignatures);
         const newSigRecords: Record<string, SigRecord> | null =
-          edgeSigRecords || Object.keys(paidSignatures).length > 0
-            ? { ...(edgeSigRecords ?? {}), ...normalizeSigRecords(paidSignatures) }
+          edgeSigRecords || normalizedPaid
+            ? { ...(edgeSigRecords ?? {}), ...(normalizedPaid ?? {}) }
             : null;
 
         if (gid) {
@@ -1285,7 +1286,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           ...prev,
           settlementStatus: result.settled ? 'settled' : 'failed',
           pendingPayouts: result.remaining ?? null,
-          paidTxSignatures: normalizeSigRecords(result.signatures),
+          paidTxSignatures: normalizeSigRecords(result.signatures) ?? prev.paidTxSignatures,
         } : null,
       );
     } catch (err: any) {
