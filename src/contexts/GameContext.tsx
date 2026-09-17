@@ -375,7 +375,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Create Game ────────────────────────────────────────
 
   const createGame = useCallback(
-    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0, classicSubMode?: ClassicSubMode) => {
+    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], _playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0, classicSubMode?: ClassicSubMode) => {
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
@@ -1177,8 +1177,11 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           for (const player of gameState.players) {
             if (player.id === hostW) continue;
             const score = allScores[player.id] ?? { transparent: 0, fake: 0, rounds: 0 };
-            const gameplayStats: Record<string, number> = {
+            const gameplayStats: Parameters<typeof upsertPlayerStats>[2] = {
               games: 1,
+              // Unconfirmed settlement must not change financial totals.
+              solWon: 0,
+              solLost: 0,
               transparentVotes: score.transparent,
               fakeVotes: score.fake,
             };
@@ -1608,8 +1611,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!myWalletId) return;
 
     const myWallet = myWalletId;
-    const currentBids = gameState.questionBids ?? {};
-    const questionBids = currentBids[questionId] ?? [];
 
     setGameState(prev => {
       if (!prev) return null;
