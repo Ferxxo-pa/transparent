@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useGame } from './contexts/GameContext';
 import { PrivyWalletProvider } from './contexts/PrivyContext';
 import { GameProvider } from './contexts/GameContext';
+import { GameRefreshBanner } from './components/GameRefreshBanner';
 import { WalletBridge } from './components/WalletBridge';
 // WalletHeader removed from global render — each page handles its own top bar
 // WalletDrawer is triggered from individual page wallet chips
@@ -44,11 +45,11 @@ function GameRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!gameState || location.pathname !== '/') return;
+    if (!gameState || location.pathname !== '/' || location.state?.skipGameRedirect) return;
     if (gameState.gameStatus === 'playing') navigate('/game', { replace: true });
     else if (gameState.gameStatus === 'gameover') navigate('/gameover', { replace: true });
     else if (gameState.gameStatus === 'waiting') navigate('/waiting', { replace: true });
-  }, [gameState, location.pathname, navigate]);
+  }, [gameState, location.pathname, location.state, navigate]);
 
   return null;
 }
@@ -86,6 +87,7 @@ function App() {
           <WalletBridge />
           <Router>
             <Background />
+            <GameRefreshBanner />
             <AnimatedRoutes />
           </Router>
         </GameProvider>
