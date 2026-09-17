@@ -130,22 +130,6 @@ export async function getGameByRoomCode(roomCode: string): Promise<GameRow | nul
   return data ?? null;
 }
 
-/** Columns the escrow-hardening migration protects at the DB level — anon
- *  clients cannot write them directly; changes must go through the
- *  advance-phase Edge Function, which verifies a wallet signature. */
-const PROTECTED_GAME_COLUMNS = new Set([
-  'status',
-  'game_phase',
-  'current_round',
-  'current_question_index',
-  'current_hot_seat_player',
-  'storyteller_choice',
-  'current_pot',
-  'settlement_status',
-  'pending_payouts',
-  'paid_tx_signatures',
-]);
-
 export async function updateGameStatus(
   gameId: string,
   updates: Partial<GameRow>
