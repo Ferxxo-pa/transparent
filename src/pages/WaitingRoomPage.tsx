@@ -1,13 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 import { Blobs, BackButton, Avatar, SolMark, Ticker, WalletChip, UsdTag } from '../components';
 
 /* ─── helpers ─────────────────────────────────────────── */
-const LAMPORTS = 1_000_000_000;
 
 const AVATAR_EMOJIS = ['🐺', '🦊', '🐸', '🦄', '🐙', '🦅', '🐋', '🦁', '🐻', '🐲'];
 const AVATAR_COLORS = [
@@ -36,12 +34,10 @@ export const WaitingRoomPage: React.FC = () => {
   const navigate = useNavigate();
   const {
     gameState, startGame, loading, error,
-    predictions, predictionPot, placePrediction,
     leaveGame, requestLeave, leaveRequests, approveLeave,
     readyUp, refreshPlayers,
   } = useGame();
-  const { publicKey, displayName } = usePrivyWallet();
-  const solPrice = useSolPrice();
+  const { publicKey } = usePrivyWallet();
 
   const [copied, setCopied] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
@@ -89,15 +85,6 @@ export const WaitingRoomPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [gameState?.gameStatus, refreshPlayers]);
 
-  // Must be before early returns (rules of hooks)
-  const predTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    predictions.forEach(p => {
-      totals[p.predicted_winner_wallet] = (totals[p.predicted_winner_wallet] ?? 0) + p.amount_lamports;
-    });
-    return totals;
-  }, [predictions]);
-
   if (!gameState) return null;
 
   // Host disconnected overlay
@@ -113,7 +100,6 @@ export const WaitingRoomPage: React.FC = () => {
     );
   }
 
-  const pot = (gameState.players.length * gameState.buyInAmount).toFixed(3);
   const potNum = gameState.players.length * gameState.buyInAmount;
   const allReady = gameState.players.length >= 2 && gameState.players.every(p => p.isReady);
   const meReady = gameState.players.find(p => p.id === myWallet)?.isReady ?? false;
