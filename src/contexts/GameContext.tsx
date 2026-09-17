@@ -55,6 +55,7 @@ interface GameContextType {
   gameState: GameState | null;
   loading: boolean;
   error: string | null;
+  refreshError: string | null;
   predictions: PredictionRow[];
   predictionPot: number; // total lamports in prediction pot
   createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number, classicSubMode?: ClassicSubMode) => Promise<boolean>;
@@ -158,6 +159,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
 
@@ -1684,8 +1686,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Also refresh game status so joiners detect when host starts
       const game = await supabase.from('games').select('*').eq('id', gameId).single();
 
+      if (gameIdRef.current !== gameId) return;
+      if (game.error || !game.data) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+        return;
+      }
+      setRefreshError(null);
       setGameState(prev => {
-        if (!prev) return prev;
+        if (!prev || prev.gameId !== gameId) return prev;
         const hostWallet = prev.hostWallet ?? '';
         const mapped = playerRowsToPlayers(players, hostWallet);
         const gameData = game.data;
@@ -1710,6 +1718,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     } catch (err) {
       console.error('refreshPlayers error:', err);
+      if (gameIdRef.current === gameId) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+      }
     }
   }, []);
 
@@ -1725,8 +1736,13 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         getPlayersForGame(gameId),
       ]);
 
+      // Ignore a completed request from a room the player has already left.
+      if (gameIdRef.current !== gameId) return;
       const game = gameRes.data;
-      if (!game) return;
+      if (gameRes.error || !game) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+        return;
+      }
 
       // Fetch votes — current round during play, ALL rounds on game over
       const currentRound = game.current_round ?? 0;
@@ -1740,8 +1756,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         votesRes = await getVotesForRound(gameId, currentRound);
       }
 
+      if (gameIdRef.current !== gameId) return;
+      setRefreshError(null);
       setGameState(prev => {
-        if (!prev) return prev;
+        if (!prev || prev.gameId !== gameId) return prev;
         const hostWallet = prev.hostWallet ?? '';
         const mapped = playerRowsToPlayers(playersRes, hostWallet);
 
@@ -1825,6 +1843,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     } catch (err) {
       console.error('[pollGameState] error:', err);
+      if (gameIdRef.current === gameId) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+      }
     }
   }, []);
 
@@ -2107,6 +2128,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     gameIdRef.current = null;
     setGameState(null);
     setError(null);
+    setRefreshError(null);
     setLoading(false);
   }, []);
 
@@ -2219,6 +2241,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         gameState,
         loading,
         error,
+        refreshError,
         predictions,
         predictionPot: predictions.reduce((s, p) => s + p.amount_lamports, 0),
         createGame,
