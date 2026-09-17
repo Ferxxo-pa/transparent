@@ -8,7 +8,6 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 import { HostQuestionPicker } from '../components/HostQuestionPicker';
 import { PlayerQuestionVote } from '../components/PlayerQuestionVote';
 import { RaisePot } from '../components/RaisePot';
-import { MagicBlockBadge } from '../components/MagicBlockBadge';
 import { QUESTIONS } from '../types/game';
 import { StorytellerPhase } from '../components/StorytellerPhase';
 import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
