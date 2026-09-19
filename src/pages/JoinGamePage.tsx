@@ -3,14 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
-import { usePrivyWallet } from '../contexts/PrivyContext';
 import { Blobs, BackButton, WalletChip } from '../components';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { code: codeParam } = useParams<{ code?: string }>();
   const { joinGame, createTestGame, loading, error } = useGame();
-  const { displayName, walletReady } = usePrivyWallet();
 
   // Parse pre-filled code from URL param into 6 individual digits
   const initialDigits = (() => {
