@@ -3,8 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { useGame } from '../contexts/GameContext';
 import { usePrivyWallet } from '../contexts/PrivyContext';
 import { useSolPrice } from '../hooks/useSolPrice';
+import { useSearchParams } from 'react-router-dom';
 import { QuestionMode, PayoutMode, ClassicSubMode } from '../types/game';
 import { Blobs, BackButton, SolMark, WalletChip, parseAmt, usdEstimate } from '../components';
+import { solStakesAllowed } from '../lib/config';
+import { hasAgeConfirmation } from '../components/AgeGate';
+import type { SpiceSetting } from '../lib/spice';
 
 /* ── Mode definitions ────────────────────────────────────── */
 
@@ -24,14 +28,19 @@ const ROUND_PRESETS = [3, 5, 7, 10];
 
 export const CreateGamePage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const cardSerial = searchParams.get('serial') ?? '';
+  const fromCard = Boolean(searchParams.get('card'));
+  const stakesOn = solStakesAllowed();
   const { createGame, createTestGame, loading, error } = useGame();
   const { connected, login } = usePrivyWallet();
   const solPrice = useSolPrice();
 
   const [mode, setMode]               = useState<QuestionMode>('classic');
   const [classicSub, setClassicSub]   = useState<ClassicSubMode>('all-or-nothing');
-  const [buyInRaw, setBuyInRaw]        = useState('0.1');
-  const [activePreset, setActivePreset] = useState('0.1');
+  const [spice, setSpice]             = useState<SpiceSetting>('mild');
+  const [buyInRaw, setBuyInRaw]        = useState('0');
+  const [activePreset, setActivePreset] = useState('0');
   const [rounds, setRounds]            = useState(5);
   const [customRounds, setCustomRounds] = useState('');
 
@@ -47,14 +56,15 @@ export const CreateGamePage: React.FC = () => {
     }
 
     const ok = await createGame(
-      buyInNum,
-      'Game Room',
+      stakesOn ? buyInNum : 0,
+      fromCard && cardSerial ? `Card ${cardSerial}` : 'Game Room',
       mode,
       undefined,
       undefined,
       'split-pot' as PayoutMode,
       rounds,
       mode === 'classic' ? classicSub : undefined,
+      spice,
     );
     if (ok) navigate('/waiting');
   };
@@ -91,6 +101,11 @@ export const CreateGamePage: React.FC = () => {
         <h2 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 14, lineHeight: 1, width: '100%' }}>
           set the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--pink)' }}>vibe.</span>
         </h2>
+        {fromCard && (
+          <p className="mono" style={{ fontSize: 12, color: 'var(--acid)', marginTop: -6, marginBottom: 12 }}>
+            host card {cardSerial || 'ready'} · free play room
+          </p>
+        )}
 
         {/* ── Mode grid (2x2) ─────────────────────────────────── */}
         <div style={{
@@ -191,15 +206,49 @@ export const CreateGamePage: React.FC = () => {
               marginTop: 6,
               fontWeight: 500,
             }}>
-              {classicSub === 'all-or-nothing'
-                ? 'skip a question → lose your entire buy-in to the pot'
-                : 'skip a question → lose 15% of your buy-in each time'}
+              {stakesOn
+                ? (classicSub === 'all-or-nothing'
+                  ? 'skip a question → lose your entire buy-in to the pot'
+                  : 'skip a question → lose 15% of your buy-in each time')
+                : 'free play — skipping does not move SOL'}
             </p>
           </div>
         )}
 
+        <div className="glass" style={{ padding: 14, borderRadius: 20, marginTop: 14, width: '100%' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <span className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--ink-faint)' }}>
+              spice
+            </span>
+            <span className="mono" style={{ fontSize: 11, color: 'var(--ink-soft)' }}>default mild</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['mild', 'spicy'] as SpiceSetting[]).map((level) => {
+              const locked = level === 'spicy' && !hasAgeConfirmation();
+              const active = spice === level;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => setSpice(level)}
+                  className="mono"
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 100, cursor: locked ? 'not-allowed' : 'pointer',
+                    border: `1px solid ${active ? 'var(--acid)' : 'rgba(255,255,255,0.10)'}`,
+                    background: active ? 'var(--acid)' : 'rgba(255,255,255,0.04)',
+                    color: active ? '#0A0810' : 'var(--ink-soft)', fontWeight: 800,
+                  }}
+                >
+                  {level === 'mild' ? 'mild' : '18+ spicy'}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* ── Buy-in card ─────────────────────────────────────── */}
-        <div
+        {stakesOn ? <div
           className="glass"
           style={{ padding: 14, borderRadius: 20, marginTop: 14, width: '100%' }}
         >
@@ -278,7 +327,16 @@ export const CreateGamePage: React.FC = () => {
               }}
             />
           </div>
-        </div>
+        </div> : (
+          <div className="glass" style={{ padding: 14, borderRadius: 20, marginTop: 14, width: '100%' }}>
+            <p className="mono" style={{ fontSize: 10, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--acid)', marginBottom: 6 }}>
+              free play
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.45, margin: 0 }}>
+              No buy-in. SOL stakes stay off unless the devnet flag is on. Test money only.
+            </p>
+          </div>
+        )}
 
         {/* ── Rounds card ─────────────────────────────────────── */}
         <div
@@ -384,12 +442,12 @@ export const CreateGamePage: React.FC = () => {
           >
             {loading ? 'creating...' : !connected ? (
               'connect wallet to create'
-            ) : (
+            ) : stakesOn && buyInNum > 0 ? (
               <>
                 spin it up · <SolMark size={14} tone="dark" />
-                {' '}{buyInNum > 0 ? buyInRaw : 'FREE'}
+                {' '}{buyInRaw}
               </>
-            )}
+            ) : 'spin it up · free'}
           </button>
           <button
             onClick={() => { createTestGame(mode, classicSub); navigate('/game'); }}

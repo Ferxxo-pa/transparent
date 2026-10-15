@@ -4,13 +4,13 @@ import { motion } from 'framer-motion';
 import { useGame } from '../contexts/GameContext';
 import { WalletSetupGate } from '../components/WalletSetupGate';
 import { usePrivyWallet } from '../contexts/PrivyContext';
-import { Blobs, BackButton, SolMark, WalletChip } from '../components';
+import { Blobs, BackButton, WalletChip } from '../components';
 
 export const JoinGamePage: React.FC = () => {
   const navigate = useNavigate();
   const { code: codeParam } = useParams<{ code?: string }>();
   const { joinGame, createTestGame, loading, error } = useGame();
-  const { displayName, walletReady } = usePrivyWallet();
+  const { displayName } = usePrivyWallet();
 
   // Parse pre-filled code from URL param into 6 individual digits
   const initialDigits = (() => {
@@ -109,12 +109,17 @@ export const JoinGamePage: React.FC = () => {
             </div>
 
             {/* title */}
-            <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 22, lineHeight: 1 }}>
-              drop the <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>digits</span>
+            <h2 className="display" style={{ fontSize: 28, margin: 0, marginBottom: 8, lineHeight: 1 }}>
+              join <span className="italic-serif" style={{ fontWeight: 400, color: 'var(--azure)' }}>room</span>
             </h2>
+            <p style={{ color: 'var(--ink-soft)', fontSize: 13, lineHeight: 1.45, margin: '0 0 22px' }}>
+              The stake is whatever the host set. Free play is the default. Payment, if any, happens after you join.
+            </p>
 
             {/* 6 digit inputs */}
             <div
+              role="group"
+              aria-label="Room code"
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 28 }}
               onPaste={handlePaste}
             >
@@ -124,6 +129,8 @@ export const JoinGamePage: React.FC = () => {
                     ref={el => { inputRefs.current[i] = el; }}
                     type="text"
                     inputMode="numeric"
+                    autoComplete="one-time-code"
+                    aria-label={`Room code digit ${i + 1} of 6`}
                     maxLength={1}
                     value={d}
                     onChange={e => handleDigitChange(i, e.target.value)}
@@ -155,15 +162,17 @@ export const JoinGamePage: React.FC = () => {
 
             {/* handle field */}
             <div style={{ marginTop: 24, textAlign: 'left' }}>
-              <label className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+              <label htmlFor="join-handle" className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)', letterSpacing: '0.14em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
                 your handle
               </label>
               <input
+                id="join-handle"
                 className="input-bare"
                 type="text"
                 value={nickname}
                 onChange={e => setNickname(e.target.value)}
-                placeholder="@degen"
+                placeholder={displayName || '@degen'}
+                aria-label="Your handle"
                 maxLength={18}
               />
             </div>
@@ -173,6 +182,7 @@ export const JoinGamePage: React.FC = () => {
           {/* error */}
           {error && (
             <motion.div
+              role="alert"
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               style={{
@@ -202,11 +212,7 @@ export const JoinGamePage: React.FC = () => {
               whileTap={allFilled && !loading ? { scale: 0.96 } : {}}
               style={{ opacity: !allFilled || loading ? 0.4 : 1, cursor: !allFilled || loading ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
-              {loading ? 'joining...' : (
-                <>
-                  ape in · <SolMark size={14} tone="dark" /> 0.1
-                </>
-              )}
+              {loading ? 'joining...' : 'Join room'}
             </motion.button>
           </div>
         </div>

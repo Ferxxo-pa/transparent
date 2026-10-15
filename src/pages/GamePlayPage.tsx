@@ -8,8 +8,8 @@ import { QuestionVotePhase } from '../components/QuestionVotePhase';
 import { HostQuestionPicker } from '../components/HostQuestionPicker';
 import { PlayerQuestionVote } from '../components/PlayerQuestionVote';
 import { RaisePot } from '../components/RaisePot';
-import { MagicBlockBadge } from '../components/MagicBlockBadge';
 import { QUESTIONS } from '../types/game';
+import { questionIndices } from '../lib/spice';
 import { StorytellerPhase } from '../components/StorytellerPhase';
 import { Blobs, BackButton, Avatar, SolMark, WalletChip } from '../components';
 
@@ -407,6 +407,7 @@ export const GamePlayPage: React.FC = () => {
           {isHost ? (
             <HostQuestionPicker
               questions={questionPool}
+              allowedIndices={gameState.spice === 'spicy' ? undefined : questionIndices('mild')}
               usedIndices={gameState.usedQuestionIndices || []}
               hotSeatPlayerName={player?.name || 'Unknown'}
               onPick={(question, index) => hostPickQuestion(question, index)}

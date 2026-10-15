@@ -113,6 +113,8 @@ export interface GameState {
   hostWallet?: string;
   /** Question mode for this game */
   questionMode: QuestionMode;
+  /** Mild is the default. Spicy is an 18+ opt-in for the room. */
+  spice?: 'mild' | 'spicy';
   /** Payout mode */
   payoutMode: PayoutMode;
   /** Number of questions/rounds (0 = one per player) */

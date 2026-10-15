@@ -75,7 +75,7 @@ const CountdownRing = ({ seconds, total }: { seconds: number; total: number }) =
 export const StorytellerPhase: React.FC<Props> = ({
   phase, prompt, isHotSeat, isHost, playerName, storytellerChoice,
   votes, voteCount, voterCount, myVote, buyInAmount, stakeVotes,
-  onChoose, onVote, onStakeVote, onAdvance,
+  onChoose, onStakeVote, onAdvance,
 }) => {
   const [doneTelling, setDoneTelling] = useState(false);
   const [recording, setRecording] = useState(false);

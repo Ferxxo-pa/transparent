@@ -7,6 +7,7 @@
 
 import nacl from 'npm:tweetnacl@1.0.3';
 import bs58 from 'npm:bs58@5.0.0';
+import { corsHeadersFor } from './cors.ts';
 
 export interface GameAuthToken {
   message: string;
@@ -55,14 +56,18 @@ export function verifyGameAuth(auth: GameAuthToken, expectedGameId: string): Ver
   return { wallet };
 }
 
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+/** Browser CORS for this request. Reflects ALLOWED_ORIGINS and never '*'. */
+export function corsHeadersForRequest(req: Request): Record<string, string> {
+  return corsHeadersFor(req.headers.get('origin'), Deno.env.get('ALLOWED_ORIGINS'));
+}
 
-export function jsonResponse(body: unknown, status = 200): Response {
+export function jsonResponse(
+  body: unknown,
+  status = 200,
+  cors: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...cors, 'Content-Type': 'application/json' },
   });
 }

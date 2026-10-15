@@ -1,7 +1,10 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect, ReactNode } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { GameState, Player, QUESTIONS, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode, ClassicSubMode, calculateSplitPayouts, calculateStorytellerRoundPayout } from '../types/game';
+import { GameState, Player, QuestionMode, GamePhase, SubmittedQuestion, PayoutMode, ClassicSubMode, calculateSplitPayouts, calculateStorytellerRoundPayout } from '../types/game';
+import { pickQuestionIndex, questionText, type SpiceSetting } from '../lib/spice';
+import { canApplyRoomRefresh } from '../lib/roomRefresh';
+import { solStakesAllowed } from '../lib/config';
 import {
   createGameInDB,
   getGameByRoomCode,
@@ -56,9 +59,10 @@ interface GameContextType {
   gameState: GameState | null;
   loading: boolean;
   error: string | null;
+  refreshError: string | null;
   predictions: PredictionRow[];
   predictionPot: number; // total lamports in prediction pot
-  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number, classicSubMode?: ClassicSubMode) => Promise<boolean>;
+  createGame: (buyIn: number, roomName: string, questionMode?: QuestionMode, customQuestions?: string[], playerName?: string, payoutMode?: PayoutMode, numQuestions?: number, classicSubMode?: ClassicSubMode, spice?: SpiceSetting) => Promise<boolean>;
   skipQuestion: () => Promise<void>;
   bidOnQuestion: (questionId: string, amount: number) => Promise<void>;
   castStakeVote: (vote: 'transparent' | 'fake', stakeAmount: number) => Promise<void>;
@@ -98,17 +102,8 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 
 // ── Helpers ─────────────────────────────────────────────────
 
-/** Pick a random question index that hasn't been used yet */
-const pickUniqueQuestionIndex = (poolSize: number, used: number[]): number => {
-  if (used.length >= poolSize) {
-    return Math.floor(Math.random() * poolSize);
-  }
-  const available = [];
-  for (let i = 0; i < poolSize; i++) {
-    if (!used.includes(i)) available.push(i);
-  }
-  return available[Math.floor(Math.random() * available.length)];
-};
+/** Pick a random question index that hasn't been used yet, inside the room's spice pool. */
+const pickUniqueQuestionIndex = (used: number[], spice?: SpiceSetting): number => pickQuestionIndex(spice, used);
 
 const generateRoomCode = (): string => {
   const part1 = Math.floor(100 + Math.random() * 900);
@@ -157,13 +152,23 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [predictions, setPredictions] = useState<PredictionRow[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<string[]>([]);
 
   const walletRef = useRef<WalletAdapter | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const gameIdRef = useRef<string | null>(null);
+  const roomGenRef = useRef(0);
   const gameStateRef = useRef<GameState | null>(null);
+
+  const commitRoom = useCallback((gameId: string | null) => {
+    if (gameIdRef.current !== gameId) {
+      roomGenRef.current += 1;
+      setRefreshError(null);
+    }
+    gameIdRef.current = gameId;
+  }, []);
 
   const setWalletAdapter = useCallback((adapter: WalletAdapter | null) => {
     walletRef.current = adapter;
@@ -191,19 +196,24 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         unsubscribeFromGame(channelRef.current);
       }
 
+      if (gameIdRef.current !== gameId) {
+        roomGenRef.current += 1;
+        setRefreshError(null);
+      }
       gameIdRef.current = gameId;
 
       const channel = subscribeToGame(
         gameId,
         // onGameChange
         (game: GameRow) => {
+          if (gameIdRef.current !== gameId) return;
           setGameState((prev) => {
-            if (!prev) return prev;
+            if (!prev || prev.gameId !== gameId) return prev;
             const questionMode = prev.questionMode;
             let currentQuestion = prev.currentQuestion;
 
             if (questionMode === 'classic' || questionMode === 'free-for-all') {
-              currentQuestion = QUESTIONS[game.current_question_index] || QUESTIONS[0];
+              currentQuestion = questionText(game.current_question_index);
             }
 
             // Reset votes whenever the round advances (syncs all clients)
@@ -229,8 +239,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
         // onPlayersChange
         (players: PlayerRow[]) => {
+          if (gameIdRef.current !== gameId) return;
           setGameState((prev) => {
-            if (!prev) return prev;
+            if (!prev || prev.gameId !== gameId) return prev;
             const mapped = playerRowsToPlayers(players, hostWallet);
             return {
               ...prev,
@@ -242,8 +253,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
         // onVotesChange — runs on ALL clients, calculates scores when all votes in
         (votes: VoteRow[]) => {
+          if (gameIdRef.current !== gameId) return;
           setGameState((prev) => {
-            if (!prev) return prev;
+            if (!prev || prev.gameId !== gameId) return prev;
             const voteMap: Record<string, 'transparent' | 'fake'> = {};
             votes.forEach((v) => { voteMap[v.voter_wallet] = v.vote; });
 
@@ -279,8 +291,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         },
         // onQuestionsChange (hot-take mode)
         (questions: QuestionSubmissionRow[]) => {
+          if (gameIdRef.current !== gameId) return;
           setGameState((prev) => {
-            if (!prev) return prev;
+            if (!prev || prev.gameId !== gameId) return prev;
             const mapped: SubmittedQuestion[] = questions.map((q) => ({
               id: q.id,
               text: q.question_text,
@@ -338,7 +351,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             unsubscribeFromGame(channelRef.current);
             channelRef.current = null;
           }
-          gameIdRef.current = null;
+          commitRoom(null);
           setGameState(null);
           setError(null);
           setLoading(false);
@@ -367,19 +380,22 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // ── Create Game ────────────────────────────────────────
 
   const createGame = useCallback(
-    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0, classicSubMode?: ClassicSubMode) => {
+    async (buyIn: number, roomName: string, questionMode: QuestionMode = 'classic', customQuestions?: string[], _playerName?: string, payoutMode: PayoutMode = 'winner-takes-all', numQuestions: number = 0, classicSubMode?: ClassicSubMode, spice: SpiceSetting = 'mild') => {
       const wallet = walletRef.current;
       if (!wallet) {
         setError('Please connect your wallet first');
         return false;
       }
 
+      const safeBuyIn = solStakesAllowed() ? buyIn : 0;
+      const roomSpice: SpiceSetting = spice === 'spicy' ? 'spicy' : 'mild';
+
       setLoading(true);
       setError(null);
 
       try {
         const roomCode = generateRoomCode();
-        const buyInLamports = Math.round(buyIn * LAMPORTS_PER_SOL);
+        const buyInLamports = Math.round(safeBuyIn * LAMPORTS_PER_SOL);
 
         // 1. Create on-chain
         let gamePdaStr: string | null = null;
@@ -407,6 +423,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           payout_mode: payoutMode,
           num_questions: numQuestions > 0 ? numQuestions : null,
           game_pda: gamePdaStr,
+          spice: roomSpice,
         });
 
         // 3. Host does NOT join as a player (Kahoot model: host = screen/controller)
@@ -419,13 +436,16 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const firstQuestion =
           questionMode === 'exposer'
             ? '' // Will be set during exposer flow
-            : QUESTIONS[0];
+            : questionText(null);
 
-        // 6. Set state
+        // 6. Set state. Bump the room generation first so an in-flight refresh
+        // of the previous room cannot overwrite this one.
+        commitRoom(game.id);
         setGameState({
           roomCode,
           roomName: roomName || 'Game Room',
-          buyInAmount: buyIn,
+          buyInAmount: safeBuyIn,
+          spice: roomSpice,
           players: playerRowsToPlayers(players, wallet.publicKey.toBase58()),
           currentPot: 0,
           gameStatus: 'waiting',
@@ -461,7 +481,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
       }
     },
-    [setupSubscription],
+    [setupSubscription, commitRoom],
   );
 
   // ── Join Game ──────────────────────────────────────────
@@ -505,19 +525,27 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 4. Fetch players
         const players = await getPlayersForGame(game.id);
         const buyIn = game.buy_in_lamports / LAMPORTS_PER_SOL;
+        if (buyIn > 0 && !solStakesAllowed()) {
+          setError('This room has a SOL buy-in. SOL stakes are off — join a free-play room.');
+          setLoading(false);
+          return false;
+        }
 
         // 5. Determine question mode from DB
         const qMode = (game.question_mode as QuestionMode) || 'classic';
         const currentQuestion =
           qMode === 'exposer'
             ? ''
-            : QUESTIONS[game.current_question_index] || QUESTIONS[0];
+            : questionText(game.current_question_index);
 
-        // 6. Set state
+        // 6. Set state. Commit the room id before publishing it so a refresh
+        // started against the previous room cannot land on top.
+        commitRoom(game.id);
         setGameState({
           roomCode: game.room_code,
           roomName: game.room_name,
           buyInAmount: buyIn,
+          spice: game.spice === 'spicy' ? 'spicy' : 'mild',
           players: playerRowsToPlayers(players, game.host_wallet),
           currentPot: players.length * buyIn,
           gameStatus: game.status,
@@ -550,7 +578,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(false);
       }
     },
-    [setupSubscription],
+    [setupSubscription, commitRoom],
   );
 
   // ── Start Game (Host only) ─────────────────────────────
@@ -667,7 +695,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           );
         } else {
           // classic — auto-pick question
-          const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
+          const qIdx = pickUniqueQuestionIndex([], gameState?.spice);
           await updateGameStatus(gid, {
             status: 'playing',
             current_hot_seat_player: firstPlayer,
@@ -678,7 +706,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setGameState((prev) =>
             prev ? {
               ...prev, gameStatus: 'playing', currentPlayerInHotSeat: firstPlayer,
-              currentQuestion: QUESTIONS[qIdx], gamePhase: 'answering', currentRound: 0,
+              currentQuestion: questionText(qIdx), gamePhase: 'answering', currentRound: 0,
               usedQuestionIndices: [qIdx],
               currentRoundMode: 'classic',
             } : null,
@@ -686,7 +714,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       } else {
         // Classic — auto-pick a random question and go straight to answering
-        const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
+        const qIdx = pickUniqueQuestionIndex([], gameState?.spice);
         await updateGameStatus(gid, {
           status: 'playing',
           current_hot_seat_player: firstPlayer,
@@ -701,7 +729,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ...prev,
                 gameStatus: 'playing',
                 currentPlayerInHotSeat: firstPlayer,
-                currentQuestion: QUESTIONS[qIdx],
+                currentQuestion: questionText(qIdx),
                 gamePhase: 'answering',
                 currentRound: 0,
                 usedQuestionIndices: [qIdx],
@@ -781,7 +809,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const nextRound = round + 1;
             // Auto-pick next question
             const usedIdxs = gameState.usedQuestionIndices || [];
-            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+            const nextQIdx = pickUniqueQuestionIndex(usedIdxs, gameState?.spice);
             await updateGameStatus(gid, {
               current_hot_seat_player: nextPlayer.id,
               current_question_index: nextQIdx,
@@ -794,7 +822,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 ? {
                     ...prev,
                     currentPlayerInHotSeat: nextPlayer.id,
-                    currentQuestion: QUESTIONS[nextQIdx],
+                    currentQuestion: questionText(nextQIdx),
                     currentRound: nextRound,
                     votes: {},
                     voteCount: 0,
@@ -956,9 +984,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             setGameState(prev => prev ? { ...prev, gamePhase: 'submitting-questions', currentPlayerInHotSeat: nextPlayer, currentRound: nextRound, currentQuestion: '', submittedQuestions: [], questionVotes: {}, questionBids: {}, votes: {}, voteCount: 0, currentRoundMode: 'exposer' } : null);
           } else {
             const usedIdxs = gameState.usedQuestionIndices || [];
-            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+            const nextQIdx = pickUniqueQuestionIndex(usedIdxs, gameState?.spice);
             if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'answering', current_question_index: nextQIdx });
-            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: QUESTIONS[nextQIdx], gamePhase: 'answering', votes: {}, voteCount: 0, currentRoundMode: 'classic', usedQuestionIndices: [...usedIdxs, nextQIdx] } : null);
+            setGameState(prev => prev ? { ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer, currentQuestion: questionText(nextQIdx), gamePhase: 'answering', votes: {}, voteCount: 0, currentRoundMode: 'classic', usedQuestionIndices: [...usedIdxs, nextQIdx] } : null);
           }
         } else {
           // Pure exposer mode — next round is always exposer
@@ -1273,12 +1301,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const nextPlayerIdx = (currentIdx + 1) % prev.players.length;
       const nextPlayer = prev.players[nextPlayerIdx];
       const usedIdxs = prev.usedQuestionIndices || [];
-      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+      const nextQIdx = pickUniqueQuestionIndex(usedIdxs, gameState?.spice);
 
       return {
         ...prev,
         currentPlayerInHotSeat: nextPlayer.id,
-        currentQuestion: QUESTIONS[nextQIdx],
+        currentQuestion: questionText(nextQIdx),
         currentRound: nextRoundNum,
         votes: {}, voteCount: 0,
         gamePhase: 'answering' as GamePhase,
@@ -1382,10 +1410,10 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (gid) await updateGameStatus(gid, { current_round: nextRound, current_hot_seat_player: nextPlayer, game_phase: 'submitting-questions' });
           } else {
             const usedIdxs = gameState.usedQuestionIndices || [];
-            const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+            const nextQIdx = pickUniqueQuestionIndex(usedIdxs, gameState?.spice);
             setGameState(prev => prev ? {
               ...prev, currentRound: nextRound, currentPlayerInHotSeat: nextPlayer,
-              currentQuestion: QUESTIONS[nextQIdx], gamePhase: 'answering', votes: {}, voteCount: 0,
+              currentQuestion: questionText(nextQIdx), gamePhase: 'answering', votes: {}, voteCount: 0,
               usedQuestionIndices: [...usedIdxs, nextQIdx],
               currentRoundMode: 'classic',
             } : null);
@@ -1448,7 +1476,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const nextPlayerIdx = (currentIdx + 1) % gameState.players.length;
       const nextPlayer = gameState.players[nextPlayerIdx];
       const usedIdxs = gameState.usedQuestionIndices || [];
-      const nextQIdx = pickUniqueQuestionIndex(QUESTIONS.length, usedIdxs);
+      const nextQIdx = pickUniqueQuestionIndex(usedIdxs, gameState?.spice);
       if (gid) {
         await updateGameStatus(gid, {
           current_hot_seat_player: nextPlayer.id,
@@ -1461,7 +1489,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setGameState(prev => prev ? {
         ...prev,
         currentPlayerInHotSeat: nextPlayer.id,
-        currentQuestion: QUESTIONS[nextQIdx],
+        currentQuestion: questionText(nextQIdx),
         currentRound: nextRound,
         votes: {}, voteCount: 0,
         gamePhase: 'answering',
@@ -1482,9 +1510,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!myWalletId) return;
 
     const myWallet = myWalletId;
-    const currentBids = gameState.questionBids ?? {};
-    const questionBids = currentBids[questionId] ?? [];
-
     setGameState(prev => {
       if (!prev) return null;
       const bids = { ...(prev.questionBids ?? {}) };
@@ -1553,15 +1578,36 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const refreshPlayers = useCallback(async () => {
     const gameId = gameIdRef.current;
+    const requestGen = roomGenRef.current;
     if (!gameId) return;
+    const stillThisRoom = () => canApplyRoomRefresh({
+      requestGameId: gameId,
+      requestGen,
+      currentGameId: gameIdRef.current,
+      currentGen: roomGenRef.current,
+      previousGameId: gameId,
+    });
     try {
       const players = await getPlayersForGame(gameId);
 
       // Also refresh game status so joiners detect when host starts
       const game = await supabase.from('games').select('*').eq('id', gameId).single();
 
+      if (!stillThisRoom()) return;
+      if (game.error || !game.data) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+        return;
+      }
+      setRefreshError(null);
+
       setGameState(prev => {
-        if (!prev) return prev;
+        if (!prev || !canApplyRoomRefresh({
+          requestGameId: gameId,
+          requestGen,
+          currentGameId: gameIdRef.current,
+          currentGen: roomGenRef.current,
+          previousGameId: prev.gameId ?? null,
+        })) return prev;
         const hostWallet = prev.hostWallet ?? '';
         const mapped = playerRowsToPlayers(players, hostWallet);
         const gameData = game.data;
@@ -1583,6 +1629,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
     } catch (err) {
       console.error('refreshPlayers error:', err);
+      if (gameIdRef.current === gameId && roomGenRef.current === requestGen) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+      }
     }
   }, []);
 
@@ -1590,7 +1639,15 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const pollGameState = useCallback(async () => {
     const gameId = gameIdRef.current;
+    const requestGen = roomGenRef.current;
     if (!gameId) return;
+    const stillThisRoom = (previousGameId: string | null = gameId) => canApplyRoomRefresh({
+      requestGameId: gameId,
+      requestGen,
+      currentGameId: gameIdRef.current,
+      currentGen: roomGenRef.current,
+      previousGameId,
+    });
     try {
       // Fetch game, players, and votes for current round in parallel
       const [gameRes, playersRes] = await Promise.all([
@@ -1598,8 +1655,12 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         getPlayersForGame(gameId),
       ]);
 
+      if (!stillThisRoom()) return;
       const game = gameRes.data;
-      if (!game) return;
+      if (gameRes.error || !game) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+        return;
+      }
 
       // Fetch votes — current round during play, ALL rounds on game over
       const currentRound = game.current_round ?? 0;
@@ -1613,15 +1674,18 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         votesRes = await getVotesForRound(gameId, currentRound);
       }
 
+      if (!stillThisRoom()) return;
+      setRefreshError(null);
+
       setGameState(prev => {
-        if (!prev) return prev;
+        if (!prev || !stillThisRoom(prev.gameId ?? null)) return prev;
         const hostWallet = prev.hostWallet ?? '';
         const mapped = playerRowsToPlayers(playersRes, hostWallet);
 
         // Determine question
         let currentQuestion = prev.currentQuestion;
         if (prev.questionMode === 'classic' || prev.questionMode === 'free-for-all') {
-          currentQuestion = QUESTIONS[game.current_question_index] || QUESTIONS[0];
+          currentQuestion = questionText(game.current_question_index);
         }
 
         // Build vote map
@@ -1695,6 +1759,9 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     } catch (err) {
       console.error('[pollGameState] error:', err);
+      if (gameIdRef.current === gameId && roomGenRef.current === requestGen) {
+        setRefreshError('Your saved game may be out of date. We could not refresh it.');
+      }
     }
   }, []);
 
@@ -1707,7 +1774,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       // If there's a buy-in, pay now
       const gs = gameStateRef.current;
-      if (gs && gs.buyInAmount > 0 && gs.hostWallet) {
+      if (gs && gs.buyInAmount > 0 && solStakesAllowed() && gs.hostWallet) {
         const hostPubkey = new PublicKey(gs.hostWallet);
         const buyInLamports = Math.round(gs.buyInAmount * LAMPORTS_PER_SOL);
         if (wallet.publicKey.toBase58() !== gs.hostWallet) {
@@ -1818,7 +1885,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unsubscribeFromGame(channelRef.current);
       channelRef.current = null;
     }
-    gameIdRef.current = null;
+    commitRoom(null);
     setGameState(null);
     setError(null);
     setLoading(false);
@@ -1901,16 +1968,18 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const createTestGame = useCallback((questionMode: QuestionMode = 'classic', classicSubMode?: ClassicSubMode) => {
     const roomCode = '000-000';
-    const qIdx = pickUniqueQuestionIndex(QUESTIONS.length, []);
+    const qIdx = pickUniqueQuestionIndex([], 'mild');
     const isClassicStart = questionMode === 'classic' || questionMode === 'free-for-all';
+    commitRoom(null);
     setGameState({
       roomCode,
       roomName: 'Test Room',
       buyInAmount: 0,
+      spice: 'mild',
       players: TEST_PLAYERS,
       currentPot: 0,
       gameStatus: 'playing',
-      currentQuestion: questionMode === 'storyteller' ? 'Tell us about the craziest thing you\'ve ever done on a dare.' : isClassicStart ? QUESTIONS[qIdx] : '',
+      currentQuestion: questionMode === 'storyteller' ? 'Tell us about the craziest thing you\'ve ever done on a dare.' : isClassicStart ? questionText(qIdx) : '',
       currentPlayerInHotSeat: 'test-p1',
       votes: {},
       voteCount: 0,
@@ -1980,7 +2049,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       unsubscribeFromGame(channelRef.current);
       channelRef.current = null;
     }
-    gameIdRef.current = null;
+    commitRoom(null);
     setGameState(null);
     setError(null);
     setLoading(false);
@@ -2095,6 +2164,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         gameState,
         loading,
         error,
+        refreshError,
         predictions,
         predictionPot: predictions.reduce((s, p) => s + p.amount_lamports, 0),
         createGame,

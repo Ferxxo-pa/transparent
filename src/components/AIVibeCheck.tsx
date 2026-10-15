@@ -35,7 +35,8 @@ function shuffle<T>(arr: T[]): T[] {
 
 export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) => {
   const [selectedVibe, setSelectedVibe] = useState<string | null>(null);
-  const [selectedSpice, setSelectedSpice] = useState<number | null>(null);
+  const [selectedSpice, setSelectedSpice] = useState<number>(0.5);
+  const [ageOk, setAgeOk] = useState(false);
 
   const generate = () => {
     if (!selectedVibe || selectedSpice === null) return;
@@ -96,11 +97,20 @@ export const AIVibeCheck: React.FC<Props> = ({ onQuestionsGenerated, onSkip }) =
 
       {/* Spice level */}
       <div>
-        <p className="label-sm" style={{ marginBottom: 8 }}>Spice level?</p>
+        <p className="label-sm" style={{ marginBottom: 8 }}>Spice level? Mild is the default.</p>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12, color: 'var(--ink-soft)', marginBottom: 8 }}>
+          <input type="checkbox" checked={ageOk} onChange={(e) => {
+            setAgeOk(e.target.checked);
+            if (!e.target.checked) setSelectedSpice(0.5);
+          }} />
+          Everyone here is 18+. Allow hotter questions.
+        </label>
         <div style={{ display: 'flex', gap: 6 }}>
           {SPICE_LEVELS.map(s => (
             <button
               key={s.label}
+              type="button"
+              disabled={s.filter > 0.5 && !ageOk}
               onClick={() => setSelectedSpice(s.filter)}
               style={{
                 flex: 1,

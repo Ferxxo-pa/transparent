@@ -7,7 +7,7 @@ interface Props {
 }
 
 export const QuestionSubmitPhase: React.FC<Props> = ({ hotSeatPlayerName, onTimerEnd }) => {
-  const { gameState, submitQuestion, bidOnQuestion } = useGame();
+  const { gameState, submitQuestion } = useGame();
   const [question,  setQuestion]  = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [timeLeft,  setTimeLeft]  = useState(30);
