@@ -28,7 +28,7 @@ import {
   TransactionInstruction,
 } from 'npm:@solana/web3.js@1.95.3';
 import bs58 from 'npm:bs58@5.0.0';
-import { verifyGameAuth, corsHeaders, jsonResponse, GameAuthToken } from '../_shared/gameAuth.ts';
+import { verifyGameAuth, jsonResponse, corsHeadersForRequest, GameAuthToken } from '../_shared/gameAuth.ts';
 
 const DEFAULT_PROGRAM_ID = '2zPLNqsyqXNxaMkzWUMh1ZcbJBR3Jr2bTky1FFaZVuF9';
 // sha256("global:distribute")[0..8] — matches target/idl/transparent.json
@@ -57,17 +57,19 @@ function encodeU64LE(n: number): Uint8Array {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersForRequest(req);
+  const respond = (body: unknown, status = 200) => jsonResponse(body, status, cors);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
     const { gameId, action, payouts, auth } = (await req.json()) as RequestBody;
-    if (!gameId || !action) return jsonResponse({ error: 'gameId and action required' }, 400);
+    if (!gameId || !action) return respond({ error: 'gameId and action required' }, 400);
 
     let wallet: string;
     try {
       wallet = verifyGameAuth(auth, gameId).wallet;
     } catch (e) {
-      return jsonResponse({ error: `auth failed: ${(e as Error).message}` }, 401);
+      return respond({ error: `auth failed: ${(e as Error).message}` }, 401);
     }
 
     const supabase = createClient(
@@ -80,11 +82,11 @@ serve(async (req) => {
       .select('*')
       .eq('id', gameId)
       .single();
-    if (gameErr || !game) return jsonResponse({ error: 'game not found' }, 404);
+    if (gameErr || !game) return respond({ error: 'game not found' }, 404);
 
     // Settlement is HOST-only. This is the core authority check.
     if (wallet !== game.host_wallet) {
-      return jsonResponse({ error: 'only the host may settle the game' }, 403);
+      return respond({ error: 'only the host may settle the game' }, 403);
     }
 
     if (action === 'settle_predictions') {
@@ -92,20 +94,20 @@ serve(async (req) => {
         .from('predictions')
         .update({ settled: true })
         .eq('game_id', gameId);
-      if (error) return jsonResponse({ error: error.message }, 500);
-      return jsonResponse({ ok: true });
+      if (error) return respond({ error: error.message }, 500);
+      return respond({ ok: true });
     }
 
     // ── action === 'distribute' ──────────────────────────────
 
     if (game.status === 'gameover') {
-      return jsonResponse({ error: 'game already settled' }, 409);
+      return respond({ error: 'game already settled' }, 409);
     }
     if (game.status === 'waiting') {
-      return jsonResponse({ error: 'game has not started' }, 409);
+      return respond({ error: 'game has not started' }, 409);
     }
     if (!payouts || Object.keys(payouts).length === 0) {
-      return jsonResponse({ error: 'payouts required' }, 400);
+      return respond({ error: 'payouts required' }, 400);
     }
 
     // Every recipient must be a player in this game.
@@ -113,17 +115,17 @@ serve(async (req) => {
       .from('players')
       .select('wallet_address')
       .eq('game_id', gameId);
-    if (playersErr) return jsonResponse({ error: 'failed to load players' }, 500);
+    if (playersErr) return respond({ error: 'failed to load players' }, 500);
     const playerWallets = new Set((players ?? []).map((p) => p.wallet_address));
     for (const recipient of Object.keys(payouts)) {
       if (!playerWallets.has(recipient)) {
-        return jsonResponse({ error: `payout recipient is not a player: ${recipient}` }, 403);
+        return respond({ error: `payout recipient is not a player: ${recipient}` }, 403);
       }
     }
 
     const rpcUrl = Deno.env.get('SOLANA_RPC') || 'https://api.devnet.solana.com';
     if (rpcUrl.includes('mainnet')) {
-      return jsonResponse({ error: 'settlement function is devnet-only' }, 500);
+      return respond({ error: 'settlement function is devnet-only' }, 500);
     }
 
     const programId = new PublicKey(Deno.env.get('ESCROW_PROGRAM_ID') || DEFAULT_PROGRAM_ID);
@@ -177,17 +179,17 @@ serve(async (req) => {
     }
 
     if (signatures.length === 0) {
-      return jsonResponse({ error: 'no valid payouts' }, 400);
+      return respond({ error: 'no valid payouts' }, 400);
     }
 
     const { error: updateErr } = await supabase
       .from('games')
       .update({ status: 'gameover' })
       .eq('id', gameId);
-    if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
+    if (updateErr) return respond({ error: updateErr.message }, 500);
 
-    return jsonResponse({ ok: true, signatures });
+    return respond({ ok: true, signatures });
   } catch (e) {
-    return jsonResponse({ error: (e as Error).message ?? 'internal error' }, 500);
+    return respond({ error: (e as Error).message ?? 'internal error' }, 500);
   }
 });

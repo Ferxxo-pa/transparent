@@ -9,6 +9,8 @@ import { WalletBridge } from './components/WalletBridge';
 // WalletDrawer is triggered from individual page wallet chips
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Background } from './components/Background';
+import { AgeGate } from './components/AgeGate';
+import { GameRefreshBanner } from './components/GameRefreshBanner';
 import { HomePage } from './pages/HomePage';
 import { JoinGamePage } from './pages/JoinGamePage';
 import { CreateGamePage } from './pages/CreateGamePage';
@@ -19,6 +21,7 @@ import { GameOverPage } from './pages/GameOverPage';
 import { WaitlistPage } from './pages/WaitlistPage';
 import { HowToPlayPage } from './pages/HowToPlayPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { CardClaimPage } from './pages/CardClaimPage';
 
 export const pageVariants = {
   initial: { opacity: 0, y: 28, scale: 0.97 },
@@ -44,11 +47,12 @@ function GameRedirect() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!gameState || location.pathname !== '/') return;
+    const skip = (location.state as { skipGameRedirect?: boolean } | null)?.skipGameRedirect;
+    if (!gameState || location.pathname !== '/' || skip) return;
     if (gameState.gameStatus === 'playing') navigate('/game', { replace: true });
     else if (gameState.gameStatus === 'gameover') navigate('/gameover', { replace: true });
     else if (gameState.gameStatus === 'waiting') navigate('/waiting', { replace: true });
-  }, [gameState, location.pathname, navigate]);
+  }, [gameState, location.pathname, location.state, navigate]);
 
   return null;
 }
@@ -71,6 +75,7 @@ function AnimatedRoutes() {
           <Route path="/waitlist" element={<PageWrap><WaitlistPage /></PageWrap>} />
           <Route path="/login"    element={<PageWrap><HomePage /></PageWrap>} />
           <Route path="/how-to-play" element={<PageWrap><HowToPlayPage /></PageWrap>} />
+          <Route path="/c/:cardToken" element={<PageWrap><CardClaimPage /></PageWrap>} />
           <Route path="*"         element={<PageWrap><NotFoundPage /></PageWrap>} />
         </Routes>
       </AnimatePresence>
@@ -85,8 +90,11 @@ function App() {
         <GameProvider>
           <WalletBridge />
           <Router>
-            <Background />
-            <AnimatedRoutes />
+            <AgeGate>
+              <Background />
+              <GameRefreshBanner />
+              <AnimatedRoutes />
+            </AgeGate>
           </Router>
         </GameProvider>
       </PrivyWalletProvider>

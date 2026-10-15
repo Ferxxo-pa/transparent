@@ -20,6 +20,7 @@ export interface GameRow {
   current_question_index: number;
   current_hot_seat_player: string | null;
   question_mode: 'classic' | 'exposer' | 'storyteller' | 'free-for-all' | 'custom' | 'hot-take' | 'ai';
+  spice?: 'mild' | 'spicy' | null;
   custom_questions: string[] | null;
   game_phase: string | null;
   current_round: number;
@@ -99,17 +100,28 @@ export async function createGameInDB(data: {
   payout_mode?: string;
   num_questions?: number | null;
   game_pda?: string | null;
+  spice?: 'mild' | 'spicy';
 }): Promise<GameRow> {
-  const dbData = { ...data };
-  if (dbData.question_mode) dbData.question_mode = modeToDb(dbData.question_mode);
-  const { data: game, error } = await supabase
-    .from('games')
-    .insert(dbData)
-    .select()
-    .single();
-  if (error) throw error;
-  if (game.question_mode) game.question_mode = modeFromDb(game.question_mode) as any;
-  return game;
+  const insertOnce = async (includeSpice: boolean) => {
+    const dbData: Record<string, unknown> = { ...data };
+    if (!includeSpice) delete dbData.spice;
+    if (typeof dbData.question_mode === 'string') dbData.question_mode = modeToDb(dbData.question_mode);
+    const { data: game, error } = await supabase.from('games').insert(dbData).select().single();
+    if (error) throw error;
+    if (game.question_mode) game.question_mode = modeFromDb(game.question_mode) as GameRow['question_mode'];
+    return game as GameRow;
+  };
+  try {
+    return await insertOnce(true);
+  } catch (err) {
+    const message = typeof err === 'object' && err && 'message' in err
+      ? String((err as { message: unknown }).message)
+      : String(err);
+    if (data.spice && /spice|schema cache|column/i.test(message)) {
+      return insertOnce(false);
+    }
+    throw err;
+  }
 }
 
 export async function getGameByRoomCode(roomCode: string): Promise<GameRow | null> {

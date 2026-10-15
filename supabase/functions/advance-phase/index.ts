@@ -15,7 +15,7 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
-import { verifyGameAuth, corsHeaders, jsonResponse, GameAuthToken } from '../_shared/gameAuth.ts';
+import { verifyGameAuth, jsonResponse, corsHeadersForRequest, GameAuthToken } from '../_shared/gameAuth.ts';
 
 // Columns a request may update at all (superset; per-caller rules below).
 const UPDATABLE_COLUMNS = new Set([
@@ -44,19 +44,21 @@ interface RequestBody {
 }
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  const cors = corsHeadersForRequest(req);
+  const respond = (body: unknown, status = 200) => jsonResponse(body, status, cors);
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
     const { gameId, updates, auth } = (await req.json()) as RequestBody;
     if (!gameId || !updates || typeof updates !== 'object') {
-      return jsonResponse({ error: 'gameId and updates required' }, 400);
+      return respond({ error: 'gameId and updates required' }, 400);
     }
 
     const keys = Object.keys(updates);
-    if (keys.length === 0) return jsonResponse({ error: 'empty update' }, 400);
+    if (keys.length === 0) return respond({ error: 'empty update' }, 400);
     for (const k of keys) {
       if (!UPDATABLE_COLUMNS.has(k)) {
-        return jsonResponse({ error: `column not updatable: ${k}` }, 403);
+        return respond({ error: `column not updatable: ${k}` }, 403);
       }
     }
 
@@ -64,7 +66,7 @@ serve(async (req) => {
     try {
       wallet = verifyGameAuth(auth, gameId).wallet;
     } catch (e) {
-      return jsonResponse({ error: `auth failed: ${(e as Error).message}` }, 401);
+      return respond({ error: `auth failed: ${(e as Error).message}` }, 401);
     }
 
     const supabase = createClient(
@@ -77,7 +79,7 @@ serve(async (req) => {
       .select('*')
       .eq('id', gameId)
       .single();
-    if (gameErr || !game) return jsonResponse({ error: 'game not found' }, 404);
+    if (gameErr || !game) return respond({ error: 'game not found' }, 404);
 
     const isHost = wallet === game.host_wallet;
 
@@ -87,10 +89,10 @@ serve(async (req) => {
         .from('players')
         .select('wallet_address')
         .eq('game_id', gameId);
-      if (playersErr) return jsonResponse({ error: 'failed to load players' }, 500);
+      if (playersErr) return respond({ error: 'failed to load players' }, 500);
       const playerWallets = (players ?? []).map((p) => p.wallet_address);
       if (!playerWallets.includes(wallet)) {
-        return jsonResponse({ error: 'not a player in this game' }, 403);
+        return respond({ error: 'not a player in this game' }, 403);
       }
 
       const isHotSeat = wallet === game.current_hot_seat_player;
@@ -102,7 +104,7 @@ serve(async (req) => {
 
       if (isStorytellerUpdate) {
         if (!isHotSeat) {
-          return jsonResponse({ error: 'only the hot-seat player may advance storyteller phases' }, 403);
+          return respond({ error: 'only the hot-seat player may advance storyteller phases' }, 403);
         }
       } else {
         // Vote-completion advance: gameover, or next-round rollover. Verify the
@@ -113,7 +115,7 @@ serve(async (req) => {
           Number(updates.current_round) === Number(game.current_round) + 1;
 
         if (!isGameover && !isRoundAdvance) {
-          return jsonResponse({ error: 'transition not permitted for players' }, 403);
+          return respond({ error: 'transition not permitted for players' }, 403);
         }
 
         const { data: votes, error: votesErr } = await supabase
@@ -121,21 +123,21 @@ serve(async (req) => {
           .select('voter_wallet')
           .eq('game_id', gameId)
           .eq('round', game.current_round);
-        if (votesErr) return jsonResponse({ error: 'failed to load votes' }, 500);
+        if (votesErr) return respond({ error: 'failed to load votes' }, 500);
 
         const eligible = playerWallets.filter((w) => w !== game.current_hot_seat_player).length;
         const votesNeeded = eligible > 0 ? eligible : playerWallets.length;
         if ((votes ?? []).length < votesNeeded) {
-          return jsonResponse({ error: 'round votes not complete' }, 403);
+          return respond({ error: 'round votes not complete' }, 403);
         }
       }
     }
 
     const { error: updateErr } = await supabase.from('games').update(updates).eq('id', gameId);
-    if (updateErr) return jsonResponse({ error: updateErr.message }, 500);
+    if (updateErr) return respond({ error: updateErr.message }, 500);
 
-    return jsonResponse({ ok: true });
+    return respond({ ok: true });
   } catch (e) {
-    return jsonResponse({ error: (e as Error).message ?? 'internal error' }, 500);
+    return respond({ error: (e as Error).message ?? 'internal error' }, 500);
   }
 });

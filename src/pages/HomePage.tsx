@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Blobs, SolMark, WalletChip } from '../components';
+import { Blobs, WalletChip } from '../components';
 
 /* ── Game modes ──────────────────────────────────────────── */
 
@@ -70,12 +70,12 @@ const MODES: GameMode[] = [
 
 /* ── Fake live players ───────────────────────────────────── */
 
-const FAKE_PLAYERS = [
-  { emoji: '🐸', name: 'capdetector', amt: '+1.42', positive: true },
-  { emoji: '🎩', name: 'soljester', amt: '+0.84', positive: true },
-  { emoji: '🦊', name: 'rugged.sol', amt: '-0.62', positive: false },
-  { emoji: '🐧', name: 'pengu_lord', amt: '+0.18', positive: true },
-  { emoji: '🐶', name: 'wifhat', amt: '-0.40', positive: false },
+const SAMPLE_HANDLES = [
+  { emoji: '🐸', name: 'capdetector' },
+  { emoji: '🎩', name: 'soljester' },
+  { emoji: '🦊', name: 'rugged.sol' },
+  { emoji: '🐧', name: 'pengu_lord' },
+  { emoji: '🐶', name: 'wifhat' },
 ];
 
 /* ── HomePage ────────────────────────────────────────────── */
@@ -277,24 +277,17 @@ export const HomePage: React.FC = () => {
                   color: 'var(--ink)',
                 }}
               >
-                live · players online
-              </span>
-            </div>
-            <span
-              className="mono"
-              style={{
-                fontSize: 9,
-                color: 'var(--ink-soft)',
-                letterSpacing: '0.08em',
-              }}
-            >
-              1,284
+              free to play
             </span>
           </div>
+          <span className="mono" style={{ fontSize: 9, color: 'var(--ink-soft)', letterSpacing: '0.08em' }}>
+            no buy-in
+          </span>
+        </div>
 
-          {/* Player rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {FAKE_PLAYERS.map((p) => (
+        {/* Player rows */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {SAMPLE_HANDLES.map((p) => (
               <div
                 key={p.name}
                 style={{
@@ -326,18 +319,8 @@ export const HomePage: React.FC = () => {
                 >
                   {p.name}
                 </span>
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: p.positive ? '#5BE584' : '#FF5C5C',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}
-                >
-                  <SolMark size={9} tone="ink" /> {p.amt}
+                <span className="mono" style={{ fontSize: 11, color: 'var(--ink-faint)' }}>
+                  free
                 </span>
               </div>
             ))}

@@ -50,6 +50,16 @@ export const SETTLEMENT_AUTHORITY = import.meta.env.VITE_SETTLEMENT_AUTHORITY ||
 /** Base URL for Supabase Edge Functions (derived from the project URL). */
 export const SUPABASE_FUNCTIONS_URL = SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : '';
 
+/** SOL buy-ins. Off unless explicitly enabled, and still devnet-only. Free play is the default. */
+export const SOL_STAKES_ENABLED = import.meta.env.VITE_SOL_STAKES_ENABLED === 'true';
+
+export function solStakesAllowed(): boolean {
+  return SOL_STAKES_ENABLED && SOLANA_NETWORK === 'devnet';
+}
+
+/** Public site origin used when a card opens Start a room. */
+export const APP_ORIGIN = import.meta.env.VITE_APP_ORIGIN || 'https://transparent-five.vercel.app';
+
 /** Route protected game-phase updates + settlement through Edge Functions.
  *  Requires the escrow-hardening RLS migration applied AND the advance-phase /
  *  settle-game functions deployed — otherwise phase updates will fail. */

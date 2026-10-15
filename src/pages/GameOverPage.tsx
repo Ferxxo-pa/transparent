@@ -144,11 +144,6 @@ export const GameOverPage: React.FC = () => {
 
   const usdWinner = usdEstimate(Math.abs(winnerNet), 'sol', solPrice);
 
-  /* which row is "me"? */
-  const myNet = isSplitPot
-    ? (splitPayouts[myWallet] ?? 0) - gameState.buyInAmount
-    : (activeWinner === myWallet ? gameState.currentPot - gameState.buyInAmount : -gameState.buyInAmount);
-
   return (
     <>
       <Blobs palette="win" />
@@ -217,7 +212,6 @@ export const GameOverPage: React.FC = () => {
           {/* ── leaderboard ── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             {ranked.map(({ p, s, honesty, payout }, i) => {
-              const isWinner = isSplitPot ? (payout > 0) : p.id === activeWinner;
               const canSelect = isHost && !confirmed && !isSplitPot;
               const netGain = isSplitPot ? payout - gameState.buyInAmount : (p.id === activeWinner ? gameState.currentPot - gameState.buyInAmount : -gameState.buyInAmount);
               const isMe = p.id === myWallet;

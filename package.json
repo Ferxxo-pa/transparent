@@ -8,13 +8,15 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "test": "node --experimental-strip-types --test tests/room-refresh.test.ts tests/cards.test.ts tests/cors-spice.test.ts tests/questions-validate.test.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
     "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
     "@privy-io/react-auth": "^3.13.1",
     "@solana-program/memo": "^0.11.0",
+    "@solana/kit": "^6.10.0",
     "@solana/spl-token": "^0.4.14",
     "@solana/wallet-adapter-base": "^0.9.27",
     "@solana/wallet-adapter-phantom": "^0.9.28",

@@ -4,13 +4,14 @@ import { Search } from 'lucide-react';
 
 interface Props {
   questions: string[];
+  allowedIndices?: number[];
   usedIndices: number[];
   hotSeatPlayerName: string;
   onPick: (question: string, index: number) => void;
   onSendToVote: (questions: string[], indices: number[]) => void;
 }
 
-export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, hotSeatPlayerName, onPick, onSendToVote }) => {
+export const HostQuestionPicker: React.FC<Props> = ({ questions, allowedIndices, usedIndices, hotSeatPlayerName, onPick, onSendToVote }) => {
   const [search, setSearch] = useState('');
   const [customQ, setCustomQ] = useState('');
   const [selected, setSelected] = useState<number[]>([]);
@@ -20,8 +21,8 @@ export const HostQuestionPicker: React.FC<Props> = ({ questions, usedIndices, ho
     const term = search.toLowerCase();
     return questions
       .map((q, i) => ({ q, i, used: usedIndices.includes(i) }))
-      .filter(({ q, used }) => !used && (!term || q.toLowerCase().includes(term)));
-  }, [questions, usedIndices, search]);
+      .filter(({ q, i, used }) => !used && (!allowedIndices || allowedIndices.includes(i)) && (!term || q.toLowerCase().includes(term)));
+  }, [questions, allowedIndices, usedIndices, search]);
 
   const handleCustom = () => {
     if (!customQ.trim()) return;

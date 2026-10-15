@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, CheckCheck, LogOut, ExternalLink } from 'lucide-react';
+import { usePrivy } from '@privy-io/react-auth';
 import { usePrivyWallet } from '../contexts/PrivyContext';
+import { fetchCreditsBalance } from '../lib/credits';
 import { useWalletBalance } from '../hooks/useWalletBalance';
 import { useSolPrice, solToUsd } from '../hooks/useSolPrice';
 import { SolMark } from './SolMark';
@@ -13,9 +15,23 @@ interface Props {
 
 export const WalletDrawer: React.FC<Props> = ({ open, onClose }) => {
   const { publicKey, displayName, logout, walletType } = usePrivyWallet();
+  const { authenticated, getAccessToken } = usePrivy();
   const balance = useWalletBalance(publicKey);
   const solPrice = useSolPrice();
   const [copied, setCopied] = useState(false);
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!open || !authenticated) return;
+    let cancelled = false;
+    getAccessToken().then((token) => {
+      if (!token || cancelled) return;
+      return fetchCreditsBalance(token);
+    }).then((value) => {
+      if (!cancelled && typeof value === 'number') setCredits(value);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, authenticated, getAccessToken]);
 
   const address = publicKey?.toBase58() ?? '';
   const shortAddr = address ? `${address.slice(0, 6)}...${address.slice(-6)}` : '';
@@ -108,6 +124,12 @@ export const WalletDrawer: React.FC<Props> = ({ open, onClose }) => {
                   fund with devnet sol to play
                 </p>
               )}
+              <p className="mono" style={{ fontSize: 12, color: 'var(--ink)', marginTop: 12 }}>
+                {credits === null ? 'credits —' : `${credits} credits`}
+              </p>
+              <p className="mono" style={{ fontSize: 10, color: 'var(--ink-faint)', marginTop: 4 }}>
+                in-game only · no transfer · no cash-out
+              </p>
             </div>
 
             {/* QR Code */}
